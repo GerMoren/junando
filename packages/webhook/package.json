@@ -2,7 +2,7 @@
   "name": "@junando/webhook",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/handler.js",
   "scripts": {
     "build": "tsup src/handler.ts --format cjs --no-splitting",
