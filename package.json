@@ -1,0 +1,33 @@
+{
+  "name": "junando",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "oxlint packages/*/src",
+    "format": "prettier --write packages/*/src scripts",
+    "typecheck": "pnpm -r run typecheck",
+    "dev:webhook": "tsx --env-file=.env.local watch scripts/dev-server.ts",
+    "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
+    "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
+    "generate:alert": "tsx scripts/generate-alert.ts",
+    "clean": "pnpm -r run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "oxlint": "^0.13.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
