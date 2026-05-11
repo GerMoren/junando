@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@junando/core": "workspace:*",
-    "@aws-sdk/client-sqs": "^3.600.0"
+    "@aws-sdk/client-sqs": "^3.600.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",

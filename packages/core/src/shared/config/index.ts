@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config — reads and validates all env vars at startup.
@@ -7,47 +7,45 @@ import { z } from "zod";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ConfigSchema = z.object({
-  llmProvider: z.enum(["gemini", "claude"]),
+  llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
   llmApiKey: z.string().min(1),
   llmModel: z.string().optional(),
-  slackBotToken: z.string().startsWith("xoxb-"),
+  slackBotToken: z.string().startsWith('xoxb-'),
   slackSigningSecret: z.string().min(1),
-  slackChannel: z.string().startsWith("#"),
+  slackChannel: z.string().startsWith('#'),
   lokiUrl: z.string().url(),
   redisUrl: z.string().url(),
-  sqsQueueUrl: z.string().url().optional(),
+  sqsQueueUrl: z.string().url().optional().or(z.literal('')),
   dedupTtlSeconds: z.coerce.number().int().positive().default(300),
   clusterWindowMs: z.coerce.number().int().positive().default(120_000),
-  logLevel: z.enum(["trace", "debug", "info", "warn", "error"]).default("info"),
-  nodeEnv: z.enum(["development", "test", "production"]).default("development"),
+  logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+  nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
 
 export function loadConfig(): Config {
   const result = ConfigSchema.safeParse({
-    llmProvider: process.env["LLM_PROVIDER"],
-    llmApiKey: process.env["LLM_API_KEY"],
-    llmModel: process.env["LLM_MODEL"],
-    slackBotToken: process.env["SLACK_BOT_TOKEN"],
-    slackSigningSecret: process.env["SLACK_SIGNING_SECRET"],
-    slackChannel: process.env["SLACK_CHANNEL"],
-    lokiUrl: process.env["LOKI_URL"],
-    redisUrl: process.env["REDIS_URL"],
-    sqsQueueUrl: process.env["SQS_QUEUE_URL"],
-    dedupTtlSeconds: process.env["DEDUP_TTL_SECONDS"],
-    clusterWindowMs: process.env["CLUSTER_WINDOW_MS"],
-    logLevel: process.env["LOG_LEVEL"],
-    nodeEnv: process.env["NODE_ENV"],
+    llmProvider: process.env['LLM_PROVIDER'],
+    llmApiKey: process.env['LLM_API_KEY'],
+    llmModel: process.env['LLM_MODEL'],
+    slackBotToken: process.env['SLACK_BOT_TOKEN'],
+    slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
+    slackChannel: process.env['SLACK_CHANNEL'],
+    lokiUrl: process.env['LOKI_URL'],
+    redisUrl: process.env['REDIS_URL'],
+    sqsQueueUrl: process.env['SQS_QUEUE_URL'],
+    dedupTtlSeconds: process.env['DEDUP_TTL_SECONDS'],
+    clusterWindowMs: process.env['CLUSTER_WINDOW_MS'],
+    logLevel: process.env['LOG_LEVEL'],
+    nodeEnv: process.env['NODE_ENV'],
   });
 
   if (!result.success) {
     const errorMessages = result.error.issues.map(
-      (issue) => `${issue.path.join(".")}: ${issue.message}`,
+      (issue) => `${issue.path.join('.')}: ${issue.message}`,
     );
-    throw new Error(
-      `Invalid configuration:\n  - ${errorMessages.join("\n  - ")}`,
-    );
+    throw new Error(`Invalid configuration:\n  - ${errorMessages.join('\n  - ')}`);
   }
 
   return result.data;

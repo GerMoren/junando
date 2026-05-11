@@ -41,3 +41,13 @@ coverage/
 
 # Typescript
 *.tsbuildinfo
+
+# Atl (skill registry)
+.atl/
+
+# AI / IDE internals
+.engram/
+.windsurf/
+
+# Temp / testing
+tmp/

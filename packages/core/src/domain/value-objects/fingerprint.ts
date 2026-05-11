@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
-import type { NormalizedAlert } from '../entities/alert.js'
+import { createHash } from 'node:crypto';
+import type { NormalizedAlert } from '../entities/alert.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fingerprint — a Value Object in DDD terms.
@@ -13,19 +13,19 @@ export class Fingerprint {
   static fromAlert(alert: NormalizedAlert): Fingerprint {
     const input = [
       alert.serviceName.toLowerCase().trim(),
-      alert.errorType.toLowerCase().trim(),
+      alert.alertType.toLowerCase().trim(),
       alert.endpointPath.toLowerCase().trim(),
-    ].join('|')
+    ].join('|');
 
-    const hash = createHash('sha256').update(input).digest('hex')
-    return new Fingerprint(hash)
+    const hash = createHash('sha256').update(input).digest('hex');
+    return new Fingerprint(hash);
   }
 
   equals(other: Fingerprint): boolean {
-    return this.value === other.value
+    return this.value === other.value;
   }
 
   toString(): string {
-    return this.value
+    return this.value;
   }
 }

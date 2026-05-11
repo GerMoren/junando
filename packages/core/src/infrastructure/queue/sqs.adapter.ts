@@ -1,9 +1,9 @@
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import type { IAlertQueue } from "../../domain/ports/index.js";
-import type { NormalizedAlert } from "../../domain/entities/alert.js";
-import { randomUUID } from "node:crypto";
-import { createLogger } from "../../shared/logger/index.js";
-import { Fingerprint } from "../../domain/value-objects/fingerprint.js";
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import type { IAlertQueue } from '../../domain/ports/index.js';
+import type { NormalizedAlert } from '../../domain/entities/alert.js';
+import { randomUUID } from 'node:crypto';
+import { createLogger } from '../../shared/logger/index.js';
+import { Fingerprint } from '../../domain/value-objects/fingerprint.js';
 
 const logger = createLogger();
 
@@ -37,10 +37,7 @@ export class SQSAlertQueue implements IAlertQueue {
         }),
       );
     } catch (err) {
-      logger.error(
-        { err, alert: fingerprint },
-        "Failed to publish alert to SQS",
-      );
+      logger.error({ err, alert: fingerprint }, 'Failed to publish alert to SQS');
       throw err;
     }
   }
@@ -56,9 +53,6 @@ export class InMemoryAlertQueue implements IAlertQueue {
   async publish(alert: NormalizedAlert): Promise<void> {
     this.published.push(alert);
     const fingerprint = Fingerprint.fromAlert(alert).toString();
-    logger.info(
-      { alert: fingerprint },
-      "Mocked publishing alert to InMemoryAlertQueue",
-    );
+    logger.info({ alert: fingerprint }, 'Mocked publishing alert to InMemoryAlertQueue');
   }
 }

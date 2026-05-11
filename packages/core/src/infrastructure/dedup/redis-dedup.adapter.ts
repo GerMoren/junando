@@ -1,5 +1,9 @@
-import type { Redis } from 'ioredis'
-import type { IDeduplicationStore } from '../../domain/ports/index.js'
+import type { Redis } from 'ioredis';
+import type { IDeduplicationStore } from '../../domain/ports/index.js';
+import { dedupRedisFailoverTotal } from '../../shared/metrics/index.js';
+import { createLogger } from '../../shared/logger/index.js';
+
+const logger = createLogger();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RedisDeduplicationStore — Infrastructure adapter.
@@ -9,7 +13,7 @@ import type { IDeduplicationStore } from '../../domain/ports/index.js'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class RedisDeduplicationStore implements IDeduplicationStore {
-  private readonly keyPrefix = 'junando:dedup:'
+  private readonly keyPrefix = 'junando:dedup:';
 
   constructor(private readonly redis: Redis) {}
 
@@ -21,16 +25,18 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
         'EX',
         ttlSeconds,
         'NX',
-      )
-      return result === 'OK'
-    } catch {
+      );
+      return result === 'OK';
+    } catch (err) {
+      logger.warn({ err, fingerprint }, 'Redis dedup check failed, failing open');
+      dedupRedisFailoverTotal.inc();
       // Fail open: Redis down → treat every alert as new (noisy but safe)
-      return true
+      return true;
     }
   }
 
   async reset(fingerprint: string): Promise<void> {
-    await this.redis.del(`${this.keyPrefix}${fingerprint}`)
+    await this.redis.del(`${this.keyPrefix}${fingerprint}`);
   }
 }
 
@@ -40,23 +46,23 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class InMemoryDeduplicationStore implements IDeduplicationStore {
-  private store = new Map<string, number>() // fingerprint → expiry timestamp
+  private readonly store = new Map<string, number>(); // fingerprint → expiry timestamp
 
   async isNew(fingerprint: string, ttlSeconds: number): Promise<boolean> {
-    const expiry = this.store.get(fingerprint)
-    const now = Date.now()
+    const expiry = this.store.get(fingerprint);
+    const now = Date.now();
 
-    if (expiry !== undefined && expiry > now) return false
+    if (expiry !== undefined && expiry > now) return false;
 
-    this.store.set(fingerprint, now + ttlSeconds * 1000)
-    return true
+    this.store.set(fingerprint, now + ttlSeconds * 1000);
+    return true;
   }
 
   async reset(fingerprint: string): Promise<void> {
-    this.store.delete(fingerprint)
+    this.store.delete(fingerprint);
   }
 
   clear(): void {
-    this.store.clear()
+    this.store.clear();
   }
 }

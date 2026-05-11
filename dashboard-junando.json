@@ -1,0 +1,48 @@
+{
+  "id": null,
+  "uid": "junando-pipeline",
+  "title": "Junando AIOps Pipeline",
+  "tags": ["junando"],
+  "timezone": "browser",
+  "schemaVersion": 16,
+  "version": 0,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "type": "stat",
+      "title": "Total Alerts",
+      "targets": [
+        {
+          "expr": "junando_alerts_received_total",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "type": "stat",
+      "title": "Webhook Requests",
+      "targets": [
+        {
+          "expr": "junando_webhooks_total",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "type": "stat",
+      "title": "Pipeline Status",
+      "targets": [
+        {
+          "expr": "up{job=\"junando\"}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

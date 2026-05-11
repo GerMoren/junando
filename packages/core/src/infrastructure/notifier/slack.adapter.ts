@@ -1,9 +1,19 @@
-import type { INotifier } from "../../domain/ports/index.js";
-import type { AlertCluster } from "../../domain/entities/cluster.js";
-import type { LLMAnalysis } from "../../domain/entities/incident.js";
-import { createLogger } from "../../shared/logger/index.js";
+import type { AlertCluster } from '../../domain/entities/cluster.js';
+import type { LLMAnalysis } from '../../domain/entities/incident.js';
+import type { INotifier } from '../../domain/ports/index.js';
+import { HTTP_TIMEOUT_MS, SLACK_API_URL, URGENCY_EMOJI } from '../../shared/constants.js';
+import { createLogger } from '../../shared/logger/index.js';
 
 const logger = createLogger();
+
+/**
+ * Sanitizes endpointPath for safe rendering in Slack Block Kit.
+ * Strips backticks (prevent markup injection) and limits length.
+ */
+function sanitizeEndpointPath(endpointPath: string | undefined): string {
+  if (!endpointPath) return 'unknown';
+  return endpointPath.replaceAll('`', '').slice(0, 200);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SlackNotifier — Infrastructure adapter.
@@ -11,35 +21,25 @@ const logger = createLogger();
 // Swap for TeamsNotifier without touching application or domain code.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const URGENCY_EMOJI: Record<string, string> = {
-  critical: "🔴",
-  high: "🟠",
-  medium: "🟡",
-  low: "🟢",
-};
-
 export class SlackNotifier implements INotifier {
   constructor(
     private readonly botToken: string,
     private readonly channel: string,
   ) {}
 
-  async send(
-    cluster: AlertCluster,
-    analysis: LLMAnalysis | null,
-  ): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
     const payload = analysis
       ? this.buildAnalysisMessage(cluster, analysis)
       : this.buildFallbackMessage(cluster);
 
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
+    const res = await fetch(SLACK_API_URL, {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         Authorization: `Bearer ${this.botToken}`,
       },
       body: JSON.stringify({ channel: this.channel, ...payload }),
-      signal: AbortSignal.timeout(5000), // 5s timeout
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS.Default),
     });
 
     if (!res.ok) throw new Error(`Slack API error: ${res.status}`);
@@ -47,71 +47,74 @@ export class SlackNotifier implements INotifier {
     if (!body.ok) throw new Error(`Slack error: ${body.error}`);
   }
 
-  private buildAnalysisMessage(cluster: AlertCluster, analysis: LLMAnalysis) {
-    const emoji = URGENCY_EMOJI[analysis.urgency_level] ?? "⚪";
-    const steps = analysis.recommended_steps
-      .map((s, i) => `${i + 1}. ${s}`)
-      .join("\n");
+  private buildAnalysisMessage(
+    cluster: AlertCluster,
+    analysis: LLMAnalysis,
+  ): { blocks: unknown[] } {
+    const emoji = URGENCY_EMOJI[analysis.urgency_level] ?? '⚪';
+    const steps = analysis.recommended_steps.map((s, i) => `${i + 1}. ${s}`).join('\n');
+
+    const safeEndpointPath = sanitizeEndpointPath(cluster.endpointPath);
 
     return {
       blocks: [
         {
-          type: "header",
+          type: 'header',
           text: {
-            type: "plain_text",
+            type: 'plain_text',
             text: `${emoji} Incident — ${cluster.serviceName}`,
           },
         },
         {
-          type: "section",
+          type: 'section',
           fields: [
-            { type: "mrkdwn", text: `*Service*\n${cluster.serviceName}` },
-            { type: "mrkdwn", text: `*Alerts*\n${cluster.alertCount}` },
-            { type: "mrkdwn", text: `*Endpoint*\n\`${cluster.endpointPath}\`` },
+            { type: 'mrkdwn', text: `*Service*\n${cluster.serviceName}` },
+            { type: 'mrkdwn', text: `*Alerts*\n${cluster.alertCount}` },
+            { type: 'mrkdwn', text: `*Endpoint*\n${safeEndpointPath}` },
             {
-              type: "mrkdwn",
+              type: 'mrkdwn',
               text: `*Urgency*\n${emoji} ${analysis.urgency_level.toUpperCase()}`,
             },
           ],
         },
         {
-          type: "section",
+          type: 'section',
           text: {
-            type: "mrkdwn",
+            type: 'mrkdwn',
             text: `*Probable cause*\n${analysis.probable_cause}`,
           },
         },
         {
-          type: "section",
-          text: { type: "mrkdwn", text: `*Recommended steps*\n${steps}` },
+          type: 'section',
+          text: { type: 'mrkdwn', text: `*Recommended steps*\n${steps}` },
         },
-        { type: "divider" },
+        { type: 'divider' },
         {
-          type: "actions",
+          type: 'actions',
           elements: [
             {
-              type: "button",
-              text: { type: "plain_text", text: "✅ Acknowledge" },
-              style: "primary",
-              action_id: "acknowledge",
+              type: 'button',
+              text: { type: 'plain_text', text: '✅ Acknowledge' },
+              style: 'primary',
+              action_id: 'acknowledge',
               value: cluster.fingerprint,
             },
             ...(analysis.requires_rollback
               ? [
                   {
-                    type: "button",
-                    text: { type: "plain_text", text: "⏪ Trigger Rollback" },
-                    style: "danger",
-                    action_id: "trigger_rollback",
+                    type: 'button',
+                    text: { type: 'plain_text', text: '⏪ Trigger Rollback' },
+                    style: 'danger',
+                    action_id: 'trigger_rollback',
                     value: cluster.fingerprint,
                     confirm: {
-                      title: { type: "plain_text", text: "Confirm rollback" },
+                      title: { type: 'plain_text', text: 'Confirm rollback' },
                       text: {
-                        type: "plain_text",
+                        type: 'plain_text',
                         text: `Roll back ${cluster.serviceName}?`,
                       },
-                      confirm: { type: "plain_text", text: "Yes, rollback" },
-                      deny: { type: "plain_text", text: "Cancel" },
+                      confirm: { type: 'plain_text', text: 'Yes, rollback' },
+                      deny: { type: 'plain_text', text: 'Cancel' },
                     },
                   },
                 ]
@@ -122,21 +125,23 @@ export class SlackNotifier implements INotifier {
     };
   }
 
-  private buildFallbackMessage(cluster: AlertCluster) {
+  private buildFallbackMessage(cluster: AlertCluster): { blocks: unknown[] } {
+    const safeEndpointPath = sanitizeEndpointPath(cluster.endpointPath);
+
     return {
       blocks: [
         {
-          type: "header",
+          type: 'header',
           text: {
-            type: "plain_text",
+            type: 'plain_text',
             text: `⚠️ Incident — ${cluster.serviceName} (no AI diagnosis)`,
           },
         },
         {
-          type: "section",
+          type: 'section',
           text: {
-            type: "mrkdwn",
-            text: `*${cluster.alertCount} alerts* on \`${cluster.endpointPath}\` since ${cluster.firstSeenAt}\nLLM analysis unavailable — manual investigation required.`,
+            type: 'mrkdwn',
+            text: `*${cluster.alertCount} alerts* on \`${safeEndpointPath}\` since ${cluster.firstSeenAt}\nLLM analysis unavailable — manual investigation required.`,
           },
         },
       ],
@@ -154,20 +159,17 @@ export class ConsoleNotifier implements INotifier {
     analysis: LLMAnalysis | null;
   }> = [];
 
-  async send(
-    cluster: AlertCluster,
-    analysis: LLMAnalysis | null,
-  ): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
     this.sent.push({ cluster, analysis });
     logger.info(
       {
         cluster: {
           serviceName: cluster.serviceName,
-          errorType: cluster.errorType,
+          alertType: cluster.alertType,
         },
-        analysis: analysis ?? "unavailable",
+        analysis: analysis ?? 'unavailable',
       },
-      "--- Junando Notification ---",
+      '--- Junando Notification ---',
     );
   }
 }

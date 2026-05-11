@@ -2,9 +2,10 @@
   "name": "junando",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "pnpm": ">=9.0.0"
   },
   "scripts": {
@@ -14,15 +15,17 @@
     "test:coverage": "vitest run --coverage",
     "lint": "oxlint packages/*/src",
     "format": "prettier --write packages/*/src scripts",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "tsc --noEmit",
     "dev:webhook": "tsx --env-file=.env.local --watch scripts/dev-server.ts | pino-pretty",
     "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
     "generate:alert": "tsx scripts/generate-alert.ts",
+    "worker:local": "tsx --env-file=.env.local scripts/worker-local.ts",
+    "simulate:incident": "tsx --env-file=.env.local scripts/simulate-incident.ts",
     "clean": "pnpm -r run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "oxlint": "^0.13.0",
     "pino-pretty": "^13.1.3",
@@ -32,6 +35,11 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.1042.0"
+    "@aws-sdk/client-sqs": "^3.1042.0",
+    "@types/ioredis": "^5.0.0",
+    "bottleneck": "^2.19.5",
+    "ioredis": "^5.10.1",
+    "opossum": "^9.0.0",
+    "prom-client": "^15.1.3"
   }
 }

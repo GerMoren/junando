@@ -6,24 +6,29 @@
  *
  * Usage: pnpm run dev:webhook
  */
-import {
-  createServer,
-  type IncomingMessage,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createLogger } from "../packages/core/src/shared/logger/index.js";
+import { createLogger, DEV_SERVER_PORT, RATE_LIMITER } from "@junando/core";
+import Bottleneck from "bottleneck";
 
 const logger = createLogger();
 
+const limiter = new Bottleneck({
+  minTime: RATE_LIMITER.MinTimeMs,
+  maxConcurrent: RATE_LIMITER.MaxConcurrent,
+});
+
 process.env["NODE_ENV"] = "development";
-process.env["SQS_QUEUE_URL"] = ""; // fuerza modo local
+process.env["SQS_QUEUE_URL"] = "";
 
-const PORT = Number(process.env["PORT"] ?? 4000);
+const PORT = Number(process.env["PORT"] ?? DEV_SERVER_PORT);
 
-// Dynamically import the handler so tsx watch reloads it on changes
-async function getHandler() {
-  // Clear module cache on each request in watch mode
+/**
+ * Lazily imports the handler module.
+ * Uses dynamic import to support tsx watch mode hot-reload.
+ * The handler is re-imported on each request to pick up file changes.
+ */
+async function getHandler(): Promise<(event: any) => Promise<any>> {
   const mod = await import("../packages/webhook/src/handler.js");
   return mod.handler;
 }
@@ -58,33 +63,32 @@ function buildEvent(req: IncomingMessage, body: string) {
   };
 }
 
-const server = createServer(
-  async (req: IncomingMessage, res: ServerResponse) => {
-    const body = await readBody(req);
-    const event = buildEvent(req, body);
+const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+  const body = await readBody(req);
+  const event = buildEvent(req, body);
 
-    try {
-      const handler = await getHandler();
-      const result = await handler(event as never);
+  try {
+    const handler = await getHandler();
+    // Apply rate limiting
+    const result = await limiter.schedule(() => handler(event as never));
 
-      const statusCode =
-        typeof result === "object" && result !== null && "statusCode" in result
-          ? (result as { statusCode: number }).statusCode
-          : 200;
-      const responseBody =
-        typeof result === "object" && result !== null && "body" in result
-          ? (result as { body: string }).body
-          : "";
+    const statusCode =
+      typeof result === "object" && result !== null && "statusCode" in result
+        ? (result as { statusCode: number }).statusCode
+        : 200;
+    const responseBody =
+      typeof result === "object" && result !== null && "body" in result
+        ? (result as { body: string }).body
+        : "";
 
-      res.writeHead(statusCode, { "Content-Type": "application/json" });
-      res.end(responseBody);
-    } catch (err) {
-      logger.error({ err }, "Handler error");
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Internal server error" }));
-    }
-  },
-);
+    res.writeHead(statusCode, { "Content-Type": "application/json" });
+    res.end(responseBody);
+  } catch (err) {
+    logger.error({ err }, "Handler error");
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Internal server error" }));
+  }
+});
 
 server.listen(PORT, () => {
   logger.info(`🔦 Junando webhook running on http://localhost:${PORT}`);

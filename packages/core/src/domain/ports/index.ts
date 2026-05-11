@@ -1,6 +1,6 @@
-import type { NormalizedAlert } from '../entities/alert.js'
-import type { AlertCluster } from '../entities/cluster.js'
-import type { LLMAnalysis } from '../entities/incident.js'
+import type { NormalizedAlert } from '../entities/alert.js';
+import type { AlertCluster } from '../entities/cluster.js';
+import type { LLMAnalysis } from '../entities/incident.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PORTS — interfaces defined by the domain.
@@ -19,8 +19,8 @@ import type { LLMAnalysis } from '../entities/incident.js'
  * Implementations: RedisDeduplicationStore, InMemoryDeduplicationStore (tests)
  */
 export interface IDeduplicationStore {
-  isNew(fingerprint: string, ttlSeconds: number): Promise<boolean>
-  reset(fingerprint: string): Promise<void>
+  isNew(fingerprint: string, ttlSeconds: number): Promise<boolean>;
+  reset(fingerprint: string): Promise<void>;
 }
 
 /**
@@ -29,7 +29,7 @@ export interface IDeduplicationStore {
  * Implementations: SQSAlertQueue, BullMQAlertQueue, InMemoryAlertQueue (tests)
  */
 export interface IAlertQueue {
-  publish(alert: NormalizedAlert): Promise<void>
+  publish(alert: NormalizedAlert): Promise<void>;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface IAlertQueue {
  * Implementations: LokiTraceRepository, DatadogTraceRepository, MockTraceRepository (tests)
  */
 export interface ITraceRepository {
-  findByTraceId(traceId: string): Promise<Record<string, unknown>[]>
+  findByTraceId(traceId: string): Promise<Record<string, unknown>[]>;
 }
 
 /**
@@ -47,7 +47,7 @@ export interface ITraceRepository {
  * Implementations: GeminiProvider, ClaudeProvider, OpenAIProvider, MockLLMProvider (tests)
  */
 export interface ILLMProvider {
-  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis>
+  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis>;
 }
 
 /**
@@ -56,5 +56,5 @@ export interface ILLMProvider {
  * Implementations: SlackNotifier, TeamsNotifier, ConsoleNotifier (local dev/tests)
  */
 export interface INotifier {
-  send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void>
+  send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void>;
 }

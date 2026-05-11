@@ -1,117 +1,282 @@
-import type { ILLMProvider } from '../../domain/ports/index.js'
-import type { AlertCluster } from '../../domain/entities/cluster.js'
-import type { LLMAnalysis } from '../../domain/entities/incident.js'
-import { LLMAnalysisSchema } from '../../domain/entities/incident.js'
+import type { ILLMProvider } from '../../domain/ports/index.js';
+import type { AlertCluster } from '../../domain/entities/cluster.js';
+import type { LLMAnalysis } from '../../domain/entities/incident.js';
+import { LLMAnalysisSchema } from '../../domain/entities/incident.js';
+import * as Breaker from 'opossum';
+import { z } from 'zod';
+import {
+  CIRCUIT_BREAKER,
+  LLM_MAX_TOKENS,
+  LLM_MODELS,
+  LLMProviderType,
+} from '../../shared/constants.js';
+import { createLogger } from '../../shared/logger/index.js';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LLM Adapters — each implements ILLMProvider.
-// Swap providers via LLM_PROVIDER env var. Domain never changes.
-// ─────────────────────────────────────────────────────────────────────────────
+const logger = createLogger();
 
-const SYSTEM_PROMPT = `You are a senior Site Reliability Engineer performing incident triage.
-Analyze the following alert cluster and trace excerpts.
-Respond ONLY with a valid JSON object matching this exact schema — no markdown, no explanation:
-{
-  "probable_cause": "string",
-  "impacted_services": ["string"],
-  "recommended_steps": ["string (max 5 items)"],
-  "urgency_level": "low" | "medium" | "high" | "critical",
-  "requires_rollback": boolean
-}`
+/**
+ * Schema for OpenRouter API response validation.
+ * Ensures type safety at the external boundary.
+ */
+export const OpenRouterResponseSchema = z.object({
+  id: z.string().optional(),
+  choices: z.array(
+    z.object({
+      index: z.number(),
+      message: z.object({
+        role: z.string(),
+        content: z.string().optional(),
+      }),
+      finish_reason: z.string().optional(),
+    }),
+  ),
+  usage: z
+    .object({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+      total_tokens: z.number().optional(),
+    })
+    .optional(),
+});
 
+export type OpenRouterResponse = z.infer<typeof OpenRouterResponseSchema>;
+
+const SYSTEM_PROMPT = `You are a senior Site Reliability Engineer.
+Respond ONLY with raw JSON, no markdown, no text before or after:
+{"probable_cause":"string","impacted_services":["string"],"recommended_steps":["string"],"urgency_level":"low|medium|high|critical","requires_rollback":true|false}`;
+
+/**
+ * Pre-compiled regex patterns for parsing LLM responses.
+ * Hoisted to module level to avoid recompilation on every parseAnalysis call.
+ * Matches JSON field extraction from raw LLM output.
+ */
+const RE_PROBABLE_CAUSE = /"probable_cause"\s*:\s*"([^"]+)"/;
+const RE_URGENCY_LEVEL = /"urgency_level"\s*:\s*"([^"]+)"/;
+const RE_REQUIRES_ROLLBACK = /"requires_rollback"\s*:\s*(true|false)/;
+const RE_RECOMMENDED_STEPS = /"recommended_steps"\s*:\s*\[([^\]]+)\]/;
+const RE_IMPACTED_SERVICES = /"impacted_services"\s*:\s*\[([^\]]+)\]/;
+
+const BREAKER_OPTIONS = {
+  timeout: CIRCUIT_BREAKER.Timeout,
+  errorThresholdPercentage: CIRCUIT_BREAKER.ErrorThresholdPercentage,
+  resetTimeout: CIRCUIT_BREAKER.ResetTimeoutMs,
+};
+
+/**
+ * Builds the user-facing prompt sent to the LLM for analysis.
+ * Includes cluster summary and trace count for context.
+ */
 function buildUserPrompt(cluster: AlertCluster, traces: Record<string, unknown>[]): string {
-  return [
-    `## Alert Cluster`,
-    `Service: ${cluster.serviceName}`,
-    `Error type: ${cluster.errorType}`,
-    `Endpoint: ${cluster.endpointPath}`,
-    `Alert count: ${cluster.alertCount}`,
-    `First seen: ${cluster.firstSeenAt}`,
-    cluster.latencyP99Ms ? `P99 latency: ${cluster.latencyP99Ms}ms` : '',
-    ``,
-    `## Representative Traces (${traces.length} spans)`,
-    JSON.stringify(traces.slice(0, 30), null, 2), // hard cap — never exceed token budget
-  ].filter(Boolean).join('\n')
+  return `Service:${cluster.serviceName} Error:${cluster.alertType} Alerts:${cluster.alertCount} Latency:${cluster.latencyP99Ms ?? 'N/A'} Traces:${traces.length}`;
 }
 
+/**
+ * Extracts LLMAnalysis from raw LLM response text.
+ * Uses multi-stage parsing: JSON → regex fallback → heuristics.
+ * Returns validated LLMAnalysis or falls back to default values.
+ */
 function parseAnalysis(raw: string): LLMAnalysis {
-  const cleaned = raw.replace(/```json|```/g, '').trim()
-  return LLMAnalysisSchema.parse(JSON.parse(cleaned))
+  const startIdx = raw.indexOf('{');
+  const endIdx = raw.lastIndexOf('}');
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    try {
+      return LLMAnalysisSchema.parse(JSON.parse(raw.slice(startIdx, endIdx + 1)));
+    } catch (err) {
+      logger.debug(
+        { err, rawLength: raw.length },
+        'JSON parse failed, falling back to regex extraction',
+      );
+    }
+  }
+
+  const probableCauseMatch = RE_PROBABLE_CAUSE.exec(raw);
+  const urgencyMatch = RE_URGENCY_LEVEL.exec(raw);
+  const rollbackMatch = RE_REQUIRES_ROLLBACK.exec(raw);
+  const stepsMatch = RE_RECOMMENDED_STEPS.exec(raw);
+  const servicesMatch = RE_IMPACTED_SERVICES.exec(raw);
+
+  const probableCause = probableCauseMatch?.[1];
+  const urgency = urgencyMatch?.[1];
+
+  if (probableCause && urgency) {
+    const steps: string[] = stepsMatch?.[1] ? (JSON.parse(`[${stepsMatch[1]}]`) as string[]) : [];
+    const services: string[] = servicesMatch?.[1]
+      ? (JSON.parse(`[${servicesMatch[1]}]`) as string[])
+      : ['unknown-service'];
+    const analysis: LLMAnalysis = {
+      probable_cause: probableCause,
+      impacted_services: services,
+      recommended_steps: steps,
+      urgency_level: urgency as LLMAnalysis['urgency_level'],
+      requires_rollback: rollbackMatch?.[1] === 'true',
+    };
+    return LLMAnalysisSchema.parse(analysis);
+  }
+
+  const lowerRaw = raw.toLowerCase();
+  let urgencyLevel: LLMAnalysis['urgency_level'] = 'medium';
+  if (lowerRaw.includes('critical') || lowerRaw.includes('severity 1')) urgencyLevel = 'critical';
+  else if (lowerRaw.includes('high') || lowerRaw.includes('severity 2')) urgencyLevel = 'high';
+  else if (lowerRaw.includes('low')) urgencyLevel = 'low';
+
+  return LLMAnalysisSchema.parse({
+    probable_cause: 'Analysis in progress - check logs for details',
+    impacted_services: ['unknown-service'],
+    recommended_steps: ['Review incident details in logs'],
+    urgency_level: urgencyLevel,
+    requires_rollback: lowerRaw.includes('rollback') || lowerRaw.includes('revert'),
+  });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GeminiProvider
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * Gemini LLM provider using Google Generative AI SDK.
+ * Wrapped with circuit breaker for resilience.
+ */
 export class GeminiProvider implements ILLMProvider {
+  private readonly breaker: InstanceType<typeof Breaker.default>;
+
   constructor(
     private readonly apiKey: string,
-    private readonly model = 'gemini-1.5-flash',
-  ) {}
+    private readonly model: string = LLM_MODELS.Gemini,
+  ) {
+    this.breaker = new Breaker.default(this.analyzeRaw.bind(this), BREAKER_OPTIONS);
+  }
 
   async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai')
-    const genAI = new GoogleGenerativeAI(this.apiKey)
-    const gemini = genAI.getGenerativeModel({ model: this.model, systemInstruction: SYSTEM_PROMPT })
+    try {
+      return (await this.breaker.fire(cluster, traces)) as LLMAnalysis;
+    } catch {
+      return this.analyzeRaw(cluster, traces);
+    }
+  }
 
-    const result = await gemini.generateContent(buildUserPrompt(cluster, traces))
-    return parseAnalysis(result.response.text())
+  private async analyzeRaw(
+    cluster: AlertCluster,
+    traces: Record<string, unknown>[],
+  ): Promise<LLMAnalysis> {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(this.apiKey);
+    const gemini = genAI.getGenerativeModel({
+      model: this.model,
+      systemInstruction: SYSTEM_PROMPT,
+    });
+
+    const result = await gemini.generateContent(buildUserPrompt(cluster, traces));
+    return parseAnalysis(result.response.text());
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ClaudeProvider
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * Claude LLM provider using Anthropic SDK.
+ * Supports Claude Haiku and other models.
+ */
 export class ClaudeProvider implements ILLMProvider {
   constructor(
     private readonly apiKey: string,
-    private readonly model = 'claude-haiku-4-5',
+    private readonly model: string = LLM_MODELS.Claude,
   ) {}
 
   async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: this.apiKey })
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const client = new Anthropic({ apiKey: this.apiKey });
 
     const message = await client.messages.create({
       model: this.model,
-      max_tokens: 1024,
+      max_tokens: LLM_MAX_TOKENS,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: buildUserPrompt(cluster, traces) }],
-    })
+    });
 
-    const text = message.content.find((b) => b.type === 'text')?.text ?? ''
-    return parseAnalysis(text)
+    const text = message.content.find((b) => b.type === 'text')?.text ?? '';
+    return parseAnalysis(text);
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MockLLMProvider — Test adapter. Returns deterministic analysis.
-// ─────────────────────────────────────────────────────────────────────────────
-
+/**
+ * Mock LLM provider for testing and local development.
+ * Returns deterministic responses without external API calls.
+ */
 export class MockLLMProvider implements ILLMProvider {
-  readonly callLog: Array<{ cluster: AlertCluster }> = []
+  readonly callLog: Array<{ cluster: AlertCluster }> = [];
 
   async analyze(cluster: AlertCluster, _traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
-    this.callLog.push({ cluster })
+    this.callLog.push({ cluster });
     return {
-      probable_cause:    `Mock: ${cluster.errorType} on ${cluster.serviceName}`,
+      probable_cause: `Mock: ${cluster.alertType} on ${cluster.serviceName}`,
       impacted_services: [cluster.serviceName],
       recommended_steps: ['Check the logs', 'Verify the deployment'],
-      urgency_level:     'high',
+      urgency_level: 'high',
       requires_rollback: false,
-    }
+    };
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// createLLMProvider() — factory, reads LLM_PROVIDER env var
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * OpenRouter LLM provider using OpenAI-compatible API.
+ * Supports various open models (Qwen, etc.) via OpenRouter gateway.
+ */
+export class OpenRouterProvider implements ILLMProvider {
+  constructor(
+    private readonly apiKey: string,
+    private readonly model: string = 'qwen/qwen-2.5-72b-instruct',
+  ) {}
+
+  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+        'HTTP-Referer': 'http://localhost:4000',
+        'X-Title': 'Junando SRE',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildUserPrompt(cluster, traces) },
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`OpenRouter API failed: ${res.status}`);
+    }
+
+    const raw = await res.json();
+    const parsed = OpenRouterResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      logger.debug({ error: parsed.error.format() }, 'OpenRouter response validation failed');
+    }
+    const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
+    return parseAnalysis(text);
+  }
+}
+
+/**
+ * Factory type for creating LLM providers.
+ * Takes API key and optional model override.
+ */
+type LLMFactory = (apiKey: string, model?: string) => ILLMProvider;
+
+/**
+ * Registry mapping provider names to their factory functions.
+ * Used by createLLMProvider to instantiate the appropriate LLM client.
+ */
+const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, LLMFactory>([
+  [LLMProviderType.Gemini, (apiKey, model) => new GeminiProvider(apiKey, model)],
+  [LLMProviderType.Claude, (apiKey, model) => new ClaudeProvider(apiKey, model)],
+  ['openrouter', (apiKey, model) => new OpenRouterProvider(apiKey, model)],
+  ['qwen', (apiKey, model) => new OpenRouterProvider(apiKey, model)],
+]);
 
 export function createLLMProvider(provider: string, apiKey: string, model?: string): ILLMProvider {
-  switch (provider) {
-    case 'gemini': return new GeminiProvider(apiKey, model)
-    case 'claude': return new ClaudeProvider(apiKey, model)
-    default: throw new Error(`Unknown LLM_PROVIDER: "${provider}". Supported: gemini, claude`)
+  const factory = LLM_PROVIDER_REGISTRY.get(provider);
+  if (!factory) {
+    const supported = Array.from(LLM_PROVIDER_REGISTRY.keys()).join(', ');
+    throw new Error(`Unknown LLM_PROVIDER: "${provider}". Supported: ${supported}`);
   }
+  return factory(apiKey, model);
 }

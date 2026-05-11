@@ -1,0 +1,78 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["import", "typescript", "unicorn"],
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "rules": {
+    "@typescript-eslint/consistent-type-imports": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": "error",
+    "@typescript-eslint/no-unused-vars": "error",
+    "@typescript-eslint/no-magic-numbers": [
+      "error",
+      {
+        "ignore": [0, 1, -1, 100, 1000],
+        "ignoreArrayIndexes": true,
+        "ignoreEnums": true
+      }
+    ],
+    "no-empty": ["error", "allowEmptyLoops"],
+    "complexity": ["error", 15],
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-magic-numbers": "off",
+    "unicorn/better-regex": "warn",
+    "unicorn/catch-error-name": "warn",
+    "unicorn/consistent-function-scoping": "warn",
+    "unicorn/empty-braces": "warn",
+    "unicorn/Error": "warn",
+    "unicorn/escape-case": "warn",
+    "unicorn/expiring-todo-comments": "warn",
+    "unicorn/explicit-length-check": "warn",
+    "unicorn/filename-case": "warn",
+    "unicorn/new-for-builtins": "warn",
+    "unicorn/no-abusive-eslint-disable": "warn",
+    "unicorn/no-array-instanceof": "warn",
+    "unicorn/no-await-expression-promise": "warn",
+    "unicorn/no-for-loop": "warn",
+    "unicorn/no-hex-escape": "warn",
+    "unicorn/no-new-buffer": "warn",
+    "unicorn/no-unreadable-array-destructuring": "warn",
+    "unicorn/no-zero-fractions": "warn",
+    "unicorn/number-literal-case": "warn",
+    "unicorn/prefer-add-event-listener": "warn",
+    "unicorn/prefer-array-find": "warn",
+    "unicorn/prefer-includes": "warn",
+    "unicorn/prefer-modern-dom-apis": "warn",
+    "unicorn/prefer-native-coercion-functions": "warn",
+    "unicorn/prefer-node-protocols": "warn",
+    "unicorn/prefer-number-properties": "warn",
+    "unicorn/prefer-optional-catch-binding": "warn",
+    "unicorn/prefer-string-replace-all": "warn",
+    "unicorn/prefer-string-slice": "warn",
+    "unicorn/prefer-type-error": "warn",
+    "unicorn/throw-error": "warn",
+    "import/no-cycle": "error",
+    "import/no-unused-modules": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["*.test.ts", "*.spec.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-magic-numbers": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "complexity": "off",
+        "no-empty": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/explicit-function-return-type": "off"
+      }
+    }
+  ]
+}

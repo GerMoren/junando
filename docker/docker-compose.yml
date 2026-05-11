@@ -36,4 +36,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
-    volumes: ['./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml']
+    volumes:
+      - './grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml'
+      - './grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml'
+      - '../dashboard-junando.json:/var/lib/grafana/dashboards/dashboard-junando.json'

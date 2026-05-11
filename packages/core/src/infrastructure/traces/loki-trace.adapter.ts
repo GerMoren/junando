@@ -1,4 +1,5 @@
-import type { ITraceRepository } from "../../domain/ports/index.js";
+import type { ITraceRepository } from '../../domain/ports/index.js';
+import { HTTP_TIMEOUT_MS } from '../../shared/constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LokiTraceRepository — Infrastructure adapter.
@@ -17,16 +18,15 @@ export class LokiTraceRepository implements ITraceRepository {
     const url = `${this.lokiUrl}/loki/api/v1/query_range?query=${query}&limit=50`;
 
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     };
-    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+    if (this.apiKey) headers['Authorization'] = `Bearer ${this.apiKey}`;
 
     const res = await fetch(url, {
       headers,
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS.Default),
     });
-    if (!res.ok)
-      throw new Error(`Loki query failed: ${res.status} ${res.statusText}`);
+    if (!res.ok) throw new Error(`Loki query failed: ${res.status} ${res.statusText}`);
 
     const body = (await res.json()) as LokiResponse;
     return this.parseResponse(body);
@@ -55,12 +55,7 @@ export class LokiTraceRepository implements ITraceRepository {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class MockTraceRepository implements ITraceRepository {
-  constructor(
-    private readonly fixtures: Map<
-      string,
-      Record<string, unknown>[]
-    > = new Map(),
-  ) {}
+  constructor(private readonly fixtures: Map<string, Record<string, unknown>[]> = new Map()) {}
 
   async findByTraceId(traceId: string): Promise<Record<string, unknown>[]> {
     return this.fixtures.get(traceId) ?? [];

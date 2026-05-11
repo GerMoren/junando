@@ -13,7 +13,8 @@
     "@junando/core": "workspace:*",
     "@aws-sdk/client-sqs": "^3.600.0",
     "@aws-sdk/client-ssm": "^3.600.0",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
