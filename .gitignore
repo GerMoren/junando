@@ -51,3 +51,10 @@ coverage/
 
 # Temp / testing
 tmp/
+
+# Infrastructure
+cdk.out/
+.pnpm-debug.log*
+
+# Docker local data (preventivo)
+docker/*/data/

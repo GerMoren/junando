@@ -19,7 +19,9 @@
     "dev:webhook": "tsx --env-file=.env.local --watch scripts/dev-server.ts | pino-pretty",
     "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
-    "generate:alert": "tsx scripts/generate-alert.ts",
+    "generate:alert": "tsx --env-file=.env.local scripts/generate-alert.ts",
+    "generate:alert:prod": "tsx --env-file=.env.production scripts/generate-alert.ts",
+
     "worker:local": "tsx --env-file=.env.local scripts/worker-local.ts",
     "simulate:incident": "tsx --env-file=.env.local scripts/simulate-incident.ts",
     "clean": "pnpm -r run clean && rm -rf node_modules"
@@ -36,6 +38,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1042.0",
+    "@aws-sdk/client-ssm": "^3.1042.0",
     "@types/ioredis": "^5.0.0",
     "bottleneck": "^2.19.5",
     "ioredis": "^5.10.1",
