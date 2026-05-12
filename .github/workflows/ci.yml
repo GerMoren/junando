@@ -81,8 +81,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: CDK Build
-        run: pnpm --filter @junando/cdk run build
+      - name: Build all packages
+        run: pnpm build
 
       - name: CDK Synth (verify stack synthesis)
         run: pnpm --filter @junando/cdk run synth

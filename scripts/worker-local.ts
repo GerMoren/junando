@@ -33,7 +33,7 @@ const logger = createLogger();
 const args = process.argv.slice(2);
 
 async function main() {
-  const config = loadConfig();
+  const config = await loadConfig();
 
   logger.info("Initializing worker-local...");
 
@@ -190,7 +190,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err: any) {
   logger.fatal({ err }, "Fatal error in worker-local");
   process.exit(1);
-});
+}
