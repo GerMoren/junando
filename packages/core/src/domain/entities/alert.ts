@@ -10,11 +10,12 @@ import { AlertType } from '../../shared/constants.js';
 export const AlertStatusSchema = z.enum(['firing', 'resolved']);
 
 export const NormalizedAlertSchema = z.object({
+  fingerprint: z.string(),
   alertName: z.string(),
   status: AlertStatusSchema,
-  serviceName: z.string(), // fingerprint field #1
-  alertType: z.nativeEnum(AlertType), // fingerprint field #2 — typed, never a raw string
-  endpointPath: z.string(), // fingerprint field #3
+  serviceName: z.string(),
+  alertType: z.nativeEnum(AlertType),
+  endpointPath: z.string(),
   traceId: z.string().optional(),
   startsAt: z.string().datetime(),
   latencyMs: z.number().optional(),
