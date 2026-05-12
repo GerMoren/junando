@@ -88,9 +88,9 @@ function verifySlackSignature(
 // No business logic here. Just boundary validation and enqueue.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
-
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
+
   const correlationId = randomUUID();
 
   // Health check

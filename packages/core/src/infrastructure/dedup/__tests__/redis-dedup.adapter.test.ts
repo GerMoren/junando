@@ -8,10 +8,18 @@ describe('RedisDeduplicationStore', () => {
   };
 
   let store: RedisDeduplicationStore;
+  // Silence warn logs from fail-open behavior
+  let loggerWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     store = new RedisDeduplicationStore(mockRedis as any);
+    // Mock the module-level logger used by RedisDeduplicationStore
+    loggerWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    loggerWarnSpy.mockRestore();
   });
 
   it('isNew: returns true and sets key with TTL when fingerprint is new', async () => {
