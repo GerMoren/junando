@@ -9,5 +9,7 @@ route:
 receivers:
   - name: junando
     webhook_configs:
-      - url: 'http://host.docker.internal:4000/webhook/alert'
+      # Para local development: usar http://host.docker.internal:4000/webhook/alert
+      # Para producción: configurar JUNANDO_WEBHOOK_URL en environment
+      - url: '${JUNANDO_WEBHOOK_URL:-http://host.docker.internal:4000/webhook/alert}'
         send_resolved: true

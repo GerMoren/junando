@@ -26,8 +26,12 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     ports: ['9093:9093']
-    volumes: ['./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml']
-    command: ['--config.file=/etc/alertmanager/alertmanager.yml']
+    volumes:
+      - './alertmanager/alertmanager.yml.template:/etc/alertmanager/alertmanager.yml.template:ro'
+      - './alertmanager/start.sh:/entrypoint.sh:ro'
+    environment:
+      - JUNANDO_WEBHOOK_URL=${JUNANDO_WEBHOOK_URL:-http://host.docker.internal:4000/webhook/alert}
+    entrypoint: ['/bin/sh', '/entrypoint.sh']
 
   grafana:
     image: grafana/grafana:11.1.0
