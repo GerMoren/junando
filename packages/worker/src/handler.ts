@@ -23,44 +23,57 @@ const SQSMessageSchema = z.object({
   alerts: z.array(
     z.object({
       fingerprint: z.string(),
+      alertName: z.string(),
+      status: z.string(),
       serviceName: z.string(),
       alertType: z.string(),
       endpointPath: z.string(),
-      latencyP99Ms: z.number().optional(),
-      labels: z.record(z.string(), z.string()).optional(),
-      annotations: z
-        .object({
-          summary: z.string().optional(),
-          description: z.string().optional(),
-        })
-        .optional(),
+      traceId: z.string().optional(),
+      startsAt: z.string(),
+      latencyMs: z.number().optional(),
+      labels: z.record(z.string()),
+      annotations: z.record(z.string()),
     }),
   ),
 });
 
 export type SQSMessage = z.infer<typeof SQSMessageSchema>;
 
-// Initialize once per Lambda container (warm starts reuse these)
-const config = loadConfig();
-const logger = createLogger(config.logLevel);
-const redis = new Redis(config.redisUrl, { lazyConnect: true });
+// Lazy initialization - config and dependencies loaded on first invocation
+// This allows SSM secrets to be read at runtime (avoids SecureString CDK issue)
+let useCase: ProcessIncidentUseCase;
+let logger: ReturnType<typeof createLogger>;
 
-// Wire up adapters — swap any of these without touching use case or domain
-const dedup = new RedisDeduplicationStore(redis);
-const traces = new LokiTraceRepository(config.lokiUrl);
-const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
-const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+async function getUseCase(): Promise<ProcessIncidentUseCase> {
+  if (useCase) {
+    return useCase;
+  }
 
-const useCase = new ProcessIncidentUseCase({
-  dedup,
-  traces,
-  llm,
-  notifier,
-  logger,
-  dedupTtlSeconds: config.dedupTtlSeconds,
-});
+  const config = await loadConfig();
+  logger = createLogger(config.logLevel);
+
+  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+
+  const dedup = new RedisDeduplicationStore(redis);
+  const traces = new LokiTraceRepository(config.lokiUrl);
+  const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
+  const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+
+  useCase = new ProcessIncidentUseCase({
+    dedup,
+    traces,
+    llm,
+    notifier,
+    logger,
+    dedupTtlSeconds: config.dedupTtlSeconds,
+  });
+
+  return useCase;
+}
 
 export const handler = async (event: SQSEvent): Promise<void> => {
+  const useCaseInstance = await getUseCase();
+
   for (const record of event.Records) {
     // Validate SQS message body with Zod before processing
     let parsed: SQSMessage;
@@ -79,6 +92,9 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     }
 
     // If this throws, SQS retries automatically. After max retries → DLQ.
-    await useCase.execute(parsed.alerts as unknown as NormalizedAlert[], parsed.correlationId);
+    await useCaseInstance.execute(
+      parsed.alerts as unknown as NormalizedAlert[],
+      parsed.correlationId,
+    );
   }
 };

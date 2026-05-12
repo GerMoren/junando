@@ -1,13 +1,13 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import {
   AlertmanagerPayloadSchema,
-  normalizePayload,
   createLogger,
-  metrics,
   loadConfig,
+  metrics,
+  normalizePayload,
 } from '@junando/core';
-import { randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 const logger = createLogger();
@@ -88,7 +88,6 @@ function verifySlackSignature(
 // No business logic here. Just boundary validation and enqueue.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const sqs = new SQSClient({});
 const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
@@ -134,7 +133,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       return { statusCode: 400, body: 'Missing payload parameter' };
     }
 
-    const config = loadConfig();
+    const config = await loadConfig();
     const slackSignature = event.headers['x-slack-signature'];
     const slackTimestamp = event.headers['x-slack-request-timestamp'];
 
@@ -214,6 +213,9 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
   // Publish to SQS — this is the only AWS call in Lambda A
   if (QUEUE_URL) {
+    // Initialize SQSClient inside the handler to avoid module-level AWS credential errors in local dev
+    const sqs = new SQSClient({});
+
     // Check message size before publishing (SQS 256KB limit)
     const messageBody = { correlationId, alerts };
     const messageSize = Buffer.byteLength(JSON.stringify(messageBody), 'utf8');
@@ -224,9 +226,9 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       // Truncate annotations to fit within limit
       const truncatedAlerts = alerts.map((alert) => ({
         ...alert,
-        annotations: alert.annotations 
+        annotations: alert.annotations
           ? Object.fromEntries(
-              Object.entries(alert.annotations).map(([k, v]) => [k, v.slice(0, 1000)])
+              Object.entries(alert.annotations).map(([k, v]) => [k, v.slice(0, 1000)]),
             )
           : {},
       }));
@@ -265,7 +267,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     } = await import('@junando/core');
 
     try {
-      const config = loadConfig();
+      const config = await loadConfig();
       const dedup = new InMemoryDeduplicationStore();
       const traces = new MockTraceRepository();
 

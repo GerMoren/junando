@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: junando
+receivers:
+  - name: junando
+    webhook_configs:
+      # Local dev: set JUNANDO_WEBHOOK_URL=http://host.docker.internal:4000/webhook/alert
+      # Production: set JUNANDO_WEBHOOK_URL=https://your-lambda-url.lambda-url.region.on.aws/
+      - url: '${JUNANDO_WEBHOOK_URL}'
+        send_resolved: true

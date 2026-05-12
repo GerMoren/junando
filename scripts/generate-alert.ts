@@ -17,7 +17,7 @@ import {
 import { createLogger } from "../packages/core/src/shared/logger/index.js";
 
 const logger = createLogger();
-const WEBHOOK_URL = process.env["WEBHOOK_URL"] ?? WEBHOOK_DEFAULTS.WebhookUrl;
+const WEBHOOK_URL = process.env["JUNANDO_WEBHOOK_URL"] ?? WEBHOOK_DEFAULTS.WebhookUrl;
 
 const args = process.argv.slice(2);
 
@@ -85,7 +85,16 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  logger.fatal({ err }, "Fatal error in generate-alert");
+try {
+  await main();
+} catch (err: any) {
+  if (err.code === "ECONNREFUSED") {
+    logger.fatal(
+      { err, url: WEBHOOK_URL },
+      "Connection refused. Is the webhook server running? If you are testing AWS, set WEBHOOK_URL environment variable.",
+    );
+  } else {
+    logger.fatal({ err }, "Fatal error in generate-alert");
+  }
   process.exit(1);
-});
+}

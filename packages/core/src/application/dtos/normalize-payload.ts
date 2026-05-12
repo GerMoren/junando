@@ -23,6 +23,8 @@ export function normalizePayload(payload: AlertmanagerPayload): NormalizedAlert[
     .filter((a) => a.status === 'firing') // ignore resolved alerts in MVP
     .map(
       (a): NormalizedAlert => ({
+        fingerprint:
+          a.fingerprint ?? `${a.labels['alertname']}-${a.labels['service']}-${Date.now()}`,
         alertName: a.labels['alertname'] ?? 'unknown',
         status: a.status,
         serviceName: a.labels['service'] ?? a.labels['job'] ?? 'unknown-service',
