@@ -66,6 +66,7 @@ describe('normalizePayload', () => {
         endpointPath: '/pay',
         traceId: 't1',
         latencyMs: 500,
+        fingerprint: 'fp1',
       }),
     );
 
@@ -77,7 +78,9 @@ describe('normalizePayload', () => {
         endpointPath: '/',
         traceId: 't3',
         latencyMs: undefined,
+        fingerprint: 'fp3',
       }),
     );
+
   });
 });
