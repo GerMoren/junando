@@ -1,3 +1,4 @@
+import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5,6 +6,46 @@ import { z } from 'zod';
 // The process exits immediately if a required variable is missing.
 // No silent failures, no undefined values in the codebase.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Load secrets from SSM using SSM_PREFIX (AWS Lambda deployment)
+async function loadSecretsFromSSM(): Promise<void> {
+  const prefix = process.env.SSM_PREFIX;
+  // Only run in AWS (when SSM_PREFIX is set), skip in local dev
+  if (!prefix) {
+    return;
+  }
+
+  const client = new SSMClient({});
+  const names = [
+    `${prefix}/llm-provider`,
+    `${prefix}/llm-api-key`,
+    `${prefix}/llm-model`,
+    `${prefix}/slack-bot-token`,
+    `${prefix}/slack-signing-secret`,
+    `${prefix}/slack-channel`,
+    `${prefix}/loki-url`,
+    `${prefix}/redis-url`,
+  ];
+
+  try {
+    const result = await client.send(
+      new GetParametersCommand({
+        Names: names,
+        WithDecryption: true,
+      }),
+    );
+
+    for (const param of result.Parameters ?? []) {
+      if (param.Name && param.Value) {
+        // Convert /junando/llm-provider -> LLM_PROVIDER
+        const key = param.Name.replace(`${prefix}/`, '').replaceAll('-', '_').toUpperCase();
+        process.env[key] = param.Value;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load SSM parameters:', err);
+  }
+}
 
 const ConfigSchema = z.object({
   llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
@@ -24,7 +65,9 @@ const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
-export function loadConfig(): Config {
+export async function loadConfig(): Promise<Config> {
+  await loadSecretsFromSSM();
+
   const result = ConfigSchema.safeParse({
     llmProvider: process.env['LLM_PROVIDER'],
     llmApiKey: process.env['LLM_API_KEY'],
