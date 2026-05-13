@@ -60,7 +60,15 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
 }
 
 export const handler = async (event: SQSEvent): Promise<void> => {
-  const useCaseInstance = await getUseCase();
+  let useCaseInstance: ProcessIncidentUseCase;
+  try {
+    useCaseInstance = await getUseCase();
+  } catch (err) {
+    // getUseCase() failed (likely loadConfig/SSM error) — use console as last resort
+    // since logger may not be initialized yet
+    console.error('[junando] FATAL: getUseCase() failed', err);
+    throw err; // re-throw so SQS retries
+  }
 
   for (const record of event.Records) {
     // Validate SQS message body with Zod before processing

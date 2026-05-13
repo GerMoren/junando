@@ -42,6 +42,9 @@ function buildLogger(opts: LoggerOptions): pino.Logger {
       },
       silenceErrors: false,
       replaceTimestamp: false,
+      // Disable batching in Lambda — the process exits before the 5s interval fires
+      // and worker_threads are killed without flushing the buffer.
+      batching: false,
     });
 
     return pino(
