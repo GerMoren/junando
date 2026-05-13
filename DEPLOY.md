@@ -5,6 +5,7 @@ Complete deployment checklist for running Junando on AWS using AWS CDK.
 ## Prerequisites
 
 ### AWS CLI
+
 ```bash
 # Verify AWS CLI is configured
 aws sts get-caller-identity
@@ -14,7 +15,9 @@ aws configure
 ```
 
 ### AWS CDK Bootstrap
+
 Bootstrap CDK in your target account/region (one-time per account/region):
+
 ```bash
 cd packages/cdk
 pnpm install
@@ -22,18 +25,19 @@ pnpm cdk bootstrap
 ```
 
 ### Required IAM Permissions
+
 Your AWS credentials need these permissions:
 
-| Permission | Reason |
-|------------|--------|
-| `cloudformation:*` | CDK creates stacks |
-| `sqs:*` | SQS queues for alert processing |
-| `lambda:*` | Lambdas for webhook + worker |
-| `ssm:GetParameter` | Read secrets from Parameter Store |
-| `kms:Decrypt` | Decrypt SecureString parameters |
-| `iam:*` | Lambda execution roles |
-| `logs:*` | CloudWatch Logs |
-| `cloudwatch:PutMetricAlarm` | DLQ alarm |
+| Permission                  | Reason                            |
+| --------------------------- | --------------------------------- |
+| `cloudformation:*`          | CDK creates stacks                |
+| `sqs:*`                     | SQS queues for alert processing   |
+| `lambda:*`                  | Lambdas for webhook + worker      |
+| `ssm:GetParameter`          | Read secrets from Parameter Store |
+| `kms:Decrypt`               | Decrypt SecureString parameters   |
+| `iam:*`                     | Lambda execution roles            |
+| `logs:*`                    | CloudWatch Logs                   |
+| `cloudwatch:PutMetricAlarm` | DLQ alarm                         |
 
 > **Tip**: Use `AdministratorAccess` for initial setup, then scope down for production.
 
@@ -43,19 +47,23 @@ Your AWS credentials need these permissions:
 
 ### 1. Configure SSM Parameter Store Secrets
 
-Create 7 SecureString parameters in AWS Systems Manager Parameter Store:
+Create 8 SecureString parameters in AWS Systems Manager Parameter Store:
 
-| Parameter | Description | Example Value |
-|-----------|-------------|---------------|
-| `/junando/llm-provider` | AI provider | `openrouter`, `claude`, `gemini`, `qwen` |
-| `/junando/llm-api-key` | API key for LLM | `sk-or-...` |
-| `/junando/slack-bot-token` | Slack bot token | `xoxb-...` |
-| `/junando/slack-signing-secret` | Slack signing secret | `your_signing_secret` |
-| `/junando/slack-channel` | Target Slack channel | `#incidents` |
-| `/junando/loki-url` | Loki URL for logging | `https://your-loki:3100` |
-| `/junando/redis-url` | Redis URL for dedup | `redis://your-redis:6379` |
+| Parameter                       | Description                                               | Example Value                                                   |
+| ------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| `/junando/llm-provider`         | AI provider                                               | `openrouter`, `claude`, `gemini`, `qwen`                        |
+| `/junando/llm-api-key`          | API key for LLM                                           | `sk-or-...`                                                     |
+| `/junando/llm-model`            | Model override (optional but recommended)                 | `google/gemma-4-31b-it:free`                                    |
+| `/junando/slack-bot-token`      | Slack bot token                                           | `xoxb-...`                                                      |
+| `/junando/slack-signing-secret` | Slack signing secret                                      | `your_signing_secret`                                           |
+| `/junando/slack-channel`        | Target Slack channel                                      | `#incidents`                                                    |
+| `/junando/loki-url`             | Grafana Cloud Loki push URL **with embedded credentials** | `https://USER:TOKEN@logs-prod-XXX.grafana.net/loki/api/v1/push` |
+| `/junando/redis-url`            | Redis URL for dedup                                       | `redis://your-redis:6379`                                       |
+
+> **Loki URL gotcha**: Use the **full push path** (`/loki/api/v1/push`) and embed credentials inline (`https://USER:TOKEN@host/...`). The Grafana Cloud token must have the `logs:write` scope. New tokens can take **up to 15 minutes** to propagate — if logs don't appear, wait before debugging.
 
 **Commands to set each parameter:**
+
 ```bash
 aws ssm put-parameter \
   --name /junando/llm-provider \
@@ -66,6 +74,12 @@ aws ssm put-parameter \
 aws ssm put-parameter \
   --name /junando/llm-api-key \
   --value "sk-or-v2-..." \
+  --type SecureString \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /junando/llm-model \
+  --value "google/gemma-4-31b-it:free" \
   --type SecureString \
   --overwrite
 
@@ -89,7 +103,7 @@ aws ssm put-parameter \
 
 aws ssm put-parameter \
   --name /junando/loki-url \
-  --value "https://loki.example.com:3100" \
+  --value "https://USER:TOKEN@logs-prod-XXX.grafana.net/loki/api/v1/push" \
   --type SecureString \
   --overwrite
 
@@ -101,6 +115,17 @@ aws ssm put-parameter \
 ```
 
 > **Note**: The worker Lambda has permission to read only `/junando/*` parameters.
+
+### Required Lambda environment variables
+
+CDK injects these automatically. Both are **required** — without them the Lambda will not load secrets and will fail validation at startup:
+
+| Variable     | Value        | Why                                                    |
+| ------------ | ------------ | ------------------------------------------------------ |
+| `SSM_PREFIX` | `/junando`   | Tells `loadConfig()` to fetch secrets from SSM         |
+| `NODE_ENV`   | `production` | Switches logger and config defaults to production mode |
+
+> ⚠️ **NEVER** use `aws lambda update-function-configuration --environment "Variables={...}"` to change env vars. The AWS CLI **OVERWRITES** all existing env vars instead of merging — you will silently delete `SSM_PREFIX` / `NODE_ENV` and the Lambda will start failing on the next cold start. **Always redeploy via CDK** (`pnpm cdk deploy --all`) to change env vars.
 
 ### 2. Build All Packages
 
@@ -117,6 +142,7 @@ pnpm cdk deploy --all
 ```
 
 Expected output:
+
 ```
  ✅  JunandoStack
 
@@ -128,12 +154,14 @@ JunandoStack.QueueURL = https://sqs.<region>.amazonaws.com/<account>/junando-ale
 ### 4. Verify Deployment
 
 Check CDK outputs:
+
 ```bash
 cd packages/cdk
 pnpm cdk outputs
 ```
 
 Or check in AWS Console:
+
 - **Lambda**: Check `junando-webhook` and `junando-worker` are active
 - **SQS**: Verify `junando-alerts` and `junando-alerts-dlq` exist
 - **CloudWatch**: Check DLQ alarm is created
@@ -146,17 +174,19 @@ Copy the `WebhookURL` from CDK outputs and add to your Alertmanager config:
 receivers:
   - name: junando
     webhook_configs:
-      - url: "https://<id>.lambda-url.<region>.on.aws"
+      - url: 'https://<id>.lambda-url.<region>.on.aws'
 ```
 
 ### 6. Test End-to-End
 
 Generate a test alert:
+
 ```bash
 pnpm run generate:alert
 ```
 
 Monitor in CloudWatch:
+
 ```bash
 # Watch webhook Lambda logs
 aws logs tail /aws/lambda/junando-webhook --follow
@@ -175,6 +205,7 @@ aws sqs get-queue-attributes \
 ## Verification Commands
 
 ### Check Lambda Logs
+
 ```bash
 # Webhook Lambda
 aws logs tail /aws/lambda/junando-webhook --follow
@@ -184,6 +215,7 @@ aws logs tail /aws/lambda/junando-worker --follow
 ```
 
 ### Check SQS Queues
+
 ```bash
 # Main queue
 aws sqs get-queue-attributes \
@@ -197,6 +229,7 @@ aws sqs get-queue-attributes \
 ```
 
 ### Check CloudWatch Alarm
+
 ```bash
 # Describe DLQ alarm
 aws cloudwatch describe-alarms \
@@ -210,6 +243,7 @@ aws cloudwatch describe-alarms \
 ### Production vs Development
 
 The CDK stack uses the default environment (no explicit account/region):
+
 ```typescript
 new JunandoStack(app, 'JunandoStack', { ... })
 ```
@@ -231,6 +265,7 @@ new JunandoStack(app, 'JunandoStack', {
 The stack automatically reads from SSM at deploy time. To change secrets:
 
 1. Update the SSM parameter:
+
    ```bash
    aws ssm put-parameter --name /junando/llm-provider --value "claude" --type SecureString --overwrite
    ```
@@ -242,6 +277,7 @@ The stack automatically reads from SSM at deploy time. To change secrets:
 ## Teardown
 
 Destroy all resources:
+
 ```bash
 cd packages/cdk
 pnpm cdk destroy --all
@@ -254,19 +290,23 @@ pnpm cdk destroy --all
 ## Troubleshooting
 
 ### "Parameter not found" error
+
 - Verify all 7 SSM parameters exist:
   ```bash
   aws ssm get-parameter --name /junando/llm-provider
   ```
 
 ### Lambda timeout errors
+
 - Check worker Lambda timeout (default: 3 minutes)
 - Verify Redis/Loki connectivity from Lambda
 
 ### Messages going to DLQ
+
 - Check CloudWatch alarm: `aws cloudwatch describe-alarms --alarm-name-prefix junando`
 - Review worker Lambda logs for the error
 
 ### Function URL returns 403
+
 - The webhook uses `AuthType.NONE` (public). Ensure you're okay with this.
 - For auth, modify `authType` in the CDK stack and redeploy.
