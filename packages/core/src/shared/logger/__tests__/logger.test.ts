@@ -35,9 +35,15 @@ describe('createLogger', () => {
     });
 
     it('accepts an optional name argument and still returns a valid logger', () => {
-      const log = createLogger('my-service');
+      const log = createLogger({ name: 'my-service' });
       expect(typeof log.info).toBe('function');
       expect(mockLokiTransport).not.toHaveBeenCalled();
+    });
+
+    it('accepts a string level for backwards compatibility', () => {
+      const log = createLogger('debug');
+      expect(typeof log.info).toBe('function');
+      expect(log.level).toBe('debug');
     });
   });
 

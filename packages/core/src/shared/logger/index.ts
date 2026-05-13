@@ -3,7 +3,19 @@ import pinoLoki from 'pino-loki';
 
 export type Logger = pino.Logger;
 
-export function createLogger(name?: string): Logger {
+export interface LoggerOptions {
+  level?: string;
+  name?: string;
+}
+
+export function createLogger(levelOrOptions?: string | LoggerOptions): Logger {
+  const opts: LoggerOptions =
+    typeof levelOrOptions === 'string'
+      ? { level: levelOrOptions }
+      : (levelOrOptions ?? {});
+
+  const level = opts.level ?? 'info';
+  const name = opts.name ?? 'junando';
   const lokiUrl = process.env['LOKI_URL'];
 
   if (lokiUrl) {
@@ -17,7 +29,7 @@ export function createLogger(name?: string): Logger {
       host,
       basicAuth: { username, password },
       labels: {
-        service: name ?? 'junando',
+        service: name,
         environment: process.env['NODE_ENV'] ?? 'production',
       },
       silenceErrors: false,
@@ -26,8 +38,8 @@ export function createLogger(name?: string): Logger {
 
     return pino(
       {
-        level: 'info',
-        base: { service: name ?? 'junando' },
+        level,
+        base: { service: name },
         timestamp: pino.stdTimeFunctions.isoTime,
       },
       transport,
@@ -35,8 +47,8 @@ export function createLogger(name?: string): Logger {
   }
 
   return pino({
-    level: 'info',
-    base: { service: name ?? 'junando' },
+    level,
+    base: { service: name },
     timestamp: pino.stdTimeFunctions.isoTime,
   });
 }
