@@ -162,7 +162,8 @@ describe('OpenRouterProvider', () => {
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe('system');
     expect(body.messages[1].role).toBe('user');
-    expect(body.response_format).toEqual({ type: 'json_object' });
+    // response_format is intentionally omitted — not supported by all OpenRouter models (e.g. Qwen free tier)
+    expect(body.response_format).toBeUndefined();
   });
 
   it('parses LLMAnalysis from response content', async () => {
@@ -191,16 +192,34 @@ describe('OpenRouterProvider', () => {
     expect(result.requires_rollback).toBe(true);
   });
 
-  it('throws when fetch response is not ok', async () => {
+  it('throws when fetch response is not ok (non-retryable status)', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
-      status: 429,
+      status: 500,
       json: async () => ({}),
     });
 
     await expect(provider.analyze(makeCluster(), [])).rejects.toThrow(
-      'OpenRouter API failed: 429',
+      'OpenRouter API failed: 500',
     );
+  });
+
+  it('retries once on 429 and throws if still rate-limited', async () => {
+    vi.useFakeTimers();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { metadata: { retry_after_seconds: 1 } } }),
+    });
+
+    const promise = provider.analyze(makeCluster(), []);
+    // Attach rejection handler immediately to avoid unhandled rejection warnings.
+    const assertion = expect(promise).rejects.toThrow('OpenRouter API failed: 429');
+    // Drain the backoff setTimeout so the second attempt runs.
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it('returns fallback analysis when response JSON is invalid', async () => {

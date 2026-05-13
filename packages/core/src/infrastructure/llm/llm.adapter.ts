@@ -231,56 +231,79 @@ export class OpenRouterProvider implements ILLMProvider {
     logger.debug({ model: this.model, promptLength: prompt.length, correlationId }, 'llm:request:start');
 
     const startMs = Date.now();
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
-        'X-Title': 'Junando SRE',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
 
-    if (!res.ok) {
-      throw new Error(`OpenRouter API failed: ${res.status}`);
-    }
-
-    const latencyMs = Date.now() - startMs;
-    const raw = await res.json();
-    const parsed = OpenRouterResponseSchema.safeParse(raw);
-    if (!parsed.success) {
-      logger.warn({ errors: parsed.error.format(), correlationId }, 'llm:validation:failed');
-    }
-
-    const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
-    const analysis = parseAnalysis(text, correlationId);
-
-    if (parsed.success && parsed.data.usage) {
-      const { prompt_tokens, completion_tokens, total_tokens } = parsed.data.usage;
-      logger.info(
-        {
-          model: this.model,
-          usage: {
-            promptTokens: prompt_tokens,
-            completionTokens: completion_tokens,
-            totalTokens: total_tokens,
-          },
-          latencyMs,
-          correlationId,
+    // Retry once on 429 using the Retry-After header from OpenRouter
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+          'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
+          'X-Title': 'Junando SRE',
         },
-        'llm:request:success',
-      );
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt },
+          ],
+          // Note: json_object response_format is NOT supported by all OpenRouter models.
+          // Qwen free tier ignores it or returns an error — rely on prompt instructions only.
+        }),
+      });
+
+      const latencyMs = Date.now() - startMs;
+      const raw = await res.json();
+
+      if (!res.ok) {
+        const retryAfter = Number(
+          (raw as { error?: { metadata?: { retry_after_seconds?: number } } })
+            ?.error?.metadata?.retry_after_seconds ?? 0,
+        );
+
+        logger.warn(
+          { status: res.status, body: raw, model: this.model, correlationId, attempt, retryAfter },
+          'llm:request:failed',
+        );
+
+        if (res.status === 429 && attempt === 0) {
+          // Some providers (Google AI Studio) do NOT return retry_after_seconds.
+          // Default to a 5s backoff in that case. Cap at 30s so Lambda doesn't time out.
+          const waitMs = retryAfter > 0 ? Math.min(retryAfter * 1000, 30_000) : 5_000;
+          logger.info({ waitMs, retryAfter, correlationId }, 'llm:retry:waiting');
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+
+        throw new Error(`OpenRouter API failed: ${res.status}`);
+      }
+
+      const parsed = OpenRouterResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn({ errors: parsed.error.format(), correlationId }, 'llm:validation:failed');
+      }
+
+      const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
+      const analysis = parseAnalysis(text, correlationId);
+
+      if (parsed.success && parsed.data.usage) {
+        const { prompt_tokens, completion_tokens, total_tokens } = parsed.data.usage;
+        logger.info(
+          {
+            model: this.model,
+            usage: { promptTokens: prompt_tokens, completionTokens: completion_tokens, totalTokens: total_tokens },
+            latencyMs,
+            correlationId,
+          },
+          'llm:request:success',
+        );
+      }
+
+      return analysis;
     }
 
-    return analysis;
+    throw new Error('OpenRouter API failed after retry');
   }
 }
 
