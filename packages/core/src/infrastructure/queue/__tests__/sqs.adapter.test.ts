@@ -7,17 +7,21 @@ import { AlertType } from '../../../shared/constants.js';
 interface MockRegistry {
   calls: unknown[][];
   send: ReturnType<typeof vi.fn>;
+  constructorCalls: number;
 }
 const registry = vi.hoisted((): MockRegistry => {
   const send = vi.fn((...args: unknown[]) => {
     registry.calls.push(args);
     return Promise.resolve({ MessageId: 'msg-abc-123' });
   });
-  return { calls: [], send };
+  return { calls: [], send, constructorCalls: 0 };
 });
 
 vi.mock('@aws-sdk/client-sqs', () => ({
-  SQSClient: vi.fn(() => ({ send: registry.send })),
+  SQSClient: vi.fn(() => {
+    registry.constructorCalls++;
+    return { send: registry.send };
+  }),
   SendMessageCommand: vi.fn(),
 }));
 
@@ -53,7 +57,13 @@ describe('SQSAlertQueue', () => {
   let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     registry.calls.length = 0;
+    registry.constructorCalls = 0;
     vi.clearAllMocks();
+    // Restore default resolved behavior after any mockRejectedValue calls
+    registry.send.mockImplementation((...args: unknown[]) => {
+      registry.calls.push(args);
+      return Promise.resolve({ MessageId: 'msg-abc-123' });
+    });
     // Mock console.error used by the error-logging wrapper
     loggerErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -127,6 +137,56 @@ describe('SQSAlertQueue', () => {
       const alert = createAlert();
 
       await expect(queue.publish(alert)).rejects.toThrow('SQS send failed');
+    });
+  });
+
+  describe('sendMessage', () => {
+    it('sends a raw message with provided FIFO params', async () => {
+      const queue = new SQSAlertQueue('https://sqs.us-east-1.amazonaws.com/123456789/test-queue');
+
+      await queue.sendMessage({
+        messageBody: '{"correlationId":"id-1","alerts":[]}',
+        messageGroupId: 'group-1',
+        messageDeduplicationId: 'dedup-1',
+      });
+
+      expect(registry.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('propagates errors from sendMessage', async () => {
+      registry.send.mockRejectedValue(new Error('Send failed'));
+      const queue = new SQSAlertQueue('https://sqs.us-east-1.amazonaws.com/123456789/test-queue');
+
+      await expect(
+        queue.sendMessage({
+          messageBody: '{}',
+          messageGroupId: 'g',
+          messageDeduplicationId: 'd',
+        }),
+      ).rejects.toThrow('Send failed');
+    });
+  });
+
+  describe('lazy SQSClient singleton', () => {
+    it('does NOT instantiate SQSClient at construction time', () => {
+      registry.constructorCalls = 0;
+      new SQSAlertQueue('https://sqs.test');
+      expect(registry.constructorCalls).toBe(0);
+    });
+
+    it('instantiates SQSClient only on first use', async () => {
+      registry.constructorCalls = 0;
+      const queue = new SQSAlertQueue('https://sqs.test');
+      await queue.sendMessage({ messageBody: '{}', messageGroupId: 'g', messageDeduplicationId: 'd' });
+      expect(registry.constructorCalls).toBe(1);
+    });
+
+    it('reuses the same SQSClient on subsequent calls (singleton)', async () => {
+      registry.constructorCalls = 0;
+      const queue = new SQSAlertQueue('https://sqs.test');
+      await queue.sendMessage({ messageBody: '{}', messageGroupId: 'g1', messageDeduplicationId: 'd1' });
+      await queue.sendMessage({ messageBody: '{}', messageGroupId: 'g2', messageDeduplicationId: 'd2' });
+      expect(registry.constructorCalls).toBe(1);
     });
   });
 });

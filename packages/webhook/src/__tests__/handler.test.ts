@@ -3,20 +3,17 @@ import { handler } from '../handler.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { createHmac } from 'node:crypto';
 
-// Mock SQS
-const mockSend = vi.fn().mockResolvedValue({ MessageId: 'msg-123' });
-vi.mock('@aws-sdk/client-sqs', () => ({
-  SQSClient: vi.fn().mockImplementation(() => ({
-    send: mockSend,
-  })),
-  SendMessageCommand: vi.fn().mockImplementation((args) => args),
-}));
+// Mock SQSAlertQueue.sendMessage from @junando/core
+const mockSendMessage = vi.fn().mockResolvedValue(undefined);
 
 // Mock @junando/core
 vi.mock('@junando/core', async () => {
   const actual = await vi.importActual('@junando/core');
   return {
     ...actual,
+    SQSAlertQueue: vi.fn().mockImplementation(() => ({
+      sendMessage: mockSendMessage,
+    })),
     loadConfig: vi.fn().mockResolvedValue({
       slackSigningSecret: 'test-secret',
       logLevel: 'error',
@@ -32,6 +29,7 @@ vi.mock('@junando/core', async () => {
 describe('Webhook Handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSendMessage.mockResolvedValue(undefined);
     process.env.SQS_QUEUE_URL = 'https://sqs.test';
   });
 
@@ -45,7 +43,7 @@ describe('Webhook Handler', () => {
     expect(JSON.parse((result as any).body)).toEqual({ status: 'ok', service: 'junando-webhook' });
   });
 
-  it('processes valid alerts and publishes to SQS', async () => {
+  it('processes valid alerts and publishes to SQS via SQSAlertQueue', async () => {
     const event = {
       rawPath: '/webhook/alert',
       body: JSON.stringify({
@@ -70,10 +68,9 @@ describe('Webhook Handler', () => {
       }),
     } as Partial<APIGatewayProxyEventV2>;
 
-
     const result = await handler(event as APIGatewayProxyEventV2);
     expect(result).toMatchObject({ statusCode: 200 });
-    expect(mockSend).toHaveBeenCalled();
+    expect(mockSendMessage).toHaveBeenCalled();
   });
 
   it('returns 422 for invalid alert payload', async () => {
@@ -84,7 +81,7 @@ describe('Webhook Handler', () => {
 
     const result = await handler(event as APIGatewayProxyEventV2);
     expect(result).toMatchObject({ statusCode: 422 });
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it('verifies slack signature correctly', async () => {
@@ -139,8 +136,8 @@ describe('Webhook Handler', () => {
           {
             status: 'firing',
             labels: { alertname: 'HugeAlert' },
-            annotations: { 
-              summary: 'a'.repeat(260000) // Trigger truncation (> 250KB)
+            annotations: {
+              summary: 'a'.repeat(260000), // Trigger truncation (> 250KB)
             },
             startsAt: '2026-05-12T14:37:46.000Z',
             endsAt: '2026-05-12T14:40:46.000Z',
@@ -152,11 +149,10 @@ describe('Webhook Handler', () => {
 
     const result = await handler(event as APIGatewayProxyEventV2);
     expect(result).toMatchObject({ statusCode: 200 });
-    expect(mockSend).toHaveBeenCalled();
-    
-    const command = mockSend.mock.calls[0][0];
-    const body = JSON.parse(command.MessageBody);
+    expect(mockSendMessage).toHaveBeenCalled();
+
+    const [params] = mockSendMessage.mock.calls[0] as [{ messageBody: string }];
+    const body = JSON.parse(params.messageBody);
     expect(body.alerts[0].annotations.summary.length).toBeLessThan(260000);
   });
 });
-

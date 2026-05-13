@@ -75,17 +75,17 @@ function buildUserPrompt(cluster: AlertCluster, traces: Record<string, unknown>[
  * Uses multi-stage parsing: JSON → regex fallback → heuristics.
  * Returns validated LLMAnalysis or falls back to default values.
  */
-function parseAnalysis(raw: string): LLMAnalysis {
+function parseAnalysis(raw: string, correlationId?: string): LLMAnalysis {
   const startIdx = raw.indexOf('{');
   const endIdx = raw.lastIndexOf('}');
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     try {
       return LLMAnalysisSchema.parse(JSON.parse(raw.slice(startIdx, endIdx + 1)));
-    } catch (err) {
-      logger.debug(
-        { err, rawLength: raw.length },
-        'JSON parse failed, falling back to regex extraction',
+    } catch {
+      logger.warn(
+        { rawResponse: raw.slice(0, 500), correlationId },
+        'llm:parse:failed',
       );
     }
   }
@@ -222,36 +222,88 @@ export class OpenRouterProvider implements ILLMProvider {
     private readonly model: string = LLM_MODELS.OpenRouter,
   ) {}
 
-  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
-        'X-Title': 'Junando SRE',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserPrompt(cluster, traces) },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
+  async analyze(
+    cluster: AlertCluster,
+    traces: Record<string, unknown>[],
+    correlationId?: string,
+  ): Promise<LLMAnalysis> {
+    const prompt = buildUserPrompt(cluster, traces);
+    logger.debug({ model: this.model, promptLength: prompt.length, correlationId }, 'llm:request:start');
 
-    if (!res.ok) {
-      throw new Error(`OpenRouter API failed: ${res.status}`);
+    const startMs = Date.now();
+
+    // Retry once on 429 using the Retry-After header from OpenRouter
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+          'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
+          'X-Title': 'Junando SRE',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt },
+          ],
+          // Note: json_object response_format is NOT supported by all OpenRouter models.
+          // Qwen free tier ignores it or returns an error — rely on prompt instructions only.
+        }),
+      });
+
+      const latencyMs = Date.now() - startMs;
+      const raw = await res.json();
+
+      if (!res.ok) {
+        const retryAfter = Number(
+          (raw as { error?: { metadata?: { retry_after_seconds?: number } } })
+            ?.error?.metadata?.retry_after_seconds ?? 0,
+        );
+
+        logger.warn(
+          { status: res.status, body: raw, model: this.model, correlationId, attempt, retryAfter },
+          'llm:request:failed',
+        );
+
+        if (res.status === 429 && attempt === 0) {
+          // Some providers (Google AI Studio) do NOT return retry_after_seconds.
+          // Default to a 5s backoff in that case. Cap at 30s so Lambda doesn't time out.
+          const waitMs = retryAfter > 0 ? Math.min(retryAfter * 1000, 30_000) : 5_000;
+          logger.info({ waitMs, retryAfter, correlationId }, 'llm:retry:waiting');
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+
+        throw new Error(`OpenRouter API failed: ${res.status}`);
+      }
+
+      const parsed = OpenRouterResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        logger.warn({ errors: parsed.error.format(), correlationId }, 'llm:validation:failed');
+      }
+
+      const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
+      const analysis = parseAnalysis(text, correlationId);
+
+      if (parsed.success && parsed.data.usage) {
+        const { prompt_tokens, completion_tokens, total_tokens } = parsed.data.usage;
+        logger.info(
+          {
+            model: this.model,
+            usage: { promptTokens: prompt_tokens, completionTokens: completion_tokens, totalTokens: total_tokens },
+            latencyMs,
+            correlationId,
+          },
+          'llm:request:success',
+        );
+      }
+
+      return analysis;
     }
 
-    const raw = await res.json();
-    const parsed = OpenRouterResponseSchema.safeParse(raw);
-    if (!parsed.success) {
-      logger.debug({ error: parsed.error.format() }, 'OpenRouter response validation failed');
-    }
-    const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
-    return parseAnalysis(text);
+    throw new Error('OpenRouter API failed after retry');
   }
 }
 

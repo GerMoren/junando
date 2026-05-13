@@ -6,7 +6,9 @@ import {
   SlackNotifier,
   createLLMProvider,
   createLogger,
+  reinitLogger,
   loadConfig,
+  flushLoki,
 } from '@junando/core';
 import type { SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
@@ -28,7 +30,7 @@ export type SQSMessage = z.infer<typeof SQSMessageSchema>;
 // Lazy initialization - config and dependencies loaded on first invocation
 // This allows SSM secrets to be read at runtime (avoids SecureString CDK issue)
 let useCase: ProcessIncidentUseCase;
-let logger: ReturnType<typeof createLogger>;
+let logger: ReturnType<typeof createLogger> = createLogger();
 
 async function getUseCase(): Promise<ProcessIncidentUseCase> {
   if (useCase) {
@@ -36,6 +38,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   }
 
   const config = await loadConfig();
+  reinitLogger({ level: config.logLevel }); // swap in Loki transport now that LOKI_URL is set
   logger = createLogger(config.logLevel);
 
   const redis = new Redis(config.redisUrl, { lazyConnect: true });
@@ -58,7 +61,26 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
 }
 
 export const handler = async (event: SQSEvent): Promise<void> => {
-  const useCaseInstance = await getUseCase();
+  try {
+    return await _handler(event);
+  } finally {
+    // Flush buffered logs to Loki before Lambda exits.
+    // In a finally block so logs are pushed even when the use case throws.
+    await flushLoki();
+  }
+};
+
+async function _handler(event: SQSEvent): Promise<void> {
+  let useCaseInstance: ProcessIncidentUseCase;
+  try {
+    useCaseInstance = await getUseCase();
+  } catch (err) {
+    // getUseCase() failed (likely loadConfig/SSM error). The module-level proxy
+    // logger writes to stdout via the initial root, so we always have a working
+    // logger here even if reinitLogger() never ran.
+    logger.fatal({ err }, 'getUseCase() failed — Lambda will retry via SQS');
+    throw err; // re-throw so SQS retries
+  }
 
   for (const record of event.Records) {
     // Validate SQS message body with Zod before processing
@@ -80,4 +102,4 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     // If this throws, SQS retries automatically. After max retries → DLQ.
     await useCaseInstance.execute(parsed.alerts, parsed.correlationId);
   }
-};
+}

@@ -1,10 +1,12 @@
-import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import {
   AlertmanagerPayloadSchema,
   createLogger,
+  reinitLogger,
   loadConfig,
   metrics,
   normalizePayload,
+  SQSAlertQueue,
+  flushLoki,
 } from '@junando/core';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -89,6 +91,14 @@ function verifySlackSignature(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  try {
+    return await _handler(event);
+  } finally {
+    await flushLoki();
+  }
+};
+
+async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
 
   const correlationId = randomUUID();
@@ -136,6 +146,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     const config = await loadConfig();
+    reinitLogger(); // swap in Loki transport now that LOKI_URL is available
     const slackSignature = event.headers['x-slack-signature'];
     const slackTimestamp = event.headers['x-slack-request-timestamp'];
 
@@ -215,10 +226,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
   // Publish to SQS — this is the only AWS call in Lambda A
   if (QUEUE_URL) {
-    // Initialize SQSClient inside the handler to avoid module-level AWS credential errors in local dev.
-    // TODO(tech-debt): Extract to SqsAlertQueueAdapter in @junando/core when the adapter
-    // interface supports send-message with FIFO params (MessageGroupId, MessageDeduplicationId).
-    const sqs = new SQSClient({});
+    const sqsQueue = new SQSAlertQueue(QUEUE_URL);
 
     // Check message size before publishing (SQS 256KB limit)
     const messageBody = { correlationId, alerts };
@@ -246,14 +254,11 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       );
     }
 
-    await sqs.send(
-      new SendMessageCommand({
-        QueueUrl: QUEUE_URL,
-        MessageBody: JSON.stringify(finalMessageBody),
-        MessageGroupId: parsed.data.groupKey, // FIFO queue support
-        MessageDeduplicationId: correlationId,
-      }),
-    );
+    await sqsQueue.sendMessage({
+      messageBody: JSON.stringify(finalMessageBody),
+      messageGroupId: parsed.data.groupKey, // FIFO queue support
+      messageDeduplicationId: correlationId,
+    });
   } else {
     logger.info(
       { alerts },
@@ -272,6 +277,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
     try {
       const config = await loadConfig();
+      reinitLogger(); // swap in Loki transport now that LOKI_URL is available
       const dedup = new InMemoryDeduplicationStore();
       const traces = new MockTraceRepository();
 
@@ -302,4 +308,4 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     statusCode: 200,
     body: JSON.stringify({ accepted: alerts.length, correlationId }),
   };
-};
+}

@@ -46,7 +46,8 @@ Junando acts as a virtual Level-3 SRE available 24/7:
 | ------------------------ | ------------------------------------------------------------------------- |
 | Alert deduplication      | Redis TTL window — configurable duration                                  |
 | Deterministic clustering | SHA-256 fingerprint on service + error + endpoint                         |
-| Bring Your Own LLM       | Gemini, Claude, OpenAI — swap via `LLM_PROVIDER` env var                  |
+| Bring Your Own LLM       | Gemini, Claude, OpenRouter, Qwen — swap via `LLM_PROVIDER` env var        |
+| Structured logging       | Pino JSON to stdout (CloudWatch) + Grafana Cloud Loki, with correlationId |
 | Privacy-first            | Only 2-3 trace excerpts sent to LLM, never full log dumps                 |
 | Stateless & cheap        | Lambda pair + SQS. Near-free on AWS free tier during dev                  |
 | ChatOps-native           | Slack Block Kit with Acknowledge / Rollback / Runbook buttons             |
@@ -151,21 +152,21 @@ junando/                          ← single GitHub repo
 
 ## Tech Stack
 
-| Layer           | Choice                                 | Why                                     |
-| --------------- | -------------------------------------- | --------------------------------------- |
-| Runtime         | Node.js 22+ LTS + TypeScript strict    | Mature AWS SDK, ecosystem               |
-| Validation      | Zod                                    | Schema-first, full type inference       |
-| Logging         | Pino                                   | Structured JSON, fastest Node.js logger |
-| Queue           | AWS SQS + DLQ                          | Managed, pay-per-use, native AWS        |
-| LLM             | Configurable: Gemini / Claude / OpenAI | No vendor lock-in                       |
-| Traces          | Loki (LogQL)                           | Open-source standard                    |
-| Metrics         | Prometheus                             | Open-source standard                    |
-| ChatOps         | Slack Block Kit                        | Interactive action buttons              |
-| IaC             | AWS CDK TypeScript                     | Zero YAML                               |
-| Package manager | pnpm workspaces                        | Strict, fast, phantom-dep free          |
-| Linter          | oxlint (pre-commit) + ESLint (CI)      | Speed + coverage                        |
-| Tests           | Vitest                                 | ESM-native, fast                        |
-| Architecture    | Hexagonal + DDD                        | Adapter-swappable, testable             |
+| Layer           | Choice                                            | Why                                         |
+| --------------- | ------------------------------------------------- | ------------------------------------------- |
+| Runtime         | Node.js 22+ LTS + TypeScript strict               | Mature AWS SDK, ecosystem                   |
+| Validation      | Zod                                               | Schema-first, full type inference           |
+| Logging         | Pino                                              | Structured JSON, fastest Node.js logger     |
+| Queue           | AWS SQS + DLQ                                     | Managed, pay-per-use, native AWS            |
+| LLM             | Configurable: Gemini / Claude / OpenRouter / Qwen | Free tier via OpenRouter, no vendor lock-in |
+| Traces          | Loki (LogQL)                                      | Open-source standard                        |
+| Metrics         | Prometheus                                        | Open-source standard                        |
+| ChatOps         | Slack Block Kit                                   | Interactive action buttons                  |
+| IaC             | AWS CDK TypeScript                                | Zero YAML                                   |
+| Package manager | pnpm workspaces                                   | Strict, fast, phantom-dep free              |
+| Linter          | oxlint (pre-commit) + ESLint (CI)                 | Speed + coverage                            |
+| Tests           | Vitest                                            | ESM-native, fast                            |
+| Architecture    | Hexagonal + DDD                                   | Adapter-swappable, testable                 |
 
 ---
 
@@ -262,21 +263,63 @@ docker run -d \
 
 ## Environment Variables
 
-| Variable               | Required | Default          | Description                                |
-| ---------------------- | -------- | ---------------- | ------------------------------------------ |
-| `NODE_ENV`             | —        | `development`    | Set to `production` in AWS                 |
-| `LLM_PROVIDER`         | ✓        | —                | `gemini` \| `claude` \| `openai`           |
-| `LLM_API_KEY`          | ✓        | —                | API key for the chosen LLM                 |
-| `LLM_MODEL`            | —        | provider default | Override model per provider                |
-| `SLACK_BOT_TOKEN`      | ✓        | —                | Slack Bot Token (`xoxb-...`)               |
-| `SLACK_SIGNING_SECRET` | ✓        | —                | For validating Slack interactivity         |
-| `SLACK_CHANNEL`        | ✓        | —                | Target channel e.g. `#incidents`           |
-| `LOKI_URL`             | ✓        | —                | Base URL of your Loki instance             |
-| `REDIS_URL`            | ✓        | —                | Redis connection string                    |
-| `SQS_QUEUE_URL`        | —        | —                | Injected by CDK in AWS. Empty = local mode |
-| `DEDUP_TTL_SECONDS`    | —        | `300`            | Deduplication window in seconds            |
-| `CLUSTER_WINDOW_MS`    | —        | `120000`         | Clustering window in milliseconds          |
-| `LOG_LEVEL`            | —        | `info`           | `trace`\|`debug`\|`info`\|`warn`\|`error`  |
+| Variable               | Required | Default          | Description                                                       |
+| ---------------------- | -------- | ---------------- | ----------------------------------------------------------------- |
+| `NODE_ENV`             | —        | `development`    | Set to `production` in AWS (required for Lambda deploy)           |
+| `SSM_PREFIX`           | AWS only | —                | E.g. `/junando`. When set, secrets are loaded from SSM at startup |
+| `LLM_PROVIDER`         | ✓        | —                | `gemini` \| `claude` \| `openrouter` \| `qwen`                    |
+| `LLM_API_KEY`          | ✓        | —                | API key for the chosen LLM                                        |
+| `LLM_MODEL`            | —        | provider default | Override model (e.g. `google/gemma-4-31b-it:free` for OpenRouter) |
+| `SLACK_BOT_TOKEN`      | ✓        | —                | Slack Bot Token (`xoxb-...`)                                      |
+| `SLACK_SIGNING_SECRET` | ✓        | —                | For validating Slack interactivity                                |
+| `SLACK_CHANNEL`        | ✓        | —                | Target channel e.g. `#incidents`                                  |
+| `LOKI_URL`             | ✓        | —                | Loki push URL with embedded credentials — see Observability       |
+| `REDIS_URL`            | ✓        | —                | Redis connection string                                           |
+| `SQS_QUEUE_URL`        | —        | —                | Injected by CDK in AWS. Empty = local mode                        |
+| `DEDUP_TTL_SECONDS`    | —        | `300`            | Deduplication window in seconds                                   |
+| `CLUSTER_WINDOW_MS`    | —        | `120000`         | Clustering window in milliseconds                                 |
+| `LOG_LEVEL`            | —        | `info`           | `trace`\|`debug`\|`info`\|`warn`\|`error`                         |
+
+---
+
+## Observability
+
+Junando emits structured JSON logs (Pino) with a `correlationId` propagated through the
+full pipeline — webhook → SQS → worker → LLM → notifier. Logs ship to two sinks:
+
+- **stdout** → CloudWatch Logs (always on, free with Lambda)
+- **Grafana Cloud Loki** → for cross-service correlation and long-term querying
+
+### Loki transport
+
+The Loki sink is a **custom in-process buffered transport** (`loki-transport.ts`),
+not `pino-loki`. Reason: `pino-abstract-transport` runs in a `worker_thread` that
+Lambda kills before the 5s batch flush completes, so logs were silently lost.
+
+- Buffers up to 1000 entries in a ring buffer (drops oldest on overflow → no OOM)
+- Flushed synchronously via `flushLoki()` at the end of every handler (`try/finally`)
+- One HTTP request per Lambda invocation
+
+### `LOKI_URL` format
+
+Use the Grafana Cloud push endpoint **with embedded credentials**:
+
+```
+https://<USER>:<TOKEN>@logs-prod-XXX.grafana.net/loki/api/v1/push
+```
+
+Notes:
+
+- The Grafana Cloud token must have the `logs:write` scope
+- New tokens take **up to 15 minutes** to propagate
+- Zod's `.url()` validator rejects `user:pass@` — `lokiUrl` uses a plain string check on purpose
+
+### LLM observability
+
+`OpenRouterProvider.analyze` emits per-call structured logs with model name,
+prompt/completion tokens, total tokens, and latency in ms. On HTTP 429 it retries
+once with backoff (uses `retry_after_seconds` if the provider returns it, else 5s,
+capped at 30s) — verified against `google/gemma-4-31b-it:free`.
 
 ---
 

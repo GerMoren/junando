@@ -55,7 +55,7 @@ const ConfigSchema = z.object({
   slackBotToken: z.string().startsWith('xoxb-'),
   slackSigningSecret: z.string().min(1),
   slackChannel: z.string().startsWith('#'),
-  lokiUrl: z.string().url(),
+  lokiUrl: z.string().min(1), // URL with embedded credentials — skip .url() which rejects user:pass@ format
   redisUrl: z.string().url(),
   sqsQueueUrl: z.string().url().optional().or(z.literal('')),
   dedupTtlSeconds: z.coerce.number().int().positive().default(300),
