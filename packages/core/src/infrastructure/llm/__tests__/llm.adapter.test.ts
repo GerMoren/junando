@@ -7,10 +7,19 @@ import {
   OpenRouterProvider,
   createLLMProvider,
   OpenRouterResponseSchema,
-  GeminiProvider,
-  ClaudeProvider,
 } from '../llm.adapter.js';
-import type { ILLMProvider } from '../../../domain/ports/index.js';
+
+// ── Logger mock ────────────────────────────────────────────────────────────
+const mockLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('../../../shared/logger/index.js', () => ({
+  createLogger: vi.fn(() => mockLogger),
+}));
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -435,5 +444,113 @@ describe('parseAnalysis edge cases', () => {
       '{"probable_cause":"bad parse","impacted_services":["svc"],"recommended_steps":["step"],"urgency_level":"medium","requires_rollback":false}';
     const result = await parseViaOpenRouter(raw);
     expect(result.urgency_level).toBe('medium');
+  });
+});
+
+// ── OpenRouterProvider structured logging tests ────────────────────────────
+
+describe('OpenRouterProvider structured logging', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('logs llm:request:start with model and promptLength before fetch', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}' } }],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-123');
+
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'qwen/model', correlationId: 'corr-123' }),
+      'llm:request:start',
+    );
+  });
+
+  it('logs llm:request:success with usage and latencyMs after successful parse', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}' } }],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-456');
+
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'qwen/model',
+        usage: expect.objectContaining({ promptTokens: 20, completionTokens: 10, totalTokens: 30 }),
+        latencyMs: expect.any(Number),
+        correlationId: 'corr-456',
+      }),
+      'llm:request:success',
+    );
+  });
+
+  it('logs llm:parse:failed as warn when JSON parse fails', async () => {
+    // Content has braces but is malformed JSON — triggers the catch branch
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: '{not valid json: at all}' } }],
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-789');
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ rawResponse: expect.any(String), correlationId: 'corr-789' }),
+      'llm:parse:failed',
+    );
+  });
+
+  it('logs llm:validation:failed as warn when OpenRouter schema validation fails', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ bad: 'structure' }] }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-abc');
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ errors: expect.anything(), correlationId: 'corr-abc' }),
+      'llm:validation:failed',
+    );
+  });
+
+  it('analyze works without correlationId param (backward compat)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}' } }],
+        usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    // Must not throw — correlationId is optional
+    await expect(provider.analyze(makeCluster(), [])).resolves.toBeDefined();
   });
 });
