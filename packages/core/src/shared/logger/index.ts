@@ -31,7 +31,7 @@ function buildLogger(opts: LoggerOptions): pino.Logger {
     const parsed = new URL(lokiUrl);
     const username = parsed.username;
     const password = parsed.password;
-    const host = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+    const host = `${parsed.protocol}//${parsed.hostname}`;
 
     const transport = pinoLoki({
       host,

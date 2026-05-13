@@ -65,7 +65,7 @@ describe('createLogger', () => {
       reinitLogger();
 
       const [opts] = mockLokiTransport.mock.calls[0] as [Record<string, unknown>];
-      expect(opts['host']).toBe('https://logs-prod-024.grafana.net/loki/api/v1/push');
+      expect(opts['host']).toBe('https://logs-prod-024.grafana.net');
     });
 
     it('passes basicAuth credentials extracted from the URL', () => {
