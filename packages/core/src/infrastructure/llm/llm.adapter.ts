@@ -1,9 +1,9 @@
-import type { ILLMProvider } from '../../domain/ports/index.js';
+import * as Breaker from 'opossum';
+import { z } from 'zod';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import { LLMAnalysisSchema } from '../../domain/entities/incident.js';
-import * as Breaker from 'opossum';
-import { z } from 'zod';
+import type { ILLMProvider } from '../../domain/ports/index.js';
 import {
   CIRCUIT_BREAKER,
   LLM_MAX_TOKENS,
@@ -219,7 +219,7 @@ export class MockLLMProvider implements ILLMProvider {
 export class OpenRouterProvider implements ILLMProvider {
   constructor(
     private readonly apiKey: string,
-    private readonly model: string = 'qwen/qwen-2.5-72b-instruct',
+    private readonly model: string = LLM_MODELS.OpenRouter,
   ) {}
 
   async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
@@ -228,7 +228,7 @@ export class OpenRouterProvider implements ILLMProvider {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKey}`,
-        'HTTP-Referer': 'http://localhost:4000',
+        'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
         'X-Title': 'Junando SRE',
       },
       body: JSON.stringify({

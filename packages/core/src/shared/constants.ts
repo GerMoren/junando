@@ -77,6 +77,7 @@ export const HOUR_MS = 3_600_000;
 export const LLM_MODELS = Object.freeze({
   Gemini: 'gemini-2.0-flash',
   Claude: 'claude-haiku-4-5',
+  OpenRouter: 'qwen/qwen-2.5-72b-instruct',
 });
 
 // ── Slack ─────────────────────────────────────────────────────────────────────

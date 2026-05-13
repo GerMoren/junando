@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
-import { randomUUID } from "node:crypto";
 import { createLogger } from "@junando/core";
+import { randomUUID } from "node:crypto";
 
 const logger = createLogger();
 
@@ -96,7 +96,10 @@ async function run() {
   logger.info({ scenario, service }, "Simulating scenario");
 
   if (target === "webhook") {
-    const url = process.env["WEBHOOK_URL"] || "http://localhost:4000/webhook/alert";
+    const url =
+      process.env["JUNANDO_WEBHOOK_URL"] ??
+      process.env["WEBHOOK_URL"] ??
+      "http://localhost:4000/webhook/alert";
     logger.info({ url }, "Sending to Webhook");
     const res = await fetch(url, {
       method: "POST",

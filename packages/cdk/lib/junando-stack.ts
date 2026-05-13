@@ -20,7 +20,7 @@ export class JunandoStack extends cdk.Stack {
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
     const coreLayer = new lambda.LayerVersion(this, 'JunandoCoreLayer', {
       code: lambda.Code.fromAsset(path.join(process.cwd(), '..', 'core', 'dist')),
-      compatibleRuntimes: [lambda.Runtime.NODEJS_22_X],
+      compatibleRuntimes: [lambda.Runtime.NODEJS_24_X],
       layerVersionName: 'junando-core-layer',
     });
 
@@ -46,7 +46,7 @@ export class JunandoStack extends cdk.Stack {
     // ── Lambda A — Webhook Receiver ──────────────────────────────────────────
     const webhookFn = new lambda.Function(this, 'WebhookLambda', {
       functionName: 'junando-webhook',
-      runtime: lambda.Runtime.NODEJS_22_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('webhook')),
       memorySize: 256,
@@ -76,10 +76,15 @@ export class JunandoStack extends cdk.Stack {
       authType: lambda.FunctionUrlAuthType.NONE,
     });
 
+    // NOTE: APP_URL cannot be injected here — it would create a circular dependency
+    // (WebhookLambda → FunctionUrl → WebhookLambda). After first deploy, set it manually:
+    //   aws ssm put-parameter --name /junando/app-url --value <WebhookURL output> --type String --overwrite
+    // Until then, llm.adapter.ts falls back to 'https://junando.app' (cosmetic only — HTTP-Referer header)
+
     // ── Lambda B — SQS Worker ────────────────────────────────────────────────
     const workerFn = new lambda.Function(this, 'WorkerLambda', {
       functionName: 'junando-worker',
-      runtime: lambda.Runtime.NODEJS_22_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('worker')),
       memorySize: 512,

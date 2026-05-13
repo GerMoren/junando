@@ -1,5 +1,6 @@
 import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
+import { createLogger } from '../logger/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config — reads and validates all env vars at startup.
@@ -43,7 +44,7 @@ async function loadSecretsFromSSM(): Promise<void> {
       }
     }
   } catch (err) {
-    console.error('Failed to load SSM parameters:', err);
+    createLogger().error({ err }, 'Failed to load SSM parameters');
   }
 }
 

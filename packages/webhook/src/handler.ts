@@ -69,7 +69,7 @@ function verifySlackSignature(
   const baseString = `v0:${timestamp}:${body}`;
   const hmac = createHmac('sha256', signingSecret);
   hmac.update(baseString, 'utf8');
-  const computedSignature = `v0:${hmac.digest('hex')}`;
+  const computedSignature = `v0=${hmac.digest('hex')}`;
 
   // Use timingSafeEqual to prevent timing attacks
   const sigBuffer = Buffer.from(signature, 'utf8');
@@ -120,7 +120,9 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // Slack sends URL-encoded payload: payload=%7B%22type%22%3A%22...%22%7D
-    // If base64 encoded (API Gateway sometimes does this), decode first
+    // Lambda Function URL may base64-encode binary/form bodies
+    // IMPORTANT: HMAC must be verified against the raw body as Slack sent it
+    // When base64 encoded, decode to get the original URL-encoded string
     const bodyStr = event.isBase64Encoded
       ? Buffer.from(event.body, 'base64').toString('utf8')
       : event.body;
@@ -213,7 +215,9 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
   // Publish to SQS — this is the only AWS call in Lambda A
   if (QUEUE_URL) {
-    // Initialize SQSClient inside the handler to avoid module-level AWS credential errors in local dev
+    // Initialize SQSClient inside the handler to avoid module-level AWS credential errors in local dev.
+    // TODO(tech-debt): Extract to SqsAlertQueueAdapter in @junando/core when the adapter
+    // interface supports send-message with FIFO params (MessageGroupId, MessageDeduplicationId).
     const sqs = new SQSClient({});
 
     // Check message size before publishing (SQS 256KB limit)
