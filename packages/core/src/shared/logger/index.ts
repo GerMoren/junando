@@ -9,15 +9,20 @@ export interface LoggerOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lazy singleton: the root logger is created on first use (or after reinit).
-// This is critical for Lambda: module-level code runs before loadConfig() sets
-// LOKI_URL. Callers that create loggers at module level get a stdout logger
-// until reinitLogger() is called inside the handler after loadConfig().
+// Proxy Logger — solves the Lambda cold-start problem.
+//
+// Module-level code runs BEFORE loadConfig() sets LOKI_URL. If we create pino
+// loggers at import time, they always get stdout (no Loki).
+//
+// Solution: every createLogger() call returns a Proxy that forwards all method
+// calls to the *current* root logger. When reinitLogger() is called after
+// loadConfig(), it swaps the root — and ALL existing proxy instances instantly
+// start writing to Loki without needing to be recreated.
 // ─────────────────────────────────────────────────────────────────────────────
 
-let _root: Logger | null = null;
+let _root: pino.Logger = buildLogger({});
 
-function buildLogger(opts: LoggerOptions): Logger {
+function buildLogger(opts: LoggerOptions): pino.Logger {
   const level = opts.level ?? 'info';
   const name = opts.name ?? 'junando';
   const lokiUrl = process.env['LOKI_URL'];
@@ -57,10 +62,9 @@ function buildLogger(opts: LoggerOptions): Logger {
 }
 
 /**
- * Returns the shared root logger, creating it on first call.
- * Module-level `const logger = createLogger()` calls hit this path — they get
- * a stdout logger if LOKI_URL isn't set yet. Call `reinitLogger()` after
- * `loadConfig()` to swap in the Loki transport for subsequent log calls.
+ * Returns a Proxy logger that always delegates to the current root logger.
+ * Module-level callers get a proxy that automatically starts writing to Loki
+ * once reinitLogger() is called inside the handler after loadConfig().
  */
 export function createLogger(levelOrOptions?: string | LoggerOptions): Logger {
   const opts: LoggerOptions =
@@ -68,25 +72,35 @@ export function createLogger(levelOrOptions?: string | LoggerOptions): Logger {
       ? { level: levelOrOptions }
       : (levelOrOptions ?? {});
 
-  // Non-default options (explicit level/name) always create a fresh logger
+  // Non-default options create a dedicated logger (not proxied to root)
   if (opts.level !== undefined || opts.name !== undefined) {
     return buildLogger(opts);
   }
 
-  if (!_root) {
-    _root = buildLogger(opts);
-  }
-  return _root;
+  // Return a Proxy that always reads from the CURRENT _root at call time.
+  // This means reinitLogger() affects all existing module-level loggers instantly.
+  return new Proxy({} as pino.Logger, {
+    get(_target, prop) {
+      const value = (_root as unknown as Record<string | symbol, unknown>)[prop];
+      if (typeof value === 'function') {
+        return (value as Function).bind(_root);
+      }
+      return value;
+    },
+    set(_target, prop, value) {
+      (_root as unknown as Record<string | symbol, unknown>)[prop] = value;
+      return true;
+    },
+  });
 }
 
 /**
- * Re-creates the root logger singleton with current env vars.
- * Call this inside your Lambda handler immediately after `loadConfig()` so
- * LOKI_URL is available before any log calls happen.
+ * Re-creates the root logger with current env vars (including LOKI_URL).
+ * Call this inside your Lambda handler immediately after loadConfig():
  *
  * @example
  * const config = await loadConfig();
- * reinitLogger(); // now all module-level loggers use Loki transport
+ * reinitLogger(); // all module-level proxy loggers now write to Loki
  */
 export function reinitLogger(opts?: LoggerOptions): void {
   _root = buildLogger(opts ?? {});
