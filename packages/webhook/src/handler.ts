@@ -1,6 +1,7 @@
 import {
   AlertmanagerPayloadSchema,
   createLogger,
+  reinitLogger,
   loadConfig,
   metrics,
   normalizePayload,
@@ -136,6 +137,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     const config = await loadConfig();
+    reinitLogger(); // swap in Loki transport now that LOKI_URL is available
     const slackSignature = event.headers['x-slack-signature'];
     const slackTimestamp = event.headers['x-slack-request-timestamp'];
 
@@ -266,6 +268,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
     try {
       const config = await loadConfig();
+      reinitLogger(); // swap in Loki transport now that LOKI_URL is available
       const dedup = new InMemoryDeduplicationStore();
       const traces = new MockTraceRepository();
 
