@@ -6,6 +6,7 @@ import {
   metrics,
   normalizePayload,
   SQSAlertQueue,
+  flushLoki,
 } from '@junando/core';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -90,6 +91,14 @@ function verifySlackSignature(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  try {
+    return await _handler(event);
+  } finally {
+    await flushLoki();
+  }
+};
+
+async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
 
   const correlationId = randomUUID();
@@ -299,4 +308,4 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     statusCode: 200,
     body: JSON.stringify({ accepted: alerts.length, correlationId }),
   };
-};
+}
