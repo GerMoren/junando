@@ -168,8 +168,14 @@ describe('Config — loadConfig', () => {
       expect(config.lokiUrl).toBe('https://loki.example.com/loki/api/v1/push');
     });
 
-    it('rejects invalid URL (no protocol)', async () => {
-      setEnv({ ...validConfig, LOKI_URL: '://loki:3100' });
+    it('accepts URLs with embedded credentials (Grafana Cloud format)', async () => {
+      setEnv({ ...validConfig, LOKI_URL: 'https://user:token@logs-prod-024.grafana.net/loki/api/v1/push' });
+      const config = await loadConfig();
+      expect(config.lokiUrl).toContain('grafana.net');
+    });
+
+    it('rejects empty lokiUrl', async () => {
+      setEnv({ ...validConfig, LOKI_URL: '' });
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
     });
 
