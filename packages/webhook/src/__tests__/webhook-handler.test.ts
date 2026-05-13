@@ -56,27 +56,6 @@ function createEvent(path: string, body: string | null, options: {
   };
 }
 
-// Helper for valid Alertmanager payload
-const validAlertmanagerPayload = {
-  version: '4',
-  groupKey: 'test-group',
-  status: 'firing',
-  receiver: 'test-receiver',
-  groupLabels: { alertname: 'TestAlert' },
-  commonLabels: { service: 'test-service' },
-  commonAnnotations: { description: 'Test description' },
-  externalURL: 'http://localhost:9093',
-  alerts: [
-    {
-      status: 'firing',
-      labels: { alertname: 'TestAlert', service: 'test-service' },
-      annotations: { description: 'Test alert' },
-      startsAt: '2026-05-12T10:00:00Z',
-      endsAt: '0001-01-01T00:00:00Z',
-      fingerprint: 'test-fp-123',
-    },
-  ],
-};
 
 describe('Webhook Lambda Handler', () => {
   beforeEach(() => {
