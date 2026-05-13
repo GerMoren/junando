@@ -21,12 +21,15 @@ interface Dependencies {
   notifier: INotifier;
   logger: Logger;
   dedupTtlSeconds: number;
+  clustering?: ClusteringService;
 }
 
 export class ProcessIncidentUseCase {
-  private readonly clustering = new ClusteringService();
+  private readonly clustering: ClusteringService;
 
-  constructor(private readonly deps: Dependencies) {}
+  constructor(private readonly deps: Dependencies) {
+    this.clustering = deps.clustering ?? new ClusteringService();
+  }
 
   async execute(alerts: NormalizedAlert[], correlationId: string): Promise<void> {
     const { dedup, traces, llm, notifier, logger, dedupTtlSeconds } = this.deps;

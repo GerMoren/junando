@@ -94,7 +94,7 @@ describe('Webhook Handler', () => {
     const baseString = `v0:${timestamp}:${body}`;
     const hmac = createHmac('sha256', secret);
     hmac.update(baseString, 'utf8');
-    const signature = `v0:${hmac.digest('hex')}`;
+    const signature = `v0=${hmac.digest('hex')}`;
 
     const event = {
       rawPath: '/webhook/slack-interactivity',

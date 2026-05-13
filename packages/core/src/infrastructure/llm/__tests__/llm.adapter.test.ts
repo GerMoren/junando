@@ -144,7 +144,7 @@ describe('OpenRouterProvider', () => {
     expect(options.headers).toMatchObject({
       'Content-Type': 'application/json',
       Authorization: 'Bearer test-key',
-      'HTTP-Referer': 'http://localhost:4000',
+      'HTTP-Referer': 'https://junando.app',
       'X-Title': 'Junando SRE',
     });
 

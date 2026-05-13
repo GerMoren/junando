@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsup src/index.ts --format esm --dts --tsconfig tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -14,7 +14,7 @@
     "@anthropic-ai/sdk": "^0.32.0",
     "@google/generative-ai": "^0.21.0",
     "@types/opossum": "^8.1.9",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.10.1",
     "opossum": "^9.0.0",
     "pino": "^9.0.0",
     "prom-client": "^15.1.3",

@@ -1,12 +1,12 @@
 import {
   LokiTraceRepository,
+  NormalizedAlertSchema,
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
   SlackNotifier,
   createLLMProvider,
   createLogger,
   loadConfig,
-  type NormalizedAlert,
 } from '@junando/core';
 import type { SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
@@ -20,21 +20,7 @@ import { z } from 'zod';
 
 const SQSMessageSchema = z.object({
   correlationId: z.string().uuid(),
-  alerts: z.array(
-    z.object({
-      fingerprint: z.string(),
-      alertName: z.string(),
-      status: z.string(),
-      serviceName: z.string(),
-      alertType: z.string(),
-      endpointPath: z.string(),
-      traceId: z.string().optional(),
-      startsAt: z.string(),
-      latencyMs: z.number().optional(),
-      labels: z.record(z.string()),
-      annotations: z.record(z.string()),
-    }),
-  ),
+  alerts: z.array(NormalizedAlertSchema),
 });
 
 export type SQSMessage = z.infer<typeof SQSMessageSchema>;
@@ -92,9 +78,6 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     }
 
     // If this throws, SQS retries automatically. After max retries → DLQ.
-    await useCaseInstance.execute(
-      parsed.alerts as unknown as NormalizedAlert[],
-      parsed.correlationId,
-    );
+    await useCaseInstance.execute(parsed.alerts, parsed.correlationId);
   }
 };

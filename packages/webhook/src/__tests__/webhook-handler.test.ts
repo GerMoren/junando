@@ -153,7 +153,7 @@ describe('Webhook Lambda Handler', () => {
       const baseString = `v0:${timestamp}:${body}`;
       const hmac = createHmac('sha256', 'test-signing-secret');
       hmac.update(baseString, 'utf8');
-      const signature = `v0:${hmac.digest('hex')}`;
+      const signature = `v0=${hmac.digest('hex')}`;
 
       return createEvent('/webhook/slack-interactivity', body, {
         headers: {
