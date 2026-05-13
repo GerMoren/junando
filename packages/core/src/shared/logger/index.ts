@@ -1,5 +1,5 @@
 import pino from 'pino';
-import pinoLoki from 'pino-loki';
+import { createLokiDestination, initLokiBuffer } from './loki-transport.js';
 
 export type Logger = pino.Logger;
 
@@ -17,7 +17,7 @@ export interface LoggerOptions {
 // Solution: every createLogger() call returns a Proxy that forwards all method
 // calls to the *current* root logger. When reinitLogger() is called after
 // loadConfig(), it swaps the root — and ALL existing proxy instances instantly
-// start writing to Loki without needing to be recreated.
+// start writing to both stdout and Loki without needing to be recreated.
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _root: pino.Logger = buildLogger({});
@@ -29,31 +29,29 @@ function buildLogger(opts: LoggerOptions): pino.Logger {
 
   if (lokiUrl) {
     const parsed = new URL(lokiUrl);
-    const username = parsed.username;
-    const password = parsed.password;
-    const host = `${parsed.protocol}//${parsed.hostname}`;
 
-    const transport = pinoLoki({
-      host,
-      basicAuth: { username, password },
+    // Initialize the in-process Loki buffer.
+    // flushLoki() must be called at the end of every Lambda handler invocation.
+    initLokiBuffer({
+      host: `${parsed.protocol}//${parsed.hostname}`,
+      username: parsed.username,
+      password: parsed.password,
       labels: {
-        service: name,
+        service_name: name,
         environment: process.env['NODE_ENV'] ?? 'production',
       },
-      silenceErrors: false,
-      replaceTimestamp: false,
-      // Disable batching in Lambda — the process exits before the 5s interval fires
-      // and worker_threads are killed without flushing the buffer.
-      batching: false,
     });
 
+    const lokiDest = createLokiDestination();
+
+    // multistream: stdout (CloudWatch) always reliable; Loki via in-process buffer.
     return pino(
       {
         level,
         base: { service: name },
         timestamp: pino.stdTimeFunctions.isoTime,
       },
-      transport,
+      pino.multistream([{ stream: process.stdout }, { stream: lokiDest }]),
     );
   }
 
@@ -82,6 +80,9 @@ export function createLogger(levelOrOptions?: string | LoggerOptions): Logger {
 
   // Return a Proxy that always reads from the CURRENT _root at call time.
   // This means reinitLogger() affects all existing module-level loggers instantly.
+  // Note: read-only by design. pino loggers must not be mutated externally;
+  // a `set` trap here would silently propagate writes to the global root and
+  // affect every other proxy instance.
   return new Proxy({} as pino.Logger, {
     get(_target, prop) {
       const value = (_root as unknown as Record<string | symbol, unknown>)[prop];
@@ -89,10 +90,6 @@ export function createLogger(levelOrOptions?: string | LoggerOptions): Logger {
         return (value as Function).bind(_root);
       }
       return value;
-    },
-    set(_target, prop, value) {
-      (_root as unknown as Record<string | symbol, unknown>)[prop] = value;
-      return true;
     },
   });
 }

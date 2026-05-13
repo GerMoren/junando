@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// ── pino-loki mock ────────────────────────────────────────────────────────
-const mockLokiTransport = vi.hoisted(() => vi.fn().mockReturnValue({ on: vi.fn() }));
+// ── loki-transport mock ───────────────────────────────────────────────────
+const mockInitLokiBuffer = vi.hoisted(() => vi.fn());
+const mockCreateLokiDestination = vi.hoisted(() =>
+  vi.fn().mockReturnValue({ write: vi.fn((_, __, cb) => cb()), on: vi.fn() }),
+);
 
-vi.mock('pino-loki', () => ({
-  default: mockLokiTransport,
+vi.mock('../loki-transport.js', () => ({
+  initLokiBuffer: mockInitLokiBuffer,
+  createLokiDestination: mockCreateLokiDestination,
+  flushLoki: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { createLogger, reinitLogger } from '../index.js';
@@ -13,7 +18,6 @@ describe('createLogger', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env['LOKI_URL'];
-    // Reset the singleton so each test starts fresh
     reinitLogger();
   });
 
@@ -32,15 +36,15 @@ describe('createLogger', () => {
       expect(typeof log.debug).toBe('function');
     });
 
-    it('does NOT call pino-loki transport when LOKI_URL is absent', () => {
+    it('does NOT init Loki transport when LOKI_URL is absent', () => {
       createLogger();
-      expect(mockLokiTransport).not.toHaveBeenCalled();
+      expect(mockInitLokiBuffer).not.toHaveBeenCalled();
     });
 
     it('accepts an optional name argument and still returns a valid logger', () => {
       const log = createLogger({ name: 'my-service' });
       expect(typeof log.info).toBe('function');
-      expect(mockLokiTransport).not.toHaveBeenCalled();
+      expect(mockInitLokiBuffer).not.toHaveBeenCalled();
     });
 
     it('accepts a string level for backwards compatibility', () => {
@@ -53,36 +57,37 @@ describe('createLogger', () => {
   describe('with LOKI_URL', () => {
     const LOKI_URL = 'https://myuser:mytoken@logs-prod-024.grafana.net/loki/api/v1/push';
 
-    it('calls pino-loki when LOKI_URL env var is set and reinitLogger is called', () => {
-      vi.stubEnv('LOKI_URL', LOKI_URL);
-      reinitLogger(); // simulate what handlers do after loadConfig()
-
-      expect(mockLokiTransport).toHaveBeenCalled();
-    });
-
-    it('passes correct host (without credentials) to pino-loki', () => {
+    it('calls initLokiBuffer when LOKI_URL env var is set and reinitLogger is called', () => {
       vi.stubEnv('LOKI_URL', LOKI_URL);
       reinitLogger();
 
-      const [opts] = mockLokiTransport.mock.calls[0] as [Record<string, unknown>];
-      expect(opts['host']).toBe('https://logs-prod-024.grafana.net');
+      expect(mockInitLokiBuffer).toHaveBeenCalled();
     });
 
-    it('passes basicAuth credentials extracted from the URL', () => {
+    it('passes correct host (without credentials or path) to initLokiBuffer', () => {
       vi.stubEnv('LOKI_URL', LOKI_URL);
       reinitLogger();
 
-      const [opts] = mockLokiTransport.mock.calls[0] as [Record<string, unknown>];
-      expect(opts['basicAuth']).toEqual({ username: 'myuser', password: 'mytoken' });
+      const [config] = mockInitLokiBuffer.mock.calls[0] as [Record<string, unknown>];
+      expect(config['host']).toBe('https://logs-prod-024.grafana.net');
     });
 
-    it('sets Loki labels with service=junando and environment from NODE_ENV', () => {
+    it('passes credentials extracted from the URL to initLokiBuffer', () => {
+      vi.stubEnv('LOKI_URL', LOKI_URL);
+      reinitLogger();
+
+      const [config] = mockInitLokiBuffer.mock.calls[0] as [Record<string, unknown>];
+      expect(config['username']).toBe('myuser');
+      expect(config['password']).toBe('mytoken');
+    });
+
+    it('sets Loki labels with service_name=junando and environment from NODE_ENV', () => {
       vi.stubEnv('LOKI_URL', LOKI_URL);
       vi.stubEnv('NODE_ENV', 'staging');
       reinitLogger();
 
-      const [opts] = mockLokiTransport.mock.calls[0] as [Record<string, unknown>];
-      expect(opts['labels']).toMatchObject({ service: 'junando', environment: 'staging' });
+      const [config] = mockInitLokiBuffer.mock.calls[0] as [Record<string, unknown>];
+      expect(config['labels']).toMatchObject({ service_name: 'junando', environment: 'staging' });
     });
 
     it('defaults environment to production when NODE_ENV is unset', () => {
@@ -90,20 +95,20 @@ describe('createLogger', () => {
       delete process.env['NODE_ENV'];
       reinitLogger();
 
-      const [opts] = mockLokiTransport.mock.calls[0] as [Record<string, unknown>];
-      expect((opts['labels'] as Record<string, string>)['environment']).toBe('production');
+      const [config] = mockInitLokiBuffer.mock.calls[0] as [Record<string, unknown>];
+      expect((config['labels'] as Record<string, string>)['environment']).toBe('production');
     });
 
     it('createLogger returns the Loki logger after reinitLogger is called', () => {
       vi.stubEnv('LOKI_URL', LOKI_URL);
       reinitLogger();
-      vi.clearAllMocks(); // clear the reinit call count
+      vi.clearAllMocks();
 
-      const log = createLogger(); // should return the already-built Loki singleton
+      const log = createLogger(); // returns proxy to existing singleton
       expect(typeof log.info).toBe('function');
       expect(typeof log.warn).toBe('function');
-      // pino-loki not called again — singleton reused
-      expect(mockLokiTransport).not.toHaveBeenCalled();
+      // initLokiBuffer not called again — singleton reused
+      expect(mockInitLokiBuffer).not.toHaveBeenCalled();
     });
   });
 });
