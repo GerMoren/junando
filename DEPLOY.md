@@ -125,6 +125,23 @@ CDK injects these automatically. Both are **required** — without them the Lamb
 | `SSM_PREFIX` | `/junando`   | Tells `loadConfig()` to fetch secrets from SSM         |
 | `NODE_ENV`   | `production` | Switches logger and config defaults to production mode |
 
+### Deployment Config Inputs
+
+These values are resolved by `bin/app.ts` with the following precedence: **shell environment variable → CDK context (`cdk.json`) → hardcoded default**.
+
+| Input variable | Shell env var  | CDK context key | Default       | Example override                          |
+| -------------- | -------------- | --------------- | ------------- | ----------------------------------------- |
+| `nodeEnv`      | `NODE_ENV`     | `nodeEnv`       | `production`  | `NODE_ENV=staging pnpm cdk deploy --all`  |
+| `ssmPrefix`    | `SSM_PREFIX`   | `ssmPrefix`     | `/junando`    | `SSM_PREFIX=/junando-staging pnpm cdk deploy --all` |
+
+To deploy to a staging environment:
+
+```bash
+NODE_ENV=staging SSM_PREFIX=/junando-staging pnpm cdk deploy --all
+```
+
+The default values (`production` / `/junando`) are also declared in `packages/cdk/cdk.json` under the `context` block so that `cdk synth` is fully reproducible without any shell overrides.
+
 > ⚠️ **NEVER** use `aws lambda update-function-configuration --environment "Variables={...}"` to change env vars. The AWS CLI **OVERWRITES** all existing env vars instead of merging — you will silently delete `SSM_PREFIX` / `NODE_ENV` and the Lambda will start failing on the next cold start. **Always redeploy via CDK** (`pnpm cdk deploy --all`) to change env vars.
 
 ### 2. Build All Packages
@@ -257,6 +274,8 @@ new JunandoStack(app, 'JunandoStack', {
     account: '123456789012',
     region: 'us-east-1',
   },
+  nodeEnv: 'production',
+  ssmPrefix: '/junando',
 });
 ```
 
