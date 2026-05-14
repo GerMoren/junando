@@ -1,0 +1,17 @@
+# demo-only — do not use in production
+# This rule fires when the junando job target is down (up == 0).
+# It exists solely to enable the autonomous local E2E path:
+#   Prometheus → AlertManager → Junando webhook → Slack
+# Remove or disable this file in production Prometheus instances.
+groups:
+  - name: demo
+    rules:
+      - alert: JunandoDown
+        expr: up{job="junando"} == 0
+        for: 30s
+        labels:
+          severity: warning
+          service: junando
+        annotations:
+          summary: "Junando is unreachable"
+          description: "The junando job target has been down for more than 30 seconds. (demo rule)"
