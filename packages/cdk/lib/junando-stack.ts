@@ -13,8 +13,15 @@ const assetPath = (pkg: string) => path.join(process.cwd(), '..', pkg, 'dist');
 // JunandoStack — all infrastructure defined in TypeScript. Zero YAML.
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface JunandoStackProps extends cdk.StackProps {
+  /** Runtime NODE_ENV for Lambda functions — resolved by bin/app.ts. */
+  nodeEnv: string;
+  /** SSM Parameter Store prefix for all secrets — resolved by bin/app.ts. */
+  ssmPrefix: string;
+}
+
 export class JunandoStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: JunandoStackProps) {
     super(scope, id, props);
 
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
@@ -54,8 +61,8 @@ export class JunandoStack extends cdk.Stack {
       layers: [coreLayer],
       environment: {
         SQS_QUEUE_URL: queue.queueUrl,
-        NODE_ENV: 'production',
-        SSM_PREFIX: '/junando',
+        NODE_ENV: props.nodeEnv,
+        SSM_PREFIX: props.ssmPrefix,
       },
     });
     queue.grantSendMessages(webhookFn);
@@ -91,8 +98,8 @@ export class JunandoStack extends cdk.Stack {
       timeout: cdk.Duration.minutes(3),
       layers: [coreLayer],
       environment: {
-        NODE_ENV: 'production',
-        SSM_PREFIX: '/junando',
+        NODE_ENV: props.nodeEnv,
+        SSM_PREFIX: props.ssmPrefix,
       },
     });
 

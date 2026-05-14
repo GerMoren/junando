@@ -1,5 +1,9 @@
 {
   "app": "node dist/bin/app.js",
   "watch": { "include": ["**"], "exclude": ["README.md", "cdk*.json", "dist", "node_modules"] },
-  "context": { "@aws-cdk/aws-lambda:recognizeLayerVersion": true }
+  "context": {
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "nodeEnv": "production",
+    "ssmPrefix": "/junando"
+  }
 }
