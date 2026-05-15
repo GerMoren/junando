@@ -21,7 +21,9 @@ services:
   prometheus:
     image: prom/prometheus:v2.53.0
     ports: ['9090:9090']
-    volumes: ['./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml']
+    volumes:
+      - './prometheus/prometheus.yml:/etc/prometheus/prometheus.yml'
+      - './prometheus/rules:/etc/prometheus/rules:ro'
 
   alertmanager:
     image: prom/alertmanager:v0.27.0

@@ -1,0 +1,30 @@
+# Production AlertManager receiver config for Junando
+# Copy the `receivers` block (and optionally `route`) into your existing alertmanager.yml.
+# Replace the url with your Lambda Function URL from CDK outputs (JunandoStack.WebhookURL).
+# See docs/ALERTMANAGER.md for edge cases (resolved alerts, grouping, large payloads).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  # Group by alertname + service to keep Slack messages focused.
+  # Avoid high-cardinality labels (e.g. pod, instance) here — one Slack message per group per interval.
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: junando
+
+receivers:
+  - name: junando
+    webhook_configs:
+      - url: 'https://<id>.lambda-url.<region>.on.aws'  # Replace with JunandoStack.WebhookURL
+        # Junando accepts resolved payloads (HTTP 200 / {"accepted":0}) but does NOT forward
+        # them to Slack at MVP. Set send_resolved: false to suppress unnecessary retries.
+        # See docs/ALERTMANAGER.md § Resolved Alerts for the full contract.
+        send_resolved: false
+        http_config:
+          follow_redirects: true
+        # 0 = no limit on alerts per batch; Junando truncates annotations when the total
+        # payload exceeds 250 KB before enqueuing to SQS. See ALERTMANAGER.md § Large Payloads.
+        max_alerts: 0

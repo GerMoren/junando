@@ -185,14 +185,18 @@ Or check in AWS Console:
 
 ### 5. Configure Alertmanager
 
-Copy the `WebhookURL` from CDK outputs and add to your Alertmanager config:
+Copy the `WebhookURL` from CDK outputs and use the ready-to-copy receiver config in [`docs/alertmanager-example.yml`](docs/alertmanager-example.yml):
 
 ```yaml
 receivers:
   - name: junando
     webhook_configs:
-      - url: 'https://<id>.lambda-url.<region>.on.aws'
+      - url: 'https://<id>.lambda-url.<region>.on.aws'  # JunandoStack.WebhookURL
+        send_resolved: false   # Junando accepts resolved payloads (HTTP 200 / {"accepted":0}) but does not forward them to Slack at MVP
+        max_alerts: 0          # Junando truncates annotations if the total payload exceeds 250 KB
 ```
+
+> **Resolved alerts**: Setting `send_resolved: false` is recommended to suppress unnecessary webhook calls. See [`docs/ALERTMANAGER.md`](docs/ALERTMANAGER.md) for the full edge-case reference (resolved behavior, grouping, large payloads, 30s SLA).
 
 ### 6. Test End-to-End
 
