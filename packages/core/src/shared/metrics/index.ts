@@ -38,6 +38,7 @@ export const latency = new Histogram({
 export const llmInferenceDuration = new Histogram({
   name: 'junando_llm_inference_duration_seconds',
   help: 'LLM inference duration in seconds',
+  labelNames: ['model'],
   buckets: [0.5, 1, 2, 5, 10, 30],
   registers: [registry],
 });

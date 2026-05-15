@@ -12,6 +12,7 @@ import {
   LLMProviderType,
 } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
+import { llmInferenceDuration, llmInferenceTotal } from '../../shared/metrics/index.js';
 
 const logger = createLogger();
 
@@ -302,9 +303,11 @@ export class OpenRouterProvider implements ILLMProvider {
             const deadlineMs = Date.now() + this.fallbackTimeoutMs;
             return this.analyzeFallback(prompt, correlationId, deadlineMs, this.model);
           }
+          llmInferenceTotal.inc({ status: 'rate_limited' });
           throw new Error(`OpenRouter API failed: ${res.status}`);
         }
 
+        llmInferenceTotal.inc({ status: 'error' });
         throw new Error(`OpenRouter API failed: ${res.status}`);
       }
 
@@ -328,6 +331,9 @@ export class OpenRouterProvider implements ILLMProvider {
           'llm:request:success',
         );
       }
+
+      llmInferenceTotal.inc({ status: 'success' });
+      llmInferenceDuration.observe({ model: this.model }, latencyMs / 1000);
 
       return analysis;
     }

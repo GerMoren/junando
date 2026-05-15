@@ -739,3 +739,83 @@ describe('OpenRouterProvider structured logging', () => {
     await expect(provider.analyze(makeCluster(), [])).resolves.toBeDefined();
   });
 });
+
+// ── OpenRouterProvider metric instrumentation tests ────────────────────────
+
+const mockMetrics = vi.hoisted(() => ({
+  inc: vi.fn(),
+  observe: vi.fn(),
+}));
+
+vi.mock('../../../shared/metrics/index.js', () => ({
+  llmInferenceTotal: { inc: mockMetrics.inc },
+  llmInferenceDuration: { observe: mockMetrics.observe },
+}));
+
+describe('OpenRouterProvider — metric instrumentation', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function makeSuccessResponse(content: string) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      }),
+    };
+  }
+
+  const successContent =
+    '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}';
+
+  it('increments llmInferenceTotal with status=success on successful call', async () => {
+    mockFetch.mockResolvedValue(makeSuccessResponse(successContent));
+    const provider = new OpenRouterProvider('key', 'qwen/test-model');
+    await provider.analyze(makeCluster(), []);
+    expect(mockMetrics.inc).toHaveBeenCalledWith({ status: 'success' });
+  });
+
+  it('observes llmInferenceDuration with model label on successful call', async () => {
+    mockFetch.mockResolvedValue(makeSuccessResponse(successContent));
+    const provider = new OpenRouterProvider('key', 'qwen/test-model');
+    await provider.analyze(makeCluster(), []);
+    expect(mockMetrics.observe).toHaveBeenCalledWith(
+      { model: 'qwen/test-model' },
+      expect.any(Number),
+    );
+  });
+
+  it('increments llmInferenceTotal with status=error on non-retryable HTTP error', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    const provider = new OpenRouterProvider('key', 'qwen/test-model');
+    await expect(provider.analyze(makeCluster(), [])).rejects.toThrow();
+    expect(mockMetrics.inc).toHaveBeenCalledWith({ status: 'error' });
+  });
+
+  it('increments llmInferenceTotal with status=rate_limited when 429 exhausted with no fallback', async () => {
+    vi.useFakeTimers();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { metadata: { retry_after_seconds: 1 } } }),
+    });
+    const provider = new OpenRouterProvider('key', 'qwen/test-model');
+    const promise = provider.analyze(makeCluster(), []);
+    const assertion = expect(promise).rejects.toThrow();
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(mockMetrics.inc).toHaveBeenCalledWith({ status: 'rate_limited' });
+    vi.useRealTimers();
+  });
+});
+
