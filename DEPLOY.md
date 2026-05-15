@@ -348,3 +348,30 @@ pnpm cdk destroy --all
 
 - The webhook uses `AuthType.NONE` (public). Ensure you're okay with this.
 - For auth, modify `authType` in the CDK stack and redeploy.
+
+
+---
+
+## Observability Dashboards
+
+Three Grafana dashboards are provided in `docs/dashboards/` for monitoring the Junando pipeline:
+
+| Dashboard | File | Description |
+|-----------|------|-------------|
+| Alert Volume | `docs/dashboards/alert-volume.json` | Webhook throughput, alerts received/processed rates |
+| LLM Performance | `docs/dashboards/llm-performance.json` | LLM latency p50/p99, 429 rate, fallback hops, token usage |
+| SQS Health | `docs/dashboards/sqs-health.json` | SQS queue depth, DLQ depth, worker error logs |
+
+### IAM Setup for SQS Panels
+
+The SQS dashboard requires CloudWatch access. Add this policy to your Grafana IAM user/role:
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["cloudwatch:GetMetricData", "cloudwatch:ListMetrics"],
+  "Resource": "*"
+}
+```
+
+For the full setup guide including Loki datasource connection, cross-account IAM role, and dashboard import steps, see: **[docs/runbooks/grafana-setup.md](docs/runbooks/grafana-setup.md)**

@@ -321,6 +321,18 @@ prompt/completion tokens, total tokens, and latency in ms. On HTTP 429 it retrie
 once with backoff (uses `retry_after_seconds` if the provider returns it, else 5s,
 capped at 30s) — verified against `google/gemma-4-31b-it:free`.
 
+### Grafana Dashboards
+
+Three portable, importable dashboard JSONs are available in [`docs/dashboards/`](docs/dashboards/):
+
+| Dashboard | Description |
+|-----------|-------------|
+| [`alert-volume.json`](docs/dashboards/alert-volume.json) | Webhook throughput, alert received/processed rates, duplicate rate |
+| [`llm-performance.json`](docs/dashboards/llm-performance.json) | LLM p50/p99 latency, 429 error rate, fallback hops, token usage |
+| [`sqs-health.json`](docs/dashboards/sqs-health.json) | SQS queue/DLQ depth (CloudWatch) + worker error logs (Loki) |
+
+For setup instructions, see **[docs/runbooks/grafana-setup.md](docs/runbooks/grafana-setup.md)**.
+
 ---
 
 ## Common Commands

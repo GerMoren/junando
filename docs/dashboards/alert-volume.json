@@ -1,0 +1,214 @@
+{
+  "__inputs": [
+    {
+      "name": "loki_ds",
+      "label": "Loki Datasource",
+      "description": "Loki datasource for Junando logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    },
+    {
+      "name": "environment",
+      "label": "Environment",
+      "description": "Deployment environment",
+      "type": "constant",
+      "value": "production"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    }
+  ],
+  "uid": "",
+  "title": "Junando — Alert Volume",
+  "description": "Pipeline throughput: alerts received, processed, and webhook request rates",
+  "tags": ["junando", "observability", "alerts"],
+  "schemaVersion": 38,
+  "version": 1,
+  "meta": {
+    "schemaVersion": 38
+  },
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "loki_ds",
+        "type": "datasource",
+        "pluginId": "loki",
+        "label": "Loki Datasource",
+        "hide": 0,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "environment",
+        "type": "custom",
+        "label": "Environment",
+        "hide": 0,
+        "options": [
+          { "text": "production", "value": "production", "selected": true },
+          { "text": "staging", "value": "staging", "selected": false },
+          { "text": "dev", "value": "dev", "selected": false }
+        ],
+        "current": { "text": "production", "value": "production" },
+        "query": "production,staging,dev"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Alerts Received Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"alerts received\" [5m]))",
+          "legendFormat": "alerts/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Alerts Processed Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"Notification sent\" [5m]))",
+          "legendFormat": "processed/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Webhook Request Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"junando-webhook\", environment=\"$environment\"} |= \"webhook\" [5m]))",
+          "legendFormat": "requests/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Duplicate Cluster Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"Duplicate cluster\" [5m]))",
+          "legendFormat": "duplicates/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Error Log Count",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=~\"junando.*\", environment=\"$environment\", level=\"error\"} [1h]))",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Avg Batch Size",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "avg_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"Processing alert batch\" | json | unwrap alertCount [5m])",
+          "legendFormat": "avg batch size",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    }
+  ]
+}
