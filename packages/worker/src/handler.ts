@@ -4,6 +4,7 @@ import {
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
   SlackNotifier,
+  metrics,
   createLLMProvider,
   createLogger,
   reinitLogger,
@@ -55,6 +56,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
     notifier,
     logger,
     dedupTtlSeconds: config.dedupTtlSeconds,
+    onClustersBuilt: (count) => metrics.alertClusters.set(count),
   });
 
   return useCase;

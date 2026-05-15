@@ -22,6 +22,7 @@ interface Dependencies {
   logger: Logger;
   dedupTtlSeconds: number;
   clustering?: ClusteringService;
+  onClustersBuilt?: (count: number) => void;
 }
 
 export class ProcessIncidentUseCase {
@@ -40,6 +41,7 @@ export class ProcessIncidentUseCase {
     // 1. Cluster alerts by fingerprint
     const clusters = this.clustering.buildClusters(alerts);
     log.info({ clusterCount: clusters.length }, 'Clusters built');
+    this.deps.onClustersBuilt?.(clusters.length);
 
     for (const cluster of clusters) {
       const log2 = log.child({ fingerprint: cluster.fingerprint, service: cluster.serviceName });

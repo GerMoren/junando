@@ -33,7 +33,7 @@ function buildLogger(opts: LoggerOptions): pino.Logger {
     // Initialize the in-process Loki buffer.
     // flushLoki() must be called at the end of every Lambda handler invocation.
     initLokiBuffer({
-      host: `${parsed.protocol}//${parsed.hostname}`,
+      host: `${parsed.protocol}//${parsed.host}`,
       username: parsed.username,
       password: parsed.password,
       labels: {

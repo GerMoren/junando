@@ -1,0 +1,221 @@
+{
+  "__inputs": [
+    {
+      "name": "loki_ds",
+      "label": "Loki Datasource",
+      "description": "Loki datasource for Junando logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    },
+    {
+      "name": "environment",
+      "label": "Environment",
+      "description": "Deployment environment",
+      "type": "constant",
+      "value": "production"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    }
+  ],
+  "uid": "",
+  "title": "Junando — LLM Performance",
+  "description": "LLM inference latency, error rates, fallback hops, and token usage",
+  "tags": ["junando", "observability", "llm"],
+  "schemaVersion": 38,
+  "version": 1,
+  "meta": {
+    "schemaVersion": 38
+  },
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "loki_ds",
+        "type": "datasource",
+        "pluginId": "loki",
+        "query": "loki",
+        "refresh": 1,
+        "label": "Loki Datasource",
+        "hide": 0,
+        "current": {
+          "selected": true,
+          "text": "Loki",
+          "value": "loki-local"
+        },
+        "options": []
+      },
+      {
+        "name": "environment",
+        "type": "custom",
+        "label": "Environment",
+        "hide": 0,
+        "options": [
+          { "text": "production", "value": "production", "selected": true },
+          { "text": "staging", "value": "staging", "selected": false },
+          { "text": "dev", "value": "dev", "selected": false }
+        ],
+        "current": { "text": "production", "value": "production" },
+        "query": "production,staging,dev"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "LLM Inference p50 Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.5, {job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap latencyMs [5m])",
+          "legendFormat": "p50 latency ms",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "LLM Inference p99 Latency (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.99, {job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap latencyMs [5m])",
+          "legendFormat": "p99 latency ms",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "LLM 429 Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:failed\" | json | status=`429` [5m]))",
+          "legendFormat": "429 errors/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "LLM Fallback Hop Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:fallback:hop\" [5m]))",
+          "legendFormat": "fallback hops/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Token Usage by Model (prompt tokens)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap usage_promptTokens [5m]))",
+          "legendFormat": "{{model}} prompt tokens",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Token Usage by Model (completion tokens)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap usage_completionTokens [5m]))",
+          "legendFormat": "{{model}} completion tokens",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "__inputs": [
+    {
+      "name": "loki_ds",
+      "label": "Loki Datasource",
+      "description": "Loki datasource for Junando logs",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    },
+    {
+      "name": "environment",
+      "label": "Environment",
+      "description": "Deployment environment",
+      "type": "constant",
+      "value": "production"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "loki",
+      "name": "Loki",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    }
+  ],
+  "uid": "",
+  "title": "Junando — SQS Health",
+  "description": "SQS queue depth, DLQ depth, message rates, and worker error logs",
+  "tags": ["junando", "observability", "sqs", "aws"],
+  "schemaVersion": 38,
+  "version": 1,
+  "meta": {
+    "schemaVersion": 38
+  },
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "loki_ds",
+        "type": "datasource",
+        "pluginId": "loki",
+        "query": "loki",
+        "refresh": 1,
+        "label": "Loki Datasource",
+        "hide": 0,
+        "current": {
+          "selected": true,
+          "text": "Loki",
+          "value": "loki-local"
+        },
+        "options": []
+      },
+      {
+        "name": "cloudwatch_ds",
+        "type": "datasource",
+        "pluginId": "cloudwatch",
+        "label": "CloudWatch Datasource",
+        "hide": 2,
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "environment",
+        "type": "custom",
+        "label": "Environment",
+        "hide": 0,
+        "options": [
+          { "text": "production", "value": "production", "selected": true },
+          { "text": "staging", "value": "staging", "selected": false },
+          { "text": "dev", "value": "dev", "selected": false }
+        ],
+        "current": { "text": "production", "value": "production" },
+        "query": "production,staging,dev"
+      },
+      {
+        "name": "sqs_queue_name",
+        "type": "custom",
+        "label": "SQS Queue Name",
+        "hide": 0,
+        "options": [
+          { "text": "junando-alerts", "value": "junando-alerts", "selected": true }
+        ],
+        "current": { "text": "junando-alerts", "value": "junando-alerts" },
+        "query": "junando-alerts"
+      },
+      {
+        "name": "sqs_dlq_name",
+        "type": "custom",
+        "label": "SQS DLQ Name",
+        "hide": 0,
+        "options": [
+          { "text": "junando-alerts-dlq", "value": "junando-alerts-dlq", "selected": true }
+        ],
+        "current": { "text": "junando-alerts-dlq", "value": "junando-alerts-dlq" },
+        "query": "junando-alerts-dlq"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "SQS Queue Depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "cloudwatch", "uid": "${cloudwatch_ds}" },
+      "targets": [
+        {
+          "queryMode": "Metrics",
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": ["$sqs_queue_name"]
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "refId": "A",
+          "legendFormat": "queue depth"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "DLQ Depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "cloudwatch", "uid": "${cloudwatch_ds}" },
+      "targets": [
+        {
+          "queryMode": "Metrics",
+          "namespace": "AWS/SQS",
+          "metricName": "ApproximateNumberOfMessagesVisible",
+          "dimensions": {
+            "QueueName": ["$sqs_dlq_name"]
+          },
+          "statistic": "Maximum",
+          "period": "60",
+          "refId": "A",
+          "legendFormat": "DLQ depth"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Messages Sent Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "cloudwatch", "uid": "${cloudwatch_ds}" },
+      "targets": [
+        {
+          "queryMode": "Metrics",
+          "namespace": "AWS/SQS",
+          "metricName": "NumberOfMessagesSent",
+          "dimensions": {
+            "QueueName": ["$sqs_queue_name"]
+          },
+          "statistic": "Sum",
+          "period": "60",
+          "refId": "A",
+          "legendFormat": "messages sent/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Worker Error Logs",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"junando-worker\", environment=\"$environment\", level=\"error\"} [5m]))",
+          "legendFormat": "worker errors/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.01 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Pipeline Inline Failures (dev)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "${loki_ds}" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"inline pipeline\" |= \"failed\" [1h]))",
+          "legendFormat": "inline failures",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

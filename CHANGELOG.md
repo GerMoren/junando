@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Observability**: Three portable Grafana dashboard JSON files in `docs/dashboards/` — `alert-volume.json` (pipeline throughput via Loki LogQL), `llm-performance.json` (LLM p50/p99 latency, 429 rate, fallback hops, token usage via Loki LogQL), `sqs-health.json` (SQS queue/DLQ depth via CloudWatch + worker errors via Loki).
+- **Observability**: `docs/runbooks/grafana-setup.md` — step-by-step guide for connecting Grafana Cloud to Loki and CloudWatch, IAM inline policy (`cloudwatch:GetMetricData`), cross-account role setup, dashboard import, and template variable binding.
+- **Metrics**: `junando_llm_inference_duration_seconds` histogram now includes `model` label — recorded on every successful OpenRouter call with elapsed duration in seconds.
+- **Metrics**: `junando_llm_inference_total` counter now incremented in `OpenRouterProvider.analyze()` with `status=success`, `status=error`, or `status=rate_limited` on each completed attempt.
+- **Metrics**: `junando_alert_clusters` gauge now set after each clustering run in `ProcessIncidentUseCase` via the new optional `onClustersBuilt` callback, wired at the composition root in the worker Lambda.
+
 - **LLM**: Automatic fallback chain for OpenRouter providers — after primary model exhausts 429 retries, cycles through `LLM_FALLBACK_MODELS` (comma-separated) in order until one succeeds or the wall-clock timeout (`LLM_FALLBACK_TIMEOUT_MS`, default 60s) is exceeded.
 - **LLM**: `llm:fallback:hop` structured log event emitted on each model transition with `{ from_model, to_model, reason }`.
 - **Config**: New fields `llmFallbackModels` (string[]) and `llmFallbackTimeoutMs` (number) wired to env vars and SSM (`/junando/llm-fallback-models`, `/junando/llm-fallback-timeout-ms`).

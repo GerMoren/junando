@@ -109,3 +109,86 @@ describe('ProcessIncidentUseCase', () => {
     expect(mockNotifier.send).toHaveBeenCalledWith(expect.anything(), null);
   });
 });
+
+describe('ProcessIncidentUseCase — onClustersBuilt callback', () => {
+  const mockDedup: IDeduplicationStore = { isNew: vi.fn(), reset: vi.fn() };
+  const mockTraces: ITraceRepository = { findByTraceId: vi.fn() };
+  const mockLlm: ILLMProvider = { analyze: vi.fn() };
+  const mockNotifier: INotifier = { send: vi.fn() };
+  const mockLogger = {
+    child: vi.fn().mockReturnThis(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+    level: 'info',
+  } as unknown as Logger;
+
+  it('calls onClustersBuilt with cluster count for a non-empty batch', async () => {
+    const onClustersBuilt = vi.fn();
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup,
+      traces: mockTraces,
+      llm: mockLlm,
+      notifier: mockNotifier,
+      logger: mockLogger,
+      dedupTtlSeconds: 300,
+      onClustersBuilt,
+    });
+
+    vi.mocked(mockDedup.isNew).mockResolvedValue(false); // skip inner processing
+    vi.mocked(mockLlm.analyze).mockResolvedValue({
+      probable_cause: 'x',
+      impacted_services: ['s'],
+      recommended_steps: [],
+      urgency_level: 'low',
+      requires_rollback: false,
+    });
+
+    const alerts = [
+      makeAlert({ serviceName: 'svc-a', alertType: AlertType.Error, endpointPath: '/a' }),
+      makeAlert({ serviceName: 'svc-b', alertType: AlertType.Error, endpointPath: '/b' }),
+    ];
+
+    await uc.execute(alerts, 'corr-cb');
+
+    expect(onClustersBuilt).toHaveBeenCalledTimes(1);
+    const [count] = vi.mocked(onClustersBuilt).mock.calls[0] as [number];
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('calls onClustersBuilt with 0 for an empty batch', async () => {
+    const onClustersBuilt = vi.fn();
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup,
+      traces: mockTraces,
+      llm: mockLlm,
+      notifier: mockNotifier,
+      logger: mockLogger,
+      dedupTtlSeconds: 300,
+      onClustersBuilt,
+    });
+
+    await uc.execute([], 'corr-empty');
+
+    expect(onClustersBuilt).toHaveBeenCalledOnce();
+    expect(onClustersBuilt).toHaveBeenCalledWith(0);
+  });
+
+  it('does not throw when onClustersBuilt is not provided', async () => {
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup,
+      traces: mockTraces,
+      llm: mockLlm,
+      notifier: mockNotifier,
+      logger: mockLogger,
+      dedupTtlSeconds: 300,
+    });
+
+    vi.mocked(mockDedup.isNew).mockResolvedValue(false);
+
+    await expect(uc.execute([makeAlert()], 'corr-no-cb')).resolves.toBeUndefined();
+  });
+});
