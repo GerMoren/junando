@@ -9,14 +9,6 @@
       "pluginName": "Loki"
     },
     {
-      "name": "cloudwatch_ds",
-      "label": "CloudWatch Datasource",
-      "description": "AWS CloudWatch datasource for SQS metrics",
-      "type": "datasource",
-      "pluginId": "cloudwatch",
-      "pluginName": "CloudWatch"
-    },
-    {
       "name": "environment",
       "label": "Environment",
       "description": "Deployment environment",
@@ -35,12 +27,6 @@
       "type": "datasource",
       "id": "loki",
       "name": "Loki",
-      "version": "1.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "cloudwatch",
-      "name": "CloudWatch",
       "version": "1.0.0"
     },
     {
@@ -77,9 +63,15 @@
         "name": "loki_ds",
         "type": "datasource",
         "pluginId": "loki",
+        "query": "loki",
+        "refresh": 1,
         "label": "Loki Datasource",
         "hide": 0,
-        "current": {},
+        "current": {
+          "selected": true,
+          "text": "Loki",
+          "value": "loki-local"
+        },
         "options": []
       },
       {
@@ -87,7 +79,7 @@
         "type": "datasource",
         "pluginId": "cloudwatch",
         "label": "CloudWatch Datasource",
-        "hide": 0,
+        "hide": 2,
         "current": {},
         "options": []
       },

@@ -63,9 +63,15 @@
         "name": "loki_ds",
         "type": "datasource",
         "pluginId": "loki",
+        "query": "loki",
+        "refresh": 1,
         "label": "Loki Datasource",
         "hide": 0,
-        "current": {},
+        "current": {
+          "selected": true,
+          "text": "Loki",
+          "value": "loki-local"
+        },
         "options": []
       },
       {

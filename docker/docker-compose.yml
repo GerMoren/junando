@@ -45,4 +45,6 @@ services:
     volumes:
       - './grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml'
       - './grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml'
-      - '../dashboard-junando.json:/var/lib/grafana/dashboards/dashboard-junando.json'
+      - '../docs/dashboards/alert-volume.json:/var/lib/grafana/dashboards/alert-volume.json'
+      - '../docs/dashboards/llm-performance.json:/var/lib/grafana/dashboards/llm-performance.json'
+      - '../docs/dashboards/sqs-health.json:/var/lib/grafana/dashboards/sqs-health.json'

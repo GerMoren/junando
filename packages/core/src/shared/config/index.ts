@@ -54,7 +54,7 @@ async function loadSecretsFromSSM(): Promise<void> {
 const ConfigSchema = z.object({
   llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
   llmApiKey: z.string().min(1),
-  llmModel: z.string().optional(),
+  llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
   slackBotToken: z.string().startsWith('xoxb-'),
   slackSigningSecret: z.string().min(1),
   slackChannel: z.string().startsWith('#'),

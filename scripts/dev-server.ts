@@ -6,10 +6,17 @@
  *
  * Usage: pnpm run dev:webhook
  */
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
-import { createLogger, DEV_SERVER_PORT, RATE_LIMITER } from "@junando/core";
+import {
+  createLogger,
+  DEV_SERVER_PORT,
+  flushLoki,
+  loadConfig,
+  RATE_LIMITER,
+  reinitLogger,
+} from "@junando/core";
 import Bottleneck from "bottleneck";
+import { randomUUID } from "node:crypto";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 const logger = createLogger();
 
@@ -83,12 +90,17 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
     res.writeHead(statusCode, { "Content-Type": "application/json" });
     res.end(responseBody);
+    await flushLoki();
   } catch (err) {
     logger.error({ err }, "Handler error");
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Internal server error" }));
+    await flushLoki();
   }
 });
+
+const config = await loadConfig();
+reinitLogger({ level: config.logLevel });
 
 server.listen(PORT, () => {
   logger.info(`🔦 Junando webhook running on http://localhost:${PORT}`);

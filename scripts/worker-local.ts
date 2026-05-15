@@ -19,8 +19,10 @@ import {
   WEBHOOK_DEFAULTS,
   createLLMProvider,
   createLogger,
+  flushLoki,
   loadConfig,
   normalizePayload,
+  reinitLogger,
   type AlertmanagerPayload,
   type NormalizedAlert,
 } from "@junando/core";
@@ -34,8 +36,7 @@ const args = process.argv.slice(2);
 
 async function main() {
   const config = await loadConfig();
-
-  logger.info("Initializing worker-local...");
+  reinitLogger({ level: config.logLevel });
 
   const redis = new Redis(config.redisUrl, { lazyConnect: true });
   try {
@@ -180,11 +181,13 @@ async function main() {
     );
     logger.info({ responsePath }, "Response saved");
 
+    await flushLoki();
     await redis.quit();
     process.exit(0);
   } catch (err) {
     const duration = Date.now() - startTime;
     logger.error({ err, durationMs: duration }, "Pipeline failed");
+    await flushLoki();
     await redis.quit();
     process.exit(1);
   }
