@@ -413,6 +413,66 @@ describe('Config — loadConfig', () => {
     });
   });
 
+  // ── Schema: llmFallbackModels ───────────────────────────────────────────
+
+  describe('llmFallbackModels (comma-separated string → string[])', () => {
+    it('defaults to empty array when LLM_FALLBACK_MODELS is unset', async () => {
+      setEnv({ ...validConfig });
+      delete process.env['LLM_FALLBACK_MODELS'];
+      const config = await loadConfig();
+      expect(config.llmFallbackModels).toEqual([
+        'google/gemma-4-31b-it:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'mistralai/mistral-7b-instruct:free',
+      ]);
+    });
+
+    it('parses a comma-separated list of models', async () => {
+      setEnv({ ...validConfig });
+      process.env['LLM_FALLBACK_MODELS'] = 'model-b,model-c';
+      const config = await loadConfig();
+      expect(config.llmFallbackModels).toEqual(['model-b', 'model-c']);
+    });
+
+    it('trims whitespace from model names', async () => {
+      setEnv({ ...validConfig });
+      process.env['LLM_FALLBACK_MODELS'] = ' model-b , model-c ';
+      const config = await loadConfig();
+      expect(config.llmFallbackModels).toEqual(['model-b', 'model-c']);
+    });
+
+    it('returns empty array when LLM_FALLBACK_MODELS is empty string', async () => {
+      setEnv({ ...validConfig });
+      process.env['LLM_FALLBACK_MODELS'] = '';
+      const config = await loadConfig();
+      expect(config.llmFallbackModels).toEqual([]);
+    });
+  });
+
+  // ── Schema: llmFallbackTimeoutMs ─────────────────────────────────────────
+
+  describe('llmFallbackTimeoutMs (number with default)', () => {
+    it('defaults to 60000 when LLM_FALLBACK_TIMEOUT_MS is unset', async () => {
+      setEnv({ ...validConfig });
+      delete process.env['LLM_FALLBACK_TIMEOUT_MS'];
+      const config = await loadConfig();
+      expect(config.llmFallbackTimeoutMs).toBe(60_000);
+    });
+
+    it('coerces string "45000" to number 45000', async () => {
+      setEnv({ ...validConfig });
+      process.env['LLM_FALLBACK_TIMEOUT_MS'] = '45000';
+      const config = await loadConfig();
+      expect(config.llmFallbackTimeoutMs).toBe(45_000);
+    });
+
+    it('rejects zero value (must be positive)', async () => {
+      setEnv({ ...validConfig });
+      process.env['LLM_FALLBACK_TIMEOUT_MS'] = '0';
+      await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+    });
+  });
+
   // ── Error messages ──────────────────────────────────────────────────────
 
   describe('error messages are descriptive', () => {

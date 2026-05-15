@@ -1,5 +1,6 @@
 import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
+import { LLM_FALLBACK_DEFAULTS } from '../constants.js';
 import { createLogger } from '../logger/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,8 @@ async function loadSecretsFromSSM(): Promise<void> {
     `${prefix}/slack-channel`,
     `${prefix}/loki-url`,
     `${prefix}/redis-url`,
+    `${prefix}/llm-fallback-models`,
+    `${prefix}/llm-fallback-timeout-ms`,
   ];
 
   try {
@@ -62,6 +65,15 @@ const ConfigSchema = z.object({
   clusterWindowMs: z.coerce.number().int().positive().default(120_000),
   logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
+  llmFallbackModels: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return LLM_FALLBACK_DEFAULTS.Models;
+      if (!v) return [];
+      return v.split(',').map((s) => s.trim()).filter(Boolean);
+    }),
+  llmFallbackTimeoutMs: z.coerce.number().int().positive().default(LLM_FALLBACK_DEFAULTS.TimeoutMs),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -83,6 +95,8 @@ export async function loadConfig(): Promise<Config> {
     clusterWindowMs: process.env['CLUSTER_WINDOW_MS'],
     logLevel: process.env['LOG_LEVEL'],
     nodeEnv: process.env['NODE_ENV'],
+    llmFallbackModels: process.env['LLM_FALLBACK_MODELS'],
+    llmFallbackTimeoutMs: process.env['LLM_FALLBACK_TIMEOUT_MS'],
   });
 
   if (!result.success) {

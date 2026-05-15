@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LLM**: Automatic fallback chain for OpenRouter providers — after primary model exhausts 429 retries, cycles through `LLM_FALLBACK_MODELS` (comma-separated) in order until one succeeds or the wall-clock timeout (`LLM_FALLBACK_TIMEOUT_MS`, default 60s) is exceeded.
+- **LLM**: `llm:fallback:hop` structured log event emitted on each model transition with `{ from_model, to_model, reason }`.
+- **Config**: New fields `llmFallbackModels` (string[]) and `llmFallbackTimeoutMs` (number) wired to env vars and SSM (`/junando/llm-fallback-models`, `/junando/llm-fallback-timeout-ms`).
+- **Constants**: `LLM_FALLBACK_DEFAULTS` constant (`{ TimeoutMs: 60_000, Models: [] }`).
+- **Deploy**: SSM parameters `/junando/llm-fallback-models` and `/junando/llm-fallback-timeout-ms` documented in `DEPLOY.md`.
+
 - **Logger**: Structured JSON logging via Pino with `correlationId` propagation across webhook → SQS → worker → LLM → notifier.
 - **Logger**: Custom in-process Loki transport (`loki-transport.ts`) with bounded ring buffer (1000 entries) and synchronous `flushLoki()` for Lambda-safe delivery to Grafana Cloud.
 - **LLM**: `OpenRouterProvider.analyze` retries once on HTTP 429 with backoff (`retry_after_seconds` from response, else 5s, capped at 30s).

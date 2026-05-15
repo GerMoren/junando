@@ -6,6 +6,7 @@ import { LLMAnalysisSchema } from '../../domain/entities/incident.js';
 import type { ILLMProvider } from '../../domain/ports/index.js';
 import {
   CIRCUIT_BREAKER,
+  LLM_FALLBACK_DEFAULTS,
   LLM_MAX_TOKENS,
   LLM_MODELS,
   LLMProviderType,
@@ -213,14 +214,33 @@ export class MockLLMProvider implements ILLMProvider {
 }
 
 /**
+ * Options for configuring the OpenRouter fallback chain.
+ * Infra-internal — not exported.
+ */
+interface FallbackOptions {
+  fallbackModels?: string[];
+  fallbackTimeoutMs?: number;
+}
+
+/**
  * OpenRouter LLM provider using OpenAI-compatible API.
  * Supports various open models (Qwen, etc.) via OpenRouter gateway.
+ * When the primary model exhausts 429 retries, cycles through fallbackModels.
  */
 export class OpenRouterProvider implements ILLMProvider {
+  private readonly fallbackModels: string[];
+  private readonly fallbackTimeoutMs: number;
+
   constructor(
     private readonly apiKey: string,
     private readonly model: string = LLM_MODELS.OpenRouter,
-  ) {}
+    fallbackModels: string[] = [],
+    fallbackTimeoutMs: number = LLM_FALLBACK_DEFAULTS.TimeoutMs,
+  ) {
+    // Deduplicate: remove primary model from fallback list at construction time
+    this.fallbackModels = fallbackModels.filter((m) => m !== model);
+    this.fallbackTimeoutMs = fallbackTimeoutMs;
+  }
 
   async analyze(
     cluster: AlertCluster,
@@ -276,6 +296,15 @@ export class OpenRouterProvider implements ILLMProvider {
           continue;
         }
 
+        if (res.status === 429) {
+          if (this.fallbackModels.length > 0) {
+            // Primary model exhausted — try fallback chain
+            const deadlineMs = Date.now() + this.fallbackTimeoutMs;
+            return this.analyzeFallback(prompt, correlationId, deadlineMs, this.model);
+          }
+          throw new Error(`OpenRouter API failed: ${res.status}`);
+        }
+
         throw new Error(`OpenRouter API failed: ${res.status}`);
       }
 
@@ -305,13 +334,61 @@ export class OpenRouterProvider implements ILLMProvider {
 
     throw new Error('OpenRouter API failed after retry');
   }
+
+  private async analyzeFallback(
+    prompt: string,
+    correlationId: string | undefined,
+    deadlineMs: number,
+    fromModel: string,
+  ): Promise<LLMAnalysis> {
+    for (const toModel of this.fallbackModels) {
+      if (Date.now() >= deadlineMs) {
+        throw new Error('OpenRouter fallback chain timed out');
+      }
+
+      logger.info({ from_model: fromModel, to_model: toModel, reason: '429', correlationId }, 'llm:fallback:hop');
+
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+          'HTTP-Referer': process.env['APP_URL'] ?? 'https://junando.app',
+          'X-Title': 'Junando SRE',
+        },
+        body: JSON.stringify({
+          model: toModel,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      });
+
+      const raw = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          fromModel = toModel;
+          continue;
+        }
+        throw new Error(`OpenRouter API failed: ${res.status}`);
+      }
+
+      const parsed = OpenRouterResponseSchema.safeParse(raw);
+      const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
+      return parseAnalysis(text, correlationId);
+    }
+
+    throw new Error('OpenRouter API exhausted all models');
+  }
 }
 
 /**
  * Factory type for creating LLM providers.
  * Takes API key and optional model override.
  */
-type LLMFactory = (apiKey: string, model?: string) => ILLMProvider;
+type LLMFactory = (apiKey: string, model?: string, options?: FallbackOptions) => ILLMProvider;
 
 /**
  * Registry mapping provider names to their factory functions.
@@ -320,15 +397,15 @@ type LLMFactory = (apiKey: string, model?: string) => ILLMProvider;
 const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, LLMFactory>([
   [LLMProviderType.Gemini, (apiKey, model) => new GeminiProvider(apiKey, model)],
   [LLMProviderType.Claude, (apiKey, model) => new ClaudeProvider(apiKey, model)],
-  ['openrouter', (apiKey, model) => new OpenRouterProvider(apiKey, model)],
-  ['qwen', (apiKey, model) => new OpenRouterProvider(apiKey, model)],
+  [LLMProviderType.OpenRouter, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs)],
+  [LLMProviderType.Qwen, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs)],
 ]);
 
-export function createLLMProvider(provider: string, apiKey: string, model?: string): ILLMProvider {
+export function createLLMProvider(provider: string, apiKey: string, model?: string, options?: FallbackOptions): ILLMProvider {
   const factory = LLM_PROVIDER_REGISTRY.get(provider);
   if (!factory) {
     const supported = Array.from(LLM_PROVIDER_REGISTRY.keys()).join(', ');
     throw new Error(`Unknown LLM_PROVIDER: "${provider}". Supported: ${supported}`);
   }
-  return factory(apiKey, model);
+  return factory(apiKey, model, options);
 }
