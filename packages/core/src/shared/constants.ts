@@ -42,6 +42,8 @@ export const ALERT_TYPE_LABELS: Readonly<typeof _alertTypeConfigs> =
 export enum LLMProviderType {
   Gemini = 'gemini',
   Claude = 'claude',
+  OpenRouter = 'openrouter',
+  Qwen = 'qwen',
 }
 
 // ── HTTP / Timeout Constants ───────────────────────────────────────────────────
@@ -72,6 +74,16 @@ export const DEDUP_TTL_MS_MULTIPLIER = 1_000;
 
 // ── Time Conversions ───────────────────────────────────────────────────────────
 export const HOUR_MS = 3_600_000;
+
+// ── LLM Fallback Defaults ─────────────────────────────────────────────────
+export const LLM_FALLBACK_DEFAULTS = Object.freeze({
+  TimeoutMs: 60_000,
+  Models: [
+    'google/gemma-4-31b-it:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'mistralai/mistral-7b-instruct:free',
+  ] as string[],
+});
 
 // ── LLM Models ────────────────────────────────────────────────────────────────
 export const LLM_MODELS = Object.freeze({

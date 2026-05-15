@@ -334,7 +334,173 @@ describe('createLLMProvider', () => {
   });
 });
 
-// ── ILLMProvider interface contract tests ─────────────────────────────────
+// ── OpenRouterProvider fallback chain tests ───────────────────────────────
+
+describe('OpenRouterProvider — fallback chain', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  function make429Response(retryAfterSeconds = 1) {
+    return {
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { metadata: { retry_after_seconds: retryAfterSeconds } } }),
+    };
+  }
+
+  function makeSuccessResponse(content: string) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content } }],
+      }),
+    };
+  }
+
+  const successContent =
+    '{"probable_cause":"fixed","impacted_services":["svc"],"recommended_steps":["act"],"urgency_level":"low","requires_rollback":false}';
+
+  it('primary success — no fallback hop emitted', async () => {
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b'], 60_000);
+    mockFetch.mockResolvedValue(makeSuccessResponse(successContent));
+
+    await provider.analyze(makeCluster(), [], 'corr-1');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockLogger.info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'llm:fallback:hop' }),
+      expect.any(String),
+    );
+  });
+
+  it('primary 429×2 then model-b succeeds — returns model-b result', async () => {
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b'], 60_000);
+    // First two calls → 429, third call → success
+    mockFetch
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(makeSuccessResponse(successContent));
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-hop');
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(result.probable_cause).toBe('fixed');
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from_model: 'model-a',
+        to_model: 'model-b',
+        reason: '429',
+      }),
+      'llm:fallback:hop',
+    );
+  });
+
+  it('all models exhausted — throws "OpenRouter API exhausted all models"', async () => {
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b'], 60_000);
+    mockFetch.mockResolvedValue(make429Response());
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-exhaust');
+    const assertion = expect(promise).rejects.toThrow('OpenRouter API exhausted all models');
+    await vi.runAllTimersAsync();
+    await assertion;
+  });
+
+  it('timeout budget exceeded before first hop — throws "OpenRouter fallback chain timed out"', async () => {
+    // fallbackTimeoutMs = 0 means deadline is already passed
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b'], 0);
+    mockFetch.mockResolvedValue(make429Response());
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-timeout');
+    const assertion = expect(promise).rejects.toThrow('OpenRouter fallback chain timed out');
+    await vi.runAllTimersAsync();
+    await assertion;
+  });
+
+  it('primary model deduped from fallback list at construction', async () => {
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-a', 'model-b'], 60_000);
+    // All three calls would be needed if model-a was in fallback too
+    mockFetch
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(makeSuccessResponse(successContent));
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-dedup');
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    // model-b was tried (not model-a again), fetch called 3 times total (2 primary + 1 fallback)
+    expect(result.probable_cause).toBe('fixed');
+    const calls = mockFetch.mock.calls as [string, RequestInit][];
+    const fallbackBody = JSON.parse(calls[2][1].body as string);
+    expect(fallbackBody.model).toBe('model-b');
+  });
+
+  it('hop log event shape has from_model, to_model, reason', async () => {
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b', 'model-c'], 60_000);
+    // model-a: 2×429, model-b: 1×429, model-c: success
+    mockFetch
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(make429Response())
+      .mockResolvedValueOnce(makeSuccessResponse(successContent));
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-shape');
+    await vi.runAllTimersAsync();
+    await promise;
+
+    const hopCalls = mockLogger.info.mock.calls.filter(
+      (c: unknown[]) => c[1] === 'llm:fallback:hop',
+    );
+    // Two transitions: a→b and b→c
+    expect(hopCalls).toHaveLength(2);
+    expect(hopCalls[0][0]).toMatchObject({ from_model: 'model-a', to_model: 'model-b', reason: '429' });
+    expect(hopCalls[1][0]).toMatchObject({ from_model: 'model-b', to_model: 'model-c', reason: '429' });
+  });
+});
+
+// ── createLLMProvider factory — fallback options ───────────────────────────
+
+describe('createLLMProvider — fallback options forwarded', () => {
+  it('forwards fallbackModels and fallbackTimeoutMs to OpenRouterProvider', async () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+    vi.useFakeTimers();
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}' } }],
+      }),
+    });
+
+    const provider = createLLMProvider('openrouter', 'key', 'model-a', {
+      fallbackModels: ['model-b'],
+      fallbackTimeoutMs: 30_000,
+    });
+
+    const promise = provider.analyze(makeCluster(), []);
+    await vi.runAllTimersAsync();
+    await promise;
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+});
 
 describe('LLM provider interface contract', () => {
   it('all providers expose analyze method', () => {

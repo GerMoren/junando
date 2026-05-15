@@ -49,16 +49,18 @@ Your AWS credentials need these permissions:
 
 Create 8 SecureString parameters in AWS Systems Manager Parameter Store:
 
-| Parameter                       | Description                                               | Example Value                                                   |
-| ------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
-| `/junando/llm-provider`         | AI provider                                               | `openrouter`, `claude`, `gemini`, `qwen`                        |
-| `/junando/llm-api-key`          | API key for LLM                                           | `sk-or-...`                                                     |
-| `/junando/llm-model`            | Model override (optional but recommended)                 | `google/gemma-4-31b-it:free`                                    |
-| `/junando/slack-bot-token`      | Slack bot token                                           | `xoxb-...`                                                      |
-| `/junando/slack-signing-secret` | Slack signing secret                                      | `your_signing_secret`                                           |
-| `/junando/slack-channel`        | Target Slack channel                                      | `#incidents`                                                    |
-| `/junando/loki-url`             | Grafana Cloud Loki push URL **with embedded credentials** | `https://USER:TOKEN@logs-prod-XXX.grafana.net/loki/api/v1/push` |
-| `/junando/redis-url`            | Redis URL for dedup                                       | `redis://your-redis:6379`                                       |
+| Parameter                           | Description                                               | Example Value                                                   |
+| ----------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| `/junando/llm-provider`             | AI provider                                               | `openrouter`, `claude`, `gemini`, `qwen`                        |
+| `/junando/llm-api-key`              | API key for LLM                                           | `sk-or-...`                                                     |
+| `/junando/llm-model`                | Model override (optional but recommended)                 | `google/gemma-4-31b-it:free`                                    |
+| `/junando/slack-bot-token`          | Slack bot token                                           | `xoxb-...`                                                      |
+| `/junando/slack-signing-secret`     | Slack signing secret                                      | `your_signing_secret`                                           |
+| `/junando/slack-channel`            | Target Slack channel                                      | `#incidents`                                                    |
+| `/junando/loki-url`                 | Grafana Cloud Loki push URL **with embedded credentials** | `https://USER:TOKEN@logs-prod-XXX.grafana.net/loki/api/v1/push` |
+| `/junando/redis-url`                | Redis URL for dedup                                       | `redis://your-redis:6379`                                       |
+| `/junando/llm-fallback-models`      | Comma-separated fallback model list (optional)            | `google/gemma-4-31b-it:free,mistralai/mistral-7b-instruct:free` |
+| `/junando/llm-fallback-timeout-ms`  | Wall-clock timeout ms for entire fallback chain (optional) | `60000`                                                        |
 
 > **Loki URL gotcha**: Use the **full push path** (`/loki/api/v1/push`) and embed credentials inline (`https://USER:TOKEN@host/...`). The Grafana Cloud token must have the `logs:write` scope. New tokens can take **up to 15 minutes** to propagate — if logs don't appear, wait before debugging.
 
@@ -110,6 +112,19 @@ aws ssm put-parameter \
 aws ssm put-parameter \
   --name /junando/redis-url \
   --value "redis://redis.example.com:6379" \
+  --type SecureString \
+  --overwrite
+
+# Optional: LLM fallback chain (OpenRouter only)
+aws ssm put-parameter \
+  --name /junando/llm-fallback-models \
+  --value "google/gemma-4-31b-it:free,mistralai/mistral-7b-instruct:free" \
+  --type SecureString \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /junando/llm-fallback-timeout-ms \
+  --value "60000" \
   --type SecureString \
   --overwrite
 ```
