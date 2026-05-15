@@ -333,6 +333,8 @@ Three portable, importable dashboard JSONs are available in [`docs/dashboards/`]
 
 For setup instructions, see **[docs/runbooks/grafana-setup.md](docs/runbooks/grafana-setup.md)**.
 
+For failure scenarios, LogQL queries, and recovery procedures, see **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
+
 ---
 
 ## Common Commands

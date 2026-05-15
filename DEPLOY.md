@@ -375,3 +375,5 @@ The SQS dashboard requires CloudWatch access. Add this policy to your Grafana IA
 ```
 
 For the full setup guide including Loki datasource connection, cross-account IAM role, and dashboard import steps, see: **[docs/runbooks/grafana-setup.md](docs/runbooks/grafana-setup.md)**
+
+For failure scenarios, LogQL queries, and on-call recovery procedures, see: **[docs/RUNBOOK.md](docs/RUNBOOK.md)**
