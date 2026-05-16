@@ -7,6 +7,10 @@
     ".": {
       "development": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./loki-http-client": {
+      "development": "./src/adapters/loki/loki-http-client.ts",
+      "default": "./dist/adapters/loki/loki-http-client.js"
     }
   },
   "scripts": {
