@@ -3,3 +3,6 @@ services:
     image: junando-webhook:local
   junando-worker:
     image: junando-worker:local
+  junando-ingest:
+    image: junando-ingest:local
+

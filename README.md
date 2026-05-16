@@ -335,6 +335,8 @@ For setup instructions, see **[docs/runbooks/grafana-setup.md](docs/runbooks/gra
 
 For failure scenarios, LogQL queries, and recovery procedures, see **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
 
+For the required JSON log schema, PII redaction rules, and LogQL query examples, see **[docs/structured-logging.md](docs/structured-logging.md)**.
+
 ---
 
 ## Common Commands
