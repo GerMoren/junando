@@ -183,6 +183,20 @@ describe('Config — loadConfig', () => {
       setEnv({ ...validConfig, LOKI_URL: '' });
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
     });
+
+    it('succeeds when LOKI_URL is absent (optional)', async () => {
+      const env = { ...validConfig };
+      delete (env as any).LOKI_URL;
+      setEnv(env);
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
+    });
+
+    it('succeeds when LOKI_URL is undefined explicitly', async () => {
+      setEnv({ ...validConfig, LOKI_URL: undefined });
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
+    });
   });
 
   // ── Schema: redisUrl ─────────────────────────────────────────────────────

@@ -49,7 +49,7 @@ async function main() {
 
   const useMock = args.includes("--mock");
   const dedup = new RedisDeduplicationStore(redis);
-  const traces = new LokiTraceRepository(config.lokiUrl);
+  const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = useMock
     ? new MockLLMProvider()
     : createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
