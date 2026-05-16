@@ -22,14 +22,14 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/webhook/ ./packages/webhook/
-COPY scripts/tsup.config.ts ./scripts/
+COPY scripts/tsup.webhook.config.ts ./scripts/
 COPY scripts/webhook-server.ts ./scripts/
 COPY scripts/http-utils.ts ./scripts/
 
 # Build packages and entrypoint
 RUN pnpm --filter @junando/core build
 RUN pnpm --filter @junando/webhook build
-RUN cd scripts && npx tsup --config tsup.config.ts
+RUN cd scripts && npx tsup --config tsup.webhook.config.ts
 
 # ── Stage 2: runner ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner
@@ -40,7 +40,7 @@ WORKDIR /app
 
 # Copy compiled handler (self-contained — no node_modules needed)
 COPY --from=builder /app/packages/webhook/dist/ ./packages/webhook/dist/
-COPY --from=builder /app/scripts/dist/webhook-server.js ./
+COPY --from=builder /app/scripts/dist/webhook-server.mjs ./
 
 USER junando
 
@@ -49,4 +49,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD wget -qO- http://localhost:4000/health || exit 1
 
-CMD ["node", "webhook-server.js"]
+CMD ["node", "webhook-server.mjs"]

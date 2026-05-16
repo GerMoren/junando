@@ -17,13 +17,13 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/worker/ ./packages/worker/
-COPY scripts/tsup.config.ts ./scripts/
+COPY scripts/tsup.worker.config.ts ./scripts/
 COPY scripts/worker-server.ts ./scripts/
 COPY scripts/worker-batch.ts ./scripts/
 
 RUN pnpm --filter @junando/core build
 RUN pnpm --filter @junando/worker build
-RUN cd scripts && npx tsup --config tsup.config.ts
+RUN cd scripts && npx tsup --config tsup.worker.config.ts
 
 # ── Stage 2: runner ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner
@@ -33,8 +33,8 @@ RUN addgroup -S junando && adduser -S junando -G junando
 WORKDIR /app
 
 COPY --from=builder /app/packages/worker/dist/ ./packages/worker/dist/
-COPY --from=builder /app/scripts/dist/worker-server.js ./
+COPY --from=builder /app/scripts/dist/worker-server.mjs ./
 
 USER junando
 
-CMD ["node", "worker-server.js"]
+CMD ["node", "worker-server.mjs"]

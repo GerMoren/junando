@@ -1,17 +1,17 @@
 services:
-  webhook:
+  junando-webhook:
     image: ghcr.io/germoren/junando-webhook:latest
     ports:
       - '4000:4000'
-    env_file: .env
+    env_file: ../.env
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
 
-  worker:
+  junando-worker:
     image: ghcr.io/germoren/junando-worker:latest
-    env_file: .env
+    env_file: ../.env
     depends_on:
       redis:
         condition: service_healthy
