@@ -174,14 +174,30 @@ describe('Config — loadConfig', () => {
       expect(config.lokiUrl).toContain('grafana.net');
     });
 
-    it('rejects empty lokiUrl', async () => {
+    it('coerces empty LOKI_URL to undefined (env var present but empty)', async () => {
       setEnv({ ...validConfig, LOKI_URL: '' });
-      await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
     });
 
-    it('rejects empty string', async () => {
+    it('coerces empty string to undefined (compose env_file passthrough)', async () => {
       setEnv({ ...validConfig, LOKI_URL: '' });
-      await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
+    });
+
+    it('succeeds when LOKI_URL is absent (optional)', async () => {
+      const env = { ...validConfig };
+      delete (env as any).LOKI_URL;
+      setEnv(env);
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
+    });
+
+    it('succeeds when LOKI_URL is undefined explicitly', async () => {
+      setEnv({ ...validConfig, LOKI_URL: undefined });
+      const config = await loadConfig();
+      expect(config.lokiUrl).toBeUndefined();
     });
   });
 

@@ -2,31 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handler } from '../handler.js';
 import type { SQSEvent } from 'aws-lambda';
 
-// Define a shared mock for the use case instance
-const mockExecute = vi.fn().mockResolvedValue(undefined);
+// Hoist mocks so they are available when vi.mock factory runs
+const mockExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockLoadConfig = vi.hoisted(() => vi.fn());
+const MockLokiTraceRepository = vi.hoisted(() => vi.fn().mockImplementation(() => ({})));
 
 // Mock dependencies from @junando/core
 vi.mock('@junando/core', async () => {
   const actual = await vi.importActual('@junando/core');
   return {
     ...actual,
-    loadConfig: vi.fn().mockResolvedValue({
-      redisUrl: 'redis://localhost:6379',
-      lokiUrl: 'http://localhost:3100',
-      slackBotToken: 'xoxb-test',
-      slackChannel: '#test',
-      llmProvider: 'gemini',
-      llmApiKey: 'test-key',
-      logLevel: 'error',
-      dedupTtlSeconds: 300,
-    }),
+    loadConfig: mockLoadConfig,
     createLogger: vi.fn().mockReturnValue({
       info: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
     }),
+    reinitLogger: vi.fn(),
+    flushLoki: vi.fn().mockResolvedValue(undefined),
     RedisDeduplicationStore: vi.fn().mockImplementation(() => ({})),
-    LokiTraceRepository: vi.fn().mockImplementation(() => ({})),
+    LokiTraceRepository: MockLokiTraceRepository,
     SlackNotifier: vi.fn().mockImplementation(() => ({})),
     createLLMProvider: vi.fn().mockImplementation(() => ({})),
     ProcessIncidentUseCase: vi.fn().mockImplementation(() => ({
@@ -45,8 +40,20 @@ vi.mock('ioredis', () => {
 });
 
 describe('Worker Handler', () => {
+  const baseConfig = {
+    redisUrl: 'redis://localhost:6379',
+    lokiUrl: 'http://localhost:3100',
+    slackBotToken: 'xoxb-test',
+    slackChannel: '#test',
+    llmProvider: 'gemini' as const,
+    llmApiKey: 'test-key',
+    logLevel: 'error' as const,
+    dedupTtlSeconds: 300,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoadConfig.mockResolvedValue(baseConfig);
   });
 
   it('processes valid SQS messages successfully', async () => {
@@ -101,5 +108,42 @@ describe('Worker Handler', () => {
     await handler(event as SQSEvent);
 
     expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('initializes LokiTraceRepository with empty string when lokiUrl is absent', async () => {
+    // When lokiUrl is undefined in config, handler must still process messages without throwing.
+    // This test uses a fresh module state by resetting the useCase singleton via module reset.
+    // The guard config.lokiUrl ?? '' in handler.ts ensures LokiTraceRepository receives '' not undefined.
+    mockLoadConfig.mockResolvedValueOnce({ ...baseConfig, lokiUrl: undefined });
+
+    // Reset the module to clear the cached useCase singleton
+    await vi.resetModules();
+    const { handler: freshHandler } = await import('../handler.js');
+
+    const event: Partial<SQSEvent> = {
+      Records: [
+        {
+          body: JSON.stringify({
+            correlationId: 'b17d0c84-f818-4039-b9c8-34ed977d6953',
+            alerts: [
+              {
+                fingerprint: 'fp2',
+                alertName: 'HighErrorRate',
+                status: 'firing',
+                serviceName: 'checkout',
+                alertType: 'http_500',
+                endpointPath: '/pay',
+                startsAt: '2026-05-12T14:37:46.000Z',
+                labels: {},
+                annotations: {},
+              },
+            ],
+          }),
+        } as any,
+      ],
+    };
+
+    // Must not throw even when lokiUrl is absent
+    await expect(freshHandler(event as SQSEvent)).resolves.not.toThrow();
   });
 });

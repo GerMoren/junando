@@ -45,7 +45,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   const redis = new Redis(config.redisUrl, { lazyConnect: true });
 
   const dedup = new RedisDeduplicationStore(redis);
-  const traces = new LokiTraceRepository(config.lokiUrl);
+  const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
   const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
 
