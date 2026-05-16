@@ -1,0 +1,52 @@
+# Dockerfile.webhook
+# Multi-stage build: compile TypeScript on host, copy dist to minimal runtime image.
+#
+# The builder stage runs pnpm install + pnpm build.
+# The runner stage copies only the compiled output — no pnpm, no TypeScript, no tsx.
+
+# ── Stage 1: builder ─────────────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable
+
+# Copy workspace manifests for layer caching
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/webhook/package.json ./packages/webhook/
+
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages/core/ ./packages/core/
+COPY packages/webhook/ ./packages/webhook/
+COPY scripts/tsup.config.ts ./scripts/
+COPY scripts/webhook-server.ts ./scripts/
+COPY scripts/http-utils.ts ./scripts/
+
+# Build packages and entrypoint
+RUN pnpm --filter @junando/core build
+RUN pnpm --filter @junando/webhook build
+RUN cd scripts && npx tsup --config tsup.config.ts
+
+# ── Stage 2: runner ───────────────────────────────────────────────────────────
+FROM node:24-alpine AS runner
+
+RUN addgroup -S junando && adduser -S junando -G junando
+
+WORKDIR /app
+
+# Copy compiled handler (self-contained — no node_modules needed)
+COPY --from=builder /app/packages/webhook/dist/ ./packages/webhook/dist/
+COPY --from=builder /app/scripts/dist/webhook-server.js ./
+
+USER junando
+
+EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+  CMD wget -qO- http://localhost:4000/health || exit 1
+
+CMD ["node", "webhook-server.js"]

@@ -1,0 +1,40 @@
+# Dockerfile.worker
+# Multi-stage build: compile TypeScript on host, copy dist to minimal runtime image.
+
+# ── Stage 1: builder ─────────────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/worker/package.json ./packages/worker/
+
+RUN pnpm install --frozen-lockfile
+
+COPY tsconfig.base.json tsconfig.json ./
+COPY packages/core/ ./packages/core/
+COPY packages/worker/ ./packages/worker/
+COPY scripts/tsup.config.ts ./scripts/
+COPY scripts/worker-server.ts ./scripts/
+COPY scripts/worker-batch.ts ./scripts/
+
+RUN pnpm --filter @junando/core build
+RUN pnpm --filter @junando/worker build
+RUN cd scripts && npx tsup --config tsup.config.ts
+
+# ── Stage 2: runner ───────────────────────────────────────────────────────────
+FROM node:24-alpine AS runner
+
+RUN addgroup -S junando && adduser -S junando -G junando
+
+WORKDIR /app
+
+COPY --from=builder /app/packages/worker/dist/ ./packages/worker/dist/
+COPY --from=builder /app/scripts/dist/worker-server.js ./
+
+USER junando
+
+CMD ["node", "worker-server.js"]
