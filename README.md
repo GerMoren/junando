@@ -261,7 +261,38 @@ receivers:
 
 ---
 
-## Self-Hosted / On-Premise (Docker)
+## Docker Images
+
+Images are published to GitHub Container Registry (`ghcr.io`) automatically:
+
+| Event | Tags published | Use case |
+|-------|---------------|----------|
+| Merge to `main` | `:main`, `:sha-<short>` | Bleeding edge — latest unreleased changes |
+| Push `v*` tag | `:latest`, `:<version>`, `:<major>.<minor>`, `:sha-<short>` | Stable release |
+
+```bash
+# Stable release (recommended for production)
+docker pull ghcr.io/germoren/junando-webhook:latest
+docker pull ghcr.io/germoren/junando-worker:latest
+docker pull ghcr.io/germoren/junando-ingest:latest
+
+# Bleeding edge (main branch)
+docker pull ghcr.io/germoren/junando-webhook:main
+docker pull ghcr.io/germoren/junando-ingest:main
+
+# Pin to a specific commit
+docker pull ghcr.io/germoren/junando-webhook:sha-a1b2c3d
+```
+
+To publish a new release:
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+---
+
+
 
 ```bash
 docker run -d \
@@ -473,6 +504,7 @@ who can't justify $100k/year for Dynatrace or Datadog AIOps.
 - [x] `cdk` package: full AWS stack
 - [x] Docker Compose local dev stack
 - [x] Docker images published to GHCR (webhook, worker, ingest) — `ghcr.io/germoren/junando-*`
+- [x] Auto-build on merge to `main` → `:main` + `:sha-*` tags (issue #26)
 - [x] `ingest` package: Loki log polling adapter — `@junando/ingest` v1 (issue #23)
 - [x] `ingest-local` script: single-tick test against local Loki with mock LLM
 - [x] Structured logging guide — `docs/structured-logging.md`

@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Ingest**: `@junando/ingest` v1 — Loki log polling adapter (issue #23). Hexagonal package (`packages/ingest/`) with `IngestRunner`, `LokiHttpClient`, `mapLokiResultToAlerts`, and `loadIngestConfig`. Polls Loki via LogQL on a configurable interval and forwards matches to `ProcessIncidentUseCase`. No Alertmanager required.
+- **CI**: Docker workflow now triggers on merge to `main` in addition to `v*` tags (issue #26). Merges to `main` publish `:main` + `:sha-<short>` tags. The `:latest` tag is only moved on semver releases, keeping it as a stable pointer.
+- **CI**: Added `type=semver,pattern={{major}}.{{minor}}` tag (e.g. `0.2`) to all three images on release.
+
+ `@junando/ingest` v1 — Loki log polling adapter (issue #23). Hexagonal package (`packages/ingest/`) with `IngestRunner`, `LokiHttpClient`, `mapLokiResultToAlerts`, and `loadIngestConfig`. Polls Loki via LogQL on a configurable interval and forwards matches to `ProcessIncidentUseCase`. No Alertmanager required.
 - **Ingest**: `scripts/ingest-server.ts` — composition root for `junando-ingest` Docker service. Handles SIGTERM/SIGINT with drain of in-flight rule promises.
 - **Ingest**: `docker/Dockerfile.ingest` — multi-stage image (builder + alpine runner, non-root user). Published to `ghcr.io/germoren/junando-ingest` on every semver tag.
 - **Ingest**: `docker/docker-compose.prod.yml` — added `junando-ingest` service with config volume mount.
