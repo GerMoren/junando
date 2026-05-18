@@ -559,6 +559,16 @@ describe('Config — loadConfig', () => {
       process.env['NOTIFIER_TYPE'] = 'slack';
       await expect(loadConfig()).rejects.toThrow(/SLACK_CHANNEL/);
     });
+
+    // CFG-03: regression — slackSigningSecret must be required when notifierType=slack.
+    // Pre-PR #39 it was schema-required; PR #39 made it optional and superRefine
+    // forgot to enforce it, causing HTTP 500 in handler.ts when createHmac receives
+    // undefined. See issue #41.
+    it('CFG-03: slack notifierType without slackSigningSecret fails validation', async () => {
+      setEnv({ ...validConfig, SLACK_SIGNING_SECRET: undefined });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      await expect(loadConfig()).rejects.toThrow(/SLACK_SIGNING_SECRET/);
+    });
   });
 
   describe('CFG-04: teams requires valid webhook URL with api-version', () => {

@@ -97,6 +97,13 @@ const ConfigSchema = z
           message: '[notifierType: slack] SLACK_CHANNEL is required and must start with #',
         });
       }
+      if (!data.slackSigningSecret) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['slackSigningSecret'],
+          message: '[notifierType: slack] SLACK_SIGNING_SECRET is required (used to verify Slack interactivity callbacks)',
+        });
+      }
     }
     if (data.notifierType === 'teams') {
       if (!data.teamsWebhookUrl) {
