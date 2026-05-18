@@ -29,7 +29,7 @@ ingest:
     - name: checkout-error-spike
       service: checkout-api
       query: 'count_over_time({service="checkout-api"} |= "\"level\":\"error\"" [5m]) > 10'
-      alertType: AVAILABILITY
+      alertType: http_500
       severity: HIGH
       windowMs: 300000  # 5 minutes — overrides global intervalMs for this rule
 
@@ -38,7 +38,7 @@ ingest:
     - name: orders-p99-latency
       service: orders-api
       query: '{service="orders-api"} | json | duration_ms > 2000'
-      alertType: PERFORMANCE
+      alertType: latency_spike
       severity: MEDIUM
       endpointPath: /api/orders
 
@@ -47,6 +47,6 @@ ingest:
     - name: payment-5xx-rate
       service: payment-gateway
       query: 'rate({service="payment-gateway"} | json | endpoint="/pay" | level="error" [5m])'
-      alertType: AVAILABILITY
+      alertType: http_500
       severity: CRITICAL
       endpointPath: /pay
