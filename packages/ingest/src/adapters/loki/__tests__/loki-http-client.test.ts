@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { LokiHttpClient } from '../loki-http-client.js';
 import { LokiHttpError } from '../../../ports/loki-http-client.port.js';
 
