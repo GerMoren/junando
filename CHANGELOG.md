@@ -9,7 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Observability**: Three portable Grafana dashboard JSON files in `docs/dashboards/` — `alert-volume.json` (pipeline throughput via Loki LogQL), `llm-performance.json` (LLM p50/p99 latency, 429 rate, fallback hops, token usage via Loki LogQL), `sqs-health.json` (SQS queue/DLQ depth via CloudWatch + worker errors via Loki).
+- **Ingest**: `@junando/ingest` v1 — Loki log polling adapter (issue #23). Hexagonal package (`packages/ingest/`) with `IngestRunner`, `LokiHttpClient`, `mapLokiResultToAlerts`, and `loadIngestConfig`. Polls Loki via LogQL on a configurable interval and forwards matches to `ProcessIncidentUseCase`. No Alertmanager required.
+- **Ingest**: `scripts/ingest-server.ts` — composition root for `junando-ingest` Docker service. Handles SIGTERM/SIGINT with drain of in-flight rule promises.
+- **Ingest**: `docker/Dockerfile.ingest` — multi-stage image (builder + alpine runner, non-root user). Published to `ghcr.io/germoren/junando-ingest` on every semver tag.
+- **Ingest**: `docker/docker-compose.prod.yml` — added `junando-ingest` service with config volume mount.
+- **Ingest**: `docker/ingest.config.example.yaml` — annotated template with 3 Loki rule examples for Grafana Cloud.
+- **Ingest**: `docker/ingest.config.local.yaml` — ready-to-use config for the local Docker stack (`http://localhost:3100`).
+- **CI**: `build-ingest` job in `.github/workflows/docker.yml` — builds and pushes `junando-ingest` multi-arch image (amd64 + arm64) on semver tags.
+- **Scripts**: `scripts/ingest-local.ts` — single-tick ingest smoke test against local Loki. Uses `MockLLMProvider` by default (no LLM credits). Flags: `--config <path>`, `--real-llm`. Run via `pnpm ingest:local`.
+- **Scripts**: `scripts/factories/process-incident.factory.ts` — shared factory for `ProcessIncidentUseCase`, reused by `ingest-server.ts`, `worker-local.ts`, and `worker-server.ts`.
+- **Docs**: `docs/structured-logging.md` — structured logging guide with required/recommended field tables, PII redaction rules, and LogQL query examples (LOG-01–LOG-04).
+- **Docker**: Added `name: junando` to all compose files — containers now named `junando-webhook-1`, `junando-redis-1`, etc. instead of `docker-*`.
+
+### Fixed
+
+- **Ingest**: `packages/ingest/tsconfig.build.json` — removed `rootDir: src` constraint that caused DTS build failure when tsc traversed cross-workspace `@junando/core` dependency.
+- **Ingest**: `docker/Dockerfile.ingest` — `tsup` now runs from `WORKDIR /app` (not `cd scripts/`) since entry paths are resolved relative to CWD. `COPY` path fixed to `dist/ingest-server.mjs`.
+- **Ingest**: `docker/ingest.config.example.yaml` — `alertType` values corrected to match schema enum (`http_500`, `latency_spike`, `recovery`). Previous values (`AVAILABILITY`, `PERFORMANCE`) were invalid.
+
+### Observability
 - **Observability**: `docs/runbooks/grafana-setup.md` — step-by-step guide for connecting Grafana Cloud to Loki and CloudWatch, IAM inline policy (`cloudwatch:GetMetricData`), cross-account role setup, dashboard import, and template variable binding.
 - **Metrics**: `junando_llm_inference_duration_seconds` histogram now includes `model` label — recorded on every successful OpenRouter call with elapsed duration in seconds.
 - **Metrics**: `junando_llm_inference_total` counter now incremented in `OpenRouterProvider.analyze()` with `status=success`, `status=error`, or `status=rate_limited` on each completed attempt.

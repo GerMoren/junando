@@ -69,7 +69,7 @@ Junando acts as a virtual Level-3 SRE available 24/7:
 ## Architecture
 
 ```
-AWS Infrastructure (Lambda, ECS, API Gateway, Step Functions...)
+AWS Infrastructure (Lambda, ECS, API Gateway...)
         │
         │ OpenTelemetry SDK / Lambda Layer
         ▼
@@ -82,13 +82,16 @@ AWS Infrastructure (Lambda, ECS, API Gateway, Step Functions...)
            Grafana Alertmanager
                  │ POST /webhook/alert
                  ▼
-   ┌─────────────────────────────┐
-   │        Junando Agent        │
-   │                             │
-   │  Lambda A (webhook)         │  ← validates with Zod, enqueues, <50ms
-   │     ↓ SQS + DLQ             │
-   │  Lambda B (worker)          │  ← dedup → cluster → extract → infer → notify
-   └─────────────────────────────┘
+   ┌──────────────────────────────────────┐
+   │           Junando Agent              │
+   │                                      │
+   │  Lambda A (webhook)                  │  ← validates, enqueues, <50ms
+   │     ↓ SQS + DLQ                      │
+   │  Lambda B (worker)                   │  ← dedup → cluster → extract → infer → notify
+   │                                      │
+   │  Ingest service (optional)           │  ← polls Loki directly via LogQL
+   │     ↓ ProcessIncidentUseCase         │     no Alertmanager required
+   └──────────────────────────────────────┘
                  │
           Slack / Teams
    (diagnosis + action buttons)
@@ -132,17 +135,31 @@ junando/                          ← single GitHub repo
 │   ├── core/                     ← business logic, zero AWS deps
 │   ├── webhook/                  ← Lambda A: HTTP entry point
 │   ├── worker/                   ← Lambda B: SQS consumer + pipeline
+│   ├── ingest/                   ← @junando/ingest — Loki polling adapter
 │   └── cdk/                      ← AWS CDK TypeScript stack
 ├── docker/
-│   ├── docker-compose.yml        ← full local dev stack
+│   ├── docker-compose.yml        ← full local dev stack (name: junando)
+│   ├── docker-compose.prod.yml   ← production compose (webhook + worker + ingest + redis)
+│   ├── docker-compose.prod.local.yml  ← override for local images
+│   ├── Dockerfile.webhook        ← multi-stage image for junando-webhook
+│   ├── Dockerfile.worker         ← multi-stage image for junando-worker
+│   ├── Dockerfile.ingest         ← multi-stage image for junando-ingest
+│   ├── ingest.config.example.yaml     ← template for ingest rules (Grafana Cloud)
+│   ├── ingest.config.local.yaml  ← local dev rules (points to localhost:3100)
 │   ├── alertmanager/             ← points to localhost:4000
 │   ├── grafana/                  ← datasources pre-configured
 │   ├── loki/                     ← single-binary local config
 │   └── prometheus/               ← scrapes junando /metrics (dogfooding)
 ├── scripts/
 │   ├── dev-server.ts             ← HTTP server wrapping Lambda A on :4000
-│   └── generate-alert.ts         ← synthetic alert generator for testing
-├── Dockerfile                    ← single container for on-premise enterprise tier
+│   ├── worker-server.ts          ← SQS polling loop for local worker
+│   ├── worker-local.ts           ← run ProcessIncidentUseCase directly (no SQS)
+│   ├── ingest-server.ts          ← composition root for junando-ingest service
+│   ├── ingest-local.ts           ← single-tick ingest test against local Loki
+│   ├── generate-alert.ts         ← synthetic alert generator (Alertmanager format)
+│   ├── simulate-incident.ts      ← full incident simulation (local or webhook target)
+│   └── factories/
+│       └── process-incident.factory.ts  ← shared wiring for ProcessIncidentUseCase
 ├── .env.example                  ← template — copy to .env.local
 ├── AGENT.md                      ← AI assistant context (read this before coding)
 └── README.md
@@ -343,11 +360,24 @@ For the required JSON log schema, PII redaction rules, and LogQL query examples,
 
 ```bash
 # Development
-pnpm run setup:local          # start Docker stack
+pnpm run setup:local          # start Docker stack (Redis, Loki, Prometheus, Grafana, Alertmanager)
 pnpm run teardown:local       # stop and clean Docker stack
 pnpm --filter @junando/core build   # compile core (required first time)
 pnpm run dev:webhook          # start webhook on :4000 with watch mode
-pnpm run generate:alert       # fire synthetic alert
+pnpm run worker:local         # run worker pipeline locally (no SQS)
+
+# Alert simulation
+pnpm run generate:alert                  # fire a synthetic Alertmanager alert (local)
+pnpm run simulate:incident               # full incident simulation via worker-local
+pnpm run simulate:incident -- --target=webhook   # send to running webhook on :4000
+pnpm run simulate:incident -- --scenario=db_outage --target=webhook
+pnpm run simulate:incident -- --scenario=bad_deploy --mock   # skip real LLM
+
+# Loki ingest (log polling)
+pnpm run ingest:local                                    # single tick against local Loki, mock LLM
+pnpm run ingest:local -- --config ./docker/ingest.config.local.yaml   # explicit config
+pnpm run ingest:local -- --real-llm                      # use real LLM from .env.local
+pnpm run ingest:dev                                      # continuous polling loop (local)
 
 # Quality
 pnpm test                     # run all tests with Vitest
@@ -355,6 +385,13 @@ pnpm test:watch               # interactive watch mode
 pnpm test:coverage            # coverage report
 pnpm lint                     # oxlint on all packages
 pnpm build                    # compile all packages
+pnpm typecheck                # tsc --noEmit across workspace
+
+# Docker (local images)
+docker build -f docker/Dockerfile.webhook -t junando-webhook:local .
+docker build -f docker/Dockerfile.worker  -t junando-worker:local  .
+docker build -f docker/Dockerfile.ingest  -t junando-ingest:local  .
+docker compose -f docker/docker-compose.prod.yml -f docker/docker-compose.prod.local.yml up -d
 
 # CDK
 pnpm cdk synth                # preview CloudFormation (no deploy)
@@ -435,10 +472,14 @@ who can't justify $100k/year for Dynatrace or Datadog AIOps.
 - [x] `worker` package: Lambda B + pipeline
 - [x] `cdk` package: full AWS stack
 - [x] Docker Compose local dev stack
-- [ ] End-to-end test with real Gemini API key
+- [x] Docker images published to GHCR (webhook, worker, ingest) — `ghcr.io/germoren/junando-*`
+- [x] `ingest` package: Loki log polling adapter — `@junando/ingest` v1 (issue #23)
+- [x] `ingest-local` script: single-tick test against local Loki with mock LLM
+- [x] Structured logging guide — `docs/structured-logging.md`
+- [ ] CloudWatch Logs ingestion adapter (issue #28)
+- [ ] End-to-end test with Cenco prod environment
 - [ ] First real deployment on personal AWS account
-- [ ] GitHub Actions CI pipeline
-- [ ] First external pilot customer
+- [ ] GitHub Actions CI pipeline (tests + lint on PR)
 
 ---
 

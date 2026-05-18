@@ -1,0 +1,27 @@
+# ingest.config.local.yaml
+# Local dev config — apunta al Loki del stack de Docker (port 3100).
+# Uso: pnpm ingest:local --config ./docker/ingest.config.local.yaml
+
+ingest:
+  intervalMs: 10000
+
+  loki:
+    url: http://localhost:3100
+    timeoutMs: 5000
+    # Sin auth — Loki local no requiere autenticación
+
+  rules:
+    # Busca cualquier log con "error" (case-insensitive) en todos los streams.
+    # En Loki local vacío esto va a devolver 0 resultados — está bien.
+    - name: local-errors
+      query: '{job=~".+"} |~ "(?i)error"'
+      service: local-test
+      alertType: http_500
+      severity: HIGH
+
+    # Busca logs del webhook de junando (si está corriendo en Docker).
+    - name: junando-webhook-errors
+      query: '{container="junando-webhook-1"} |~ "error"'
+      service: junando-webhook
+      alertType: http_500
+      severity: HIGH

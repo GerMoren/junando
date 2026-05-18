@@ -1,3 +1,4 @@
+name: junando
 services:
   junando-webhook:
     image: junando-webhook:local
