@@ -95,6 +95,9 @@ export const LLM_MODELS = Object.freeze({
 // ── Slack ─────────────────────────────────────────────────────────────────────
 export const SLACK_API_URL = 'https://slack.com/api/chat.postMessage';
 
+// ── Teams ─────────────────────────────────────────────────────────────────────
+export const TEAMS_WEBHOOK_TIMEOUT_MS = 10_000;
+
 const _urgencyEmoji: Record<string, string> = {
   critical: '🔴',
   high: '🟠',

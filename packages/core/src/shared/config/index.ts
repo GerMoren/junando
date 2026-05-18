@@ -51,30 +51,69 @@ async function loadSecretsFromSSM(): Promise<void> {
   }
 }
 
-const ConfigSchema = z.object({
-  llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
-  llmApiKey: z.string().min(1),
-  llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
-  slackBotToken: z.string().startsWith('xoxb-'),
-  slackSigningSecret: z.string().min(1),
-  slackChannel: z.string().startsWith('#'),
-  lokiUrl: z.string().optional().transform((v) => v === '' ? undefined : v), // URL with embedded credentials — skip .url() which rejects user:pass@ format. Optional: containers may run without Loki; logger falls back to stdout. Empty string is coerced to undefined (env var unset vs empty are equivalent).
-  redisUrl: z.string().url(),
-  sqsQueueUrl: z.string().url().optional().or(z.literal('')),
-  dedupTtlSeconds: z.coerce.number().int().positive().default(300),
-  clusterWindowMs: z.coerce.number().int().positive().default(120_000),
-  logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
-  nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
-  llmFallbackModels: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === undefined) return LLM_FALLBACK_DEFAULTS.Models;
-      if (!v) return [];
-      return v.split(',').map((s) => s.trim()).filter(Boolean);
-    }),
-  llmFallbackTimeoutMs: z.coerce.number().int().positive().default(LLM_FALLBACK_DEFAULTS.TimeoutMs),
-});
+const ConfigSchema = z
+  .object({
+    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
+    llmApiKey: z.string().min(1),
+    llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
+    // Notifier selector — defaults to 'slack' for backward compatibility
+    notifierType: z.enum(['slack', 'teams']).default('slack'),
+    // Slack fields — optional at schema level; superRefine enforces them conditionally
+    slackBotToken: z.string().startsWith('xoxb-').optional(),
+    slackSigningSecret: z.string().min(1).optional(),
+    slackChannel: z.string().startsWith('#').optional(),
+    // Teams field
+    teamsWebhookUrl: z.string().url().optional(),
+    lokiUrl: z.string().optional().transform((v) => v === '' ? undefined : v), // URL with embedded credentials — skip .url() which rejects user:pass@ format. Optional: containers may run without Loki; logger falls back to stdout. Empty string is coerced to undefined (env var unset vs empty are equivalent).
+    redisUrl: z.string().url(),
+    sqsQueueUrl: z.string().url().optional().or(z.literal('')),
+    dedupTtlSeconds: z.coerce.number().int().positive().default(300),
+    clusterWindowMs: z.coerce.number().int().positive().default(120_000),
+    logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+    nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
+    llmFallbackModels: z
+      .string()
+      .optional()
+      .transform((v) => {
+        if (v === undefined) return LLM_FALLBACK_DEFAULTS.Models;
+        if (!v) return [];
+        return v.split(',').map((s) => s.trim()).filter(Boolean);
+      }),
+    llmFallbackTimeoutMs: z.coerce.number().int().positive().default(LLM_FALLBACK_DEFAULTS.TimeoutMs),
+  })
+  .superRefine((data, ctx) => {
+    if (data.notifierType === 'slack') {
+      if (!data.slackBotToken) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['slackBotToken'],
+          message: '[notifierType: slack] SLACK_BOT_TOKEN is required and must start with xoxb-',
+        });
+      }
+      if (!data.slackChannel) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['slackChannel'],
+          message: '[notifierType: slack] SLACK_CHANNEL is required and must start with #',
+        });
+      }
+    }
+    if (data.notifierType === 'teams') {
+      if (!data.teamsWebhookUrl) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teamsWebhookUrl'],
+          message: '[notifierType: teams] TEAMS_WEBHOOK_URL is required',
+        });
+      } else if (!data.teamsWebhookUrl.includes('api-version=')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['teamsWebhookUrl'],
+          message: '[notifierType: teams] TEAMS_WEBHOOK_URL must include api-version= query param',
+        });
+      }
+    }
+  });
 
 export type Config = z.infer<typeof ConfigSchema>;
 
@@ -85,9 +124,11 @@ export async function loadConfig(): Promise<Config> {
     llmProvider: process.env['LLM_PROVIDER'],
     llmApiKey: process.env['LLM_API_KEY'],
     llmModel: process.env['LLM_MODEL'],
+    notifierType: process.env['NOTIFIER_TYPE'],
     slackBotToken: process.env['SLACK_BOT_TOKEN'],
     slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
     slackChannel: process.env['SLACK_CHANNEL'],
+    teamsWebhookUrl: process.env['TEAMS_WEBHOOK_URL'],
     lokiUrl: process.env['LOKI_URL'],
     redisUrl: process.env['REDIS_URL'],
     sqsQueueUrl: process.env['SQS_QUEUE_URL'],

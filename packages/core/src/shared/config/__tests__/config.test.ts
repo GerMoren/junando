@@ -48,6 +48,10 @@ function setEnv(vars: Partial<typeof validConfig>) {
 function clearEnv() {
   Object.keys(validConfig).forEach((k) => delete process.env[k]);
   delete process.env.SSM_PREFIX;
+  delete process.env.NOTIFIER_TYPE;
+  delete process.env.TEAMS_WEBHOOK_URL;
+  delete process.env.LLM_FALLBACK_MODELS;
+  delete process.env.LLM_FALLBACK_TIMEOUT_MS;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -500,6 +504,107 @@ describe('Config — loadConfig', () => {
       } catch (err: any) {
         expect(err.message).toContain('llmProvider');
         expect(err.message).toContain('llmApiKey');
+      }
+    });
+  });
+
+  // ── Notifier discriminated union (CFG-01..06) ────────────────────────────
+
+  describe('CFG-02: missing NOTIFIER_TYPE defaults to slack', () => {
+    it('defaults notifierType to slack when NOTIFIER_TYPE is absent', async () => {
+      setEnv({ ...validConfig });
+      const config = await loadConfig();
+      expect(config.notifierType).toBe('slack');
+    });
+  });
+
+  describe('CFG-01: NOTIFIER_TYPE enum validation', () => {
+    it('accepts NOTIFIER_TYPE=teams', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.powerautomate.com/invoke?api-version=1';
+      const config = await loadConfig();
+      expect(config.notifierType).toBe('teams');
+    });
+
+    it('accepts NOTIFIER_TYPE=slack with valid slack vars', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      const config = await loadConfig();
+      expect(config.notifierType).toBe('slack');
+    });
+
+    it('rejects NOTIFIER_TYPE=discord with validation error', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'discord';
+      await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+    });
+  });
+
+  describe('CFG-03: slack requires token and channel', () => {
+    it('rejects slack without SLACK_BOT_TOKEN', async () => {
+      setEnv({ ...validConfig, SLACK_BOT_TOKEN: undefined });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      await expect(loadConfig()).rejects.toThrow(/SLACK_BOT_TOKEN/);
+    });
+
+    it('rejects slack with invalid token prefix (not xoxb-)', async () => {
+      setEnv({ ...validConfig, SLACK_BOT_TOKEN: 'xoxa-bad' });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      await expect(loadConfig()).rejects.toThrow(/xoxb-/);
+    });
+
+    it('rejects slack without SLACK_CHANNEL', async () => {
+      setEnv({ ...validConfig, SLACK_CHANNEL: undefined });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      await expect(loadConfig()).rejects.toThrow(/SLACK_CHANNEL/);
+    });
+  });
+
+  describe('CFG-04: teams requires valid webhook URL with api-version', () => {
+    it('rejects teams without TEAMS_WEBHOOK_URL', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      await expect(loadConfig()).rejects.toThrow(/TEAMS_WEBHOOK_URL/);
+    });
+
+    it('rejects teams URL missing api-version query param', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.com/invoke';
+      await expect(loadConfig()).rejects.toThrow(/api-version/);
+    });
+
+    it('accepts teams URL with api-version present (any value)', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.powerautomate.com/invoke?api-version=2024-10-01';
+      const config = await loadConfig();
+      expect(config.notifierType).toBe('teams');
+      expect(config.teamsWebhookUrl).toContain('api-version=');
+    });
+  });
+
+  describe('CFG-05: no cross-pollution — teams ignores slack vars', () => {
+    it('parses successfully when NOTIFIER_TYPE=teams and slack vars are also set', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.powerautomate.com/invoke?api-version=1';
+      const config = await loadConfig();
+      expect(config.notifierType).toBe('teams');
+    });
+  });
+
+  describe('CFG-06: error message includes notifierType context', () => {
+    it('error for missing TEAMS_WEBHOOK_URL includes "teams" context', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      try {
+        await loadConfig();
+        expect.fail('should have thrown');
+      } catch (err: any) {
+        expect(err.message).toContain('TEAMS_WEBHOOK_URL');
+        expect(err.message).toContain('teams');
       }
     });
   });

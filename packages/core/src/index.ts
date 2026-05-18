@@ -34,6 +34,8 @@ export {
   MockLLMProvider,
 } from './infrastructure/llm/llm.adapter.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
+export { TeamsNotifier, TeamsNotifierError } from './infrastructure/notifier/teams.adapter.js';
+export { createNotifier } from './infrastructure/notifier/factory.js';
 export { InMemoryAlertQueue, SQSAlertQueue } from './infrastructure/queue/sqs.adapter.js';
 export {
   LokiTraceRepository,

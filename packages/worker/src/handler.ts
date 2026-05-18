@@ -3,7 +3,7 @@ import {
   NormalizedAlertSchema,
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
-  SlackNotifier,
+  createNotifier,
   metrics,
   createLLMProvider,
   createLogger,
@@ -47,7 +47,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   const dedup = new RedisDeduplicationStore(redis);
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
-  const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+  const notifier = createNotifier(config);
 
   useCase = new ProcessIncidentUseCase({
     dedup,

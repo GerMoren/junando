@@ -21,7 +21,7 @@ import {
   LokiTraceRepository,
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
-  SlackNotifier,
+  createNotifier,
   createLLMProvider,
   createLogger,
   flushLoki,
@@ -103,7 +103,7 @@ const traces = new LokiTraceRepository(appConfig.lokiUrl ?? ingestConfig.ingest.
 const llm = useRealLlm
   ? createLLMProvider(appConfig.llmProvider, appConfig.llmApiKey, appConfig.llmModel)
   : new MockLLMProvider();
-const notifier = new SlackNotifier(appConfig.slackBotToken, appConfig.slackChannel);
+const notifier = createNotifier(appConfig);
 
 const processIncidentUseCase = new ProcessIncidentUseCase({
   dedup,
