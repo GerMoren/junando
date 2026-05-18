@@ -40,6 +40,36 @@ export function sanitizeText(s: string, maxLength = 4_000): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// sanitizeErrorBody — scrubs credentials from upstream error responses before
+// they reach logs. Power Automate / Azure Logic Apps sometimes echo parts of
+// the request URL (including the `sig=` SAS token) in error bodies.
+// Pure function — no side effects.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ERROR_BODY_MAX = 500;
+
+export function sanitizeErrorBody(body: string, webhookUrl: string): string {
+  let result = body;
+
+  // 1. Replace the exact webhook URL if present.
+  if (webhookUrl && result.includes(webhookUrl)) {
+    result = result.split(webhookUrl).join('[redacted-webhook-url]');
+  }
+
+  // 2. Defensive scrub of any sig= querystring-like token (covers cases where
+  //    the URL is echoed in a slightly different form, e.g. URL-encoded or
+  //    embedded in JSON).
+  result = result.replace(/sig=[^&"'\s]+/gi, 'sig=[redacted]');
+
+  // 3. Truncate to ERROR_BODY_MAX chars with ellipsis marker.
+  if (result.length > ERROR_BODY_MAX) {
+    result = result.slice(0, ERROR_BODY_MAX) + '…';
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Adaptive Card payload builders
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -182,7 +212,8 @@ export class TeamsNotifier implements INotifier {
 
       if (!res.ok) {
         const body = await res.text();
-        throw new TeamsNotifierError(`Teams webhook error ${res.status}: ${body}`);
+        const safeBody = sanitizeErrorBody(body, this.webhookUrl);
+        throw new TeamsNotifierError(`Teams webhook error ${res.status}: ${safeBody}`);
       }
     } catch (err) {
       if (err instanceof TeamsNotifierError) {

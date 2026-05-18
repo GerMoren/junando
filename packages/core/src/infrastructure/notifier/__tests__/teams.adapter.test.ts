@@ -162,6 +162,31 @@ describe('TeamsNotifier', () => {
     await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow('Internal Server Error');
   });
 
+  // ── TNT-09: HTTP error body is truncated and webhook URL / sig token scrubbed ──
+  // Prevents credential leak to CloudWatch logs (e.g. when Azure/Power Automate
+  // echoes parts of the request URL back in error responses).
+
+  it('TNT-09: HTTP error message truncates body to 500 chars and scrubs webhook URL', async () => {
+    const webhookWithSecret = 'https://prod.example.powerautomate.com/invoke?api-version=1&sig=SUPER_SECRET_TOKEN_abc123XYZ';
+    const longLeak = `request failed for url ${webhookWithSecret} with details: ` + 'X'.repeat(800);
+    mockFetch.mockResolvedValue({ ok: false, status: 502, text: async () => longLeak });
+
+    const leakyNotifier = new TeamsNotifier(webhookWithSecret);
+    const err = await leakyNotifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    // Webhook URL must not appear verbatim
+    expect(err.message).not.toContain(webhookWithSecret);
+    // sig token must not appear verbatim
+    expect(err.message).not.toContain('SUPER_SECRET_TOKEN_abc123XYZ');
+    // body portion is truncated to <= 500 chars and ends with the truncation marker
+    // (overall message contains the prefix "Teams webhook error 502: " plus body)
+    const colonIdx = err.message.indexOf(': ');
+    const bodyPart = err.message.slice(colonIdx + 2);
+    expect(bodyPart.length).toBeLessThanOrEqual(501); // 500 chars + '…'
+    expect(bodyPart.endsWith('…')).toBe(true);
+  });
+
   // ── TNT-06: sanitization ──────────────────────────────────────────────────
 
   it('strips HTML tags from service name (TNT-06)', async () => {
