@@ -15,7 +15,7 @@ import {
   MockLLMProvider,
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
-  SlackNotifier,
+  createNotifier,
   WEBHOOK_DEFAULTS,
   createLLMProvider,
   createLogger,
@@ -53,7 +53,7 @@ async function main() {
   const llm = useMock
     ? new MockLLMProvider()
     : createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
-  const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+  const notifier = createNotifier(config);
 
   const useCase = new ProcessIncidentUseCase({
     dedup,

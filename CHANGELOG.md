@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Notifier**: Microsoft Teams adapter via Power Automate Workflow webhooks (issue #21). `TeamsNotifier` sends Adaptive Card v1.5 payloads with full LLM analysis (service, urgency, probable cause, recommended steps, runbook action) or a minimal fallback card when analysis is unavailable. Config uses `NOTIFIER_TYPE=teams` + `TEAMS_WEBHOOK_URL`. Existing Slack deployments are unaffected — `NOTIFIER_TYPE` defaults to `slack`.
+- **Config**: `NOTIFIER_TYPE` discriminated union with `superRefine` validation. Slack fields required only when `NOTIFIER_TYPE=slack`; Teams URL (with `api-version=` query param) required only when `NOTIFIER_TYPE=teams`. Cross-pollution prevented — no false failures on shared environments.
+- **Core**: `createNotifier(config)` factory in `packages/core/src/infrastructure/notifier/factory.ts` — single instantiation point for all notifier types (WIR-02).
+
 - **CI**: Docker workflow now triggers on merge to `main` in addition to `v*` tags (issue #26). Merges to `main` publish `:main` + `:sha-<short>` tags. The `:latest` tag is only moved on semver releases, keeping it as a stable pointer.
 - **CI**: Added `type=semver,pattern={{major}}.{{minor}}` tag (e.g. `0.2`) to all three images on release.
 

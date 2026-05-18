@@ -8,11 +8,11 @@
  */
 import {
   createLLMProvider,
+  createNotifier,
   LokiTraceRepository,
   metrics,
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
-  SlackNotifier,
 } from '../../packages/core/src/index.js';
 import type { Config, Logger } from '../../packages/core/src/index.js';
 import { Redis } from 'ioredis';
@@ -46,7 +46,7 @@ export function createProcessIncidentUseCase(
   const dedup = new RedisDeduplicationStore(redis);
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
-  const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+  const notifier = createNotifier(config);
 
   return new ProcessIncidentUseCase({
     dedup,

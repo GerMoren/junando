@@ -318,15 +318,49 @@ docker run -d \
 | `LLM_PROVIDER`         | ✓        | —                | `gemini` \| `claude` \| `openrouter` \| `qwen`                    |
 | `LLM_API_KEY`          | ✓        | —                | API key for the chosen LLM                                        |
 | `LLM_MODEL`            | —        | provider default | Override model (e.g. `google/gemma-4-31b-it:free` for OpenRouter) |
-| `SLACK_BOT_TOKEN`      | ✓        | —                | Slack Bot Token (`xoxb-...`)                                      |
-| `SLACK_SIGNING_SECRET` | ✓        | —                | For validating Slack interactivity                                |
-| `SLACK_CHANNEL`        | ✓        | —                | Target channel e.g. `#incidents`                                  |
+| `SLACK_BOT_TOKEN`      | ✓ (slack) | —                | Slack Bot Token (`xoxb-...`). Required when `NOTIFIER_TYPE=slack` |
+| `SLACK_SIGNING_SECRET` | ✓ (slack) | —                | For validating Slack interactivity. Required when `NOTIFIER_TYPE=slack` |
+| `SLACK_CHANNEL`        | ✓ (slack) | —                | Target channel e.g. `#incidents`. Required when `NOTIFIER_TYPE=slack` |
+| `NOTIFIER_TYPE`        | —        | `slack`          | `slack` \| `teams` — selects the notification backend             |
+| `TEAMS_WEBHOOK_URL`    | ✓ (teams)| —                | Power Automate workflow webhook URL. Required when `NOTIFIER_TYPE=teams`. Must include `api-version=` query param |
 | `LOKI_URL`             | ✓        | —                | Loki push URL with embedded credentials — see Observability       |
 | `REDIS_URL`            | ✓        | —                | Redis connection string                                           |
 | `SQS_QUEUE_URL`        | —        | —                | Injected by CDK in AWS. Empty = local mode                        |
 | `DEDUP_TTL_SECONDS`    | —        | `300`            | Deduplication window in seconds                                   |
 | `CLUSTER_WINDOW_MS`    | —        | `120000`         | Clustering window in milliseconds                                 |
 | `LOG_LEVEL`            | —        | `info`           | `trace`\|`debug`\|`info`\|`warn`\|`error`                         |
+
+---
+
+## Teams Notifier Setup
+
+Junando supports Microsoft Teams as a notification backend via Power Automate Workflow webhooks.
+
+### Requirements
+
+1. **Create a Power Automate Workflow** — use the "Post to a channel" template with an HTTP trigger.
+2. **Copy the webhook URL** — it looks like:
+   ```
+   https://prod-XX.westus.logic.azure.com/workflows/.../invoke?api-version=2024-10-01&sp=...&sv=...&sig=...
+   ```
+   > ⚠️ The URL **must** include the `api-version=` query parameter. Microsoft changes the value periodically — Junando accepts any value, so you don't need to update it.
+
+3. **Set environment variables**:
+   ```bash
+   NOTIFIER_TYPE=teams
+   TEAMS_WEBHOOK_URL=https://prod-XX.powerautomate.com/workflows/.../invoke?api-version=2024-10-01&sp=...
+   ```
+
+### Webhook Behavior
+
+- Junando sends an [Adaptive Card v1.5](https://adaptivecards.io/) payload wrapped in the Teams `message` envelope.
+- The webhook returns **HTTP 202 Accepted** — Junando treats both 200 and 202 as success.
+- Timeout defaults to **10 seconds** (`TEAMS_WEBHOOK_TIMEOUT_MS`). SQS handles retries on timeout.
+- The full webhook URL (including the `sig=` secret) is **never logged**. Only the hostname is included in error messages.
+
+### Existing Slack Deployments
+
+Setting `NOTIFIER_TYPE` is optional — it defaults to `slack`. Existing Slack deployments continue to work without any changes.
 
 ---
 

@@ -150,7 +150,7 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
     const slackSignature = event.headers['x-slack-signature'];
     const slackTimestamp = event.headers['x-slack-request-timestamp'];
 
-    if (!verifySlackSignature(slackSignature, slackTimestamp, bodyStr, config.slackSigningSecret)) {
+    if (!verifySlackSignature(slackSignature, slackTimestamp, bodyStr, config.slackSigningSecret!)) {
       metrics.webhookRequestsTotal.inc({ endpoint: '/webhook/slack-interactivity', status: '401' });
       logger.warn({ correlationId }, 'Invalid Slack signature');
       return { statusCode: 401, body: 'Invalid signature' };
@@ -271,7 +271,7 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
       InMemoryDeduplicationStore,
       MockTraceRepository,
       createLLMProvider,
-      SlackNotifier,
+      createNotifier,
       loadConfig,
     } = await import('@junando/core');
 
@@ -282,7 +282,7 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
       const traces = new MockTraceRepository();
 
       const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
-      const notifier = new SlackNotifier(config.slackBotToken, config.slackChannel);
+      const notifier = createNotifier(config);
 
       const useCase = new ProcessIncidentUseCase({
         dedup,
