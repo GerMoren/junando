@@ -1,0 +1,52 @@
+# ingest.config.example.yaml
+# Copy to ingest.config.yaml and edit for your services.
+# Auth secrets are read from environment variables — never paste literal tokens here.
+
+ingest:
+  # How often the polling loop queries Loki, in milliseconds.
+  intervalMs: 30000
+
+  loki:
+    # Loki query API endpoint (no trailing slash).
+    url: https://logs-prod-XXX.grafana.net/loki/api/v1
+
+    # HTTP request timeout per Loki query, in milliseconds.
+    timeoutMs: 10000
+
+    # Authentication — choose 'bearer' (Grafana Cloud token) or 'basic' (username + password).
+    # The values below are environment variable NAMES, not the secrets themselves.
+    auth:
+      type: bearer
+      tokenEnv: LOKI_AUTH_TOKEN
+      # For basic auth, use instead:
+      # type: basic
+      # userEnv: LOKI_AUTH_USER
+      # passEnv: LOKI_AUTH_PASS
+
+  rules:
+    # Rule 1: Error spike on the checkout service.
+    # Fires when the checkout-api logs more than 10 error-level lines in 5 minutes.
+    - name: checkout-error-spike
+      service: checkout-api
+      query: 'count_over_time({service="checkout-api"} |= "\"level\":\"error\"" [5m]) > 10'
+      alertType: http_500
+      severity: HIGH
+      windowMs: 300000  # 5 minutes — overrides global intervalMs for this rule
+
+    # Rule 2: p99 latency degradation on the orders service.
+    # Fires when any request logged with duration_ms > 2000 is observed.
+    - name: orders-p99-latency
+      service: orders-api
+      query: '{service="orders-api"} | json | duration_ms > 2000'
+      alertType: latency_spike
+      severity: MEDIUM
+      endpointPath: /api/orders
+
+    # Rule 3: HTTP 5xx rate on the payment gateway.
+    # Fires when error-level logs reference the /pay endpoint.
+    - name: payment-5xx-rate
+      service: payment-gateway
+      query: 'rate({service="payment-gateway"} | json | endpoint="/pay" | level="error" [5m])'
+      alertType: http_500
+      severity: CRITICAL
+      endpointPath: /pay

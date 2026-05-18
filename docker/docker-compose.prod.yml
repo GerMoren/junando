@@ -1,3 +1,4 @@
+name: junando
 services:
   junando-webhook:
     image: ghcr.io/germoren/junando-webhook:latest
@@ -12,6 +13,18 @@ services:
   junando-worker:
     image: ghcr.io/germoren/junando-worker:latest
     env_file: ../.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  junando-ingest:
+    image: ghcr.io/germoren/junando-ingest:${TAG:-latest}
+    env_file: ../.env
+    environment:
+      INGEST_CONFIG_PATH: /etc/junando/ingest.config.yaml
+    volumes:
+      - ./ingest.config.yaml:/etc/junando/ingest.config.yaml:ro
     depends_on:
       redis:
         condition: service_healthy
