@@ -244,4 +244,44 @@ describe('TeamsNotifier', () => {
     expect(result.message).toContain('prod.example.powerautomate.com');
     expect(result.message).not.toContain('api-version');
   });
+
+  // ── TNT-10: hostname is pre-computed at construction time ────────────────
+  // Prevents the catch block from doing `new URL(this.webhookUrl).hostname`,
+  // which would throw and shadow the original error if the URL ever became
+  // invalid (defense in depth — also more efficient).
+
+  it('TNT-10: hostname for error context is captured at construction, not in the catch path', async () => {
+    vi.useFakeTimers();
+
+    mockFetch.mockImplementation(
+      (_url: string, options: RequestInit) => new Promise<never>((_, reject) => {
+        const signal = options.signal as AbortSignal | undefined;
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      }),
+    );
+
+    const constructedHost = 'prod.example.powerautomate.com';
+    const notifierFast = new TeamsNotifier(`https://${constructedHost}/invoke?api-version=1`, 50);
+
+    // Mutate webhookUrl to an invalid value after construction. If the catch
+    // block parses lazily, it will throw inside the error handler and the
+    // original AbortError context will be lost.
+    (notifierFast as unknown as { webhookUrl: string }).webhookUrl = 'not-a-valid-url';
+
+    const sendPromise = notifierFast
+      .send(makeCluster(), makeAnalysis())
+      .catch((err) => err as Error);
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await sendPromise;
+
+    expect(result).toBeInstanceOf(TeamsNotifierError);
+    expect(result.message).toContain('50ms');
+    expect(result.message).toContain(constructedHost);
+  });
 });
