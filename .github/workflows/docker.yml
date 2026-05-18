@@ -153,7 +153,10 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile.ingest
-          platforms: linux/amd64,linux/arm64
+          # NOTE: arm64 disabled — QEMU emulation crashes with SIGILL during
+          # pnpm install for ingest (larger dep graph than webhook/worker).
+          # Re-enable via native arm64 runners once available. See issue #33.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
