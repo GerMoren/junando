@@ -593,6 +593,25 @@ describe('Config — loadConfig', () => {
       expect(config.notifierType).toBe('teams');
       expect(config.teamsWebhookUrl).toContain('api-version=');
     });
+
+    // CFG-04: brittle substring check would have accepted api-version= anywhere
+    // in the URL (e.g. baked into the path). Validation must require it as a
+    // proper query parameter.
+    it('CFG-04: rejects teams URL where api-version= appears only in path, not as query param', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://logic.azure.com/workflows/api-version=fake/invoke';
+      await expect(loadConfig()).rejects.toThrow(/api-version/);
+    });
+
+    // CFG-05: URLs with api-version as a proper query parameter pass validation.
+    it('CFG-05: accepts teams URL with api-version as proper query param', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.powerautomate.com/workflows/abc/triggers/manual/invoke?api-version=2016-10-01';
+      const config = await loadConfig();
+      expect(config.teamsWebhookUrl).toContain('api-version=2016-10-01');
+    });
   });
 
   describe('CFG-05: no cross-pollution — teams ignores slack vars', () => {

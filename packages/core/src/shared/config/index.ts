@@ -112,12 +112,27 @@ const ConfigSchema = z
           path: ['teamsWebhookUrl'],
           message: '[notifierType: teams] TEAMS_WEBHOOK_URL is required',
         });
-      } else if (!data.teamsWebhookUrl.includes('api-version=')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['teamsWebhookUrl'],
-          message: '[notifierType: teams] TEAMS_WEBHOOK_URL must include api-version= query param',
-        });
+      } else {
+        // Parse the URL and require api-version as a real query parameter,
+        // not just any substring (which would accept e.g. an api-version=
+        // segment baked into the URL path).
+        let parsed: URL | undefined;
+        try {
+          parsed = new URL(data.teamsWebhookUrl);
+        } catch {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['teamsWebhookUrl'],
+            message: '[notifierType: teams] TEAMS_WEBHOOK_URL must be a valid URL',
+          });
+        }
+        if (parsed && !parsed.searchParams.has('api-version')) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['teamsWebhookUrl'],
+            message: '[notifierType: teams] TEAMS_WEBHOOK_URL must include api-version= as a query parameter',
+          });
+        }
       }
     }
   });
