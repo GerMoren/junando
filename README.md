@@ -141,11 +141,14 @@ junando/                          ← single GitHub repo
 │   ├── docker-compose.yml        ← full local dev stack (name: junando)
 │   ├── docker-compose.prod.yml   ← production compose (webhook + worker + ingest + redis)
 │   ├── docker-compose.prod.local.yml  ← override for local images
+│   ├── docker-compose.localstack.yml  ← optional LocalStack SQS helper for ingest local-dev
 │   ├── Dockerfile.webhook        ← multi-stage image for junando-webhook
 │   ├── Dockerfile.worker         ← multi-stage image for junando-worker
 │   ├── Dockerfile.ingest         ← multi-stage image for junando-ingest
-│   ├── ingest.config.example.yaml     ← template for ingest rules (Grafana Cloud)
-│   ├── ingest.config.local.yaml  ← local dev rules (points to localhost:3100)
+│   ├── ingest.config.example.yaml     ← template for Loki ingest rules (Grafana Cloud)
+│   ├── ingest.config.local.yaml  ← local dev Loki rules (points to localhost:3100)
+│   ├── ingest.config.sqs.example.yaml ← template for generic SQS ingest
+│   ├── ingest.config.sqs.local.yaml   ← LocalStack-friendly SQS ingest config
 │   ├── alertmanager/             ← points to localhost:4000
 │   ├── grafana/                  ← datasources pre-configured
 │   ├── loki/                     ← single-binary local config
@@ -156,6 +159,9 @@ junando/                          ← single GitHub repo
 │   ├── worker-local.ts           ← run ProcessIncidentUseCase directly (no SQS)
 │   ├── ingest-server.ts          ← composition root for junando-ingest service
 │   ├── ingest-local.ts           ← single-tick ingest test against local Loki
+│   ├── ingest/
+│   │   ├── runtime.ts            ← Loki vs SQS runtime selection seam
+│   │   └── processors/           ← source-specific queue processors (for example Cenco)
 │   ├── generate-alert.ts         ← synthetic alert generator (Alertmanager format)
 │   ├── simulate-incident.ts      ← full incident simulation (local or webhook target)
 │   └── factories/
@@ -265,10 +271,10 @@ receivers:
 
 Images are published to GitHub Container Registry (`ghcr.io`) automatically:
 
-| Event | Tags published | Use case |
-|-------|---------------|----------|
-| Merge to `main` | `:main`, `:sha-<short>` | Bleeding edge — latest unreleased changes |
-| Push `v*` tag | `:latest`, `:<version>`, `:<major>.<minor>`, `:sha-<short>` | Stable release |
+| Event           | Tags published                                              | Use case                                  |
+| --------------- | ----------------------------------------------------------- | ----------------------------------------- |
+| Merge to `main` | `:main`, `:sha-<short>`                                     | Bleeding edge — latest unreleased changes |
+| Push `v*` tag   | `:latest`, `:<version>`, `:<major>.<minor>`, `:sha-<short>` | Stable release                            |
 
 ```bash
 # Stable release (recommended for production)
@@ -285,14 +291,13 @@ docker pull ghcr.io/germoren/junando-webhook:sha-a1b2c3d
 ```
 
 To publish a new release:
+
 ```bash
 git tag v0.3.0
 git push origin v0.3.0
 ```
 
 ---
-
-
 
 ```bash
 docker run -d \
@@ -311,24 +316,24 @@ docker run -d \
 
 ## Environment Variables
 
-| Variable               | Required | Default          | Description                                                       |
-| ---------------------- | -------- | ---------------- | ----------------------------------------------------------------- |
-| `NODE_ENV`             | —        | `development`    | Set to `production` in AWS (required for Lambda deploy)           |
-| `SSM_PREFIX`           | AWS only | —                | E.g. `/junando`. When set, secrets are loaded from SSM at startup |
-| `LLM_PROVIDER`         | ✓        | —                | `gemini` \| `claude` \| `openrouter` \| `qwen`                    |
-| `LLM_API_KEY`          | ✓        | —                | API key for the chosen LLM                                        |
-| `LLM_MODEL`            | —        | provider default | Override model (e.g. `google/gemma-4-31b-it:free` for OpenRouter) |
-| `SLACK_BOT_TOKEN`      | ✓ (slack) | —                | Slack Bot Token (`xoxb-...`). Required when `NOTIFIER_TYPE=slack` |
-| `SLACK_SIGNING_SECRET` | ✓ (slack) | —                | For validating Slack interactivity. Required when `NOTIFIER_TYPE=slack` |
-| `SLACK_CHANNEL`        | ✓ (slack) | —                | Target channel e.g. `#incidents`. Required when `NOTIFIER_TYPE=slack` |
-| `NOTIFIER_TYPE`        | —        | `slack`          | `slack` \| `teams` — selects the notification backend             |
-| `TEAMS_WEBHOOK_URL`    | ✓ (teams)| —                | Power Automate workflow webhook URL. Required when `NOTIFIER_TYPE=teams`. Must include `api-version=` query param |
-| `LOKI_URL`             | ✓        | —                | Loki push URL with embedded credentials — see Observability       |
-| `REDIS_URL`            | ✓        | —                | Redis connection string                                           |
-| `SQS_QUEUE_URL`        | —        | —                | Injected by CDK in AWS. Empty = local mode                        |
-| `DEDUP_TTL_SECONDS`    | —        | `300`            | Deduplication window in seconds                                   |
-| `CLUSTER_WINDOW_MS`    | —        | `120000`         | Clustering window in milliseconds                                 |
-| `LOG_LEVEL`            | —        | `info`           | `trace`\|`debug`\|`info`\|`warn`\|`error`                         |
+| Variable               | Required  | Default          | Description                                                                                                       |
+| ---------------------- | --------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`             | —         | `development`    | Set to `production` in AWS (required for Lambda deploy)                                                           |
+| `SSM_PREFIX`           | AWS only  | —                | E.g. `/junando`. When set, secrets are loaded from SSM at startup                                                 |
+| `LLM_PROVIDER`         | ✓         | —                | `gemini` \| `claude` \| `openrouter` \| `qwen`                                                                    |
+| `LLM_API_KEY`          | ✓         | —                | API key for the chosen LLM                                                                                        |
+| `LLM_MODEL`            | —         | provider default | Override model (e.g. `google/gemma-4-31b-it:free` for OpenRouter)                                                 |
+| `SLACK_BOT_TOKEN`      | ✓ (slack) | —                | Slack Bot Token (`xoxb-...`). Required when `NOTIFIER_TYPE=slack`                                                 |
+| `SLACK_SIGNING_SECRET` | ✓ (slack) | —                | For validating Slack interactivity. Required when `NOTIFIER_TYPE=slack`                                           |
+| `SLACK_CHANNEL`        | ✓ (slack) | —                | Target channel e.g. `#incidents`. Required when `NOTIFIER_TYPE=slack`                                             |
+| `NOTIFIER_TYPE`        | —         | `slack`          | `slack` \| `teams` — selects the notification backend                                                             |
+| `TEAMS_WEBHOOK_URL`    | ✓ (teams) | —                | Power Automate workflow webhook URL. Required when `NOTIFIER_TYPE=teams`. Must include `api-version=` query param |
+| `LOKI_URL`             | ✓         | —                | Loki push URL with embedded credentials — see Observability                                                       |
+| `REDIS_URL`            | ✓         | —                | Redis connection string                                                                                           |
+| `SQS_QUEUE_URL`        | —         | —                | Injected by CDK in AWS. Empty = local mode                                                                        |
+| `DEDUP_TTL_SECONDS`    | —         | `300`            | Deduplication window in seconds                                                                                   |
+| `CLUSTER_WINDOW_MS`    | —         | `120000`         | Clustering window in milliseconds                                                                                 |
+| `LOG_LEVEL`            | —         | `info`           | `trace`\|`debug`\|`info`\|`warn`\|`error`                                                                         |
 
 ---
 
@@ -340,9 +345,11 @@ Junando supports Microsoft Teams as a notification backend via Power Automate Wo
 
 1. **Create a Power Automate Workflow** — use the "Post to a channel" template with an HTTP trigger.
 2. **Copy the webhook URL** — it looks like:
+
    ```
    https://prod-XX.westus.logic.azure.com/workflows/.../invoke?api-version=2024-10-01&sp=...&sv=...&sig=...
    ```
+
    > ⚠️ The URL **must** include the `api-version=` query parameter. Microsoft changes the value periodically — Junando accepts any value, so you don't need to update it.
 
 3. **Set environment variables**:
@@ -407,11 +414,11 @@ capped at 30s) — verified against `google/gemma-4-31b-it:free`.
 
 Three portable, importable dashboard JSONs are available in [`docs/dashboards/`](docs/dashboards/):
 
-| Dashboard | Description |
-|-----------|-------------|
-| [`alert-volume.json`](docs/dashboards/alert-volume.json) | Webhook throughput, alert received/processed rates, duplicate rate |
-| [`llm-performance.json`](docs/dashboards/llm-performance.json) | LLM p50/p99 latency, 429 error rate, fallback hops, token usage |
-| [`sqs-health.json`](docs/dashboards/sqs-health.json) | SQS queue/DLQ depth (CloudWatch) + worker error logs (Loki) |
+| Dashboard                                                      | Description                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [`alert-volume.json`](docs/dashboards/alert-volume.json)       | Webhook throughput, alert received/processed rates, duplicate rate |
+| [`llm-performance.json`](docs/dashboards/llm-performance.json) | LLM p50/p99 latency, 429 error rate, fallback hops, token usage    |
+| [`sqs-health.json`](docs/dashboards/sqs-health.json)           | SQS queue/DLQ depth (CloudWatch) + worker error logs (Loki)        |
 
 For setup instructions, see **[docs/runbooks/grafana-setup.md](docs/runbooks/grafana-setup.md)**.
 
@@ -444,6 +451,12 @@ pnpm run ingest:local -- --config ./docker/ingest.config.local.yaml   # explicit
 pnpm run ingest:local -- --real-llm                      # use real LLM from .env.local
 pnpm run ingest:dev                                      # continuous polling loop (local)
 
+# SQS ingest (LocalStack helper)
+# Add AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and
+# INGEST_CONFIG_PATH=./docker/ingest.config.sqs.local.yaml to .env.local
+docker compose -f docker/docker-compose.localstack.yml up -d
+pnpm run ingest:sqs:local                                # run ingest-server using .env.local
+
 # Quality
 pnpm test                     # run all tests with Vitest
 pnpm test:watch               # interactive watch mode
@@ -457,6 +470,11 @@ docker build -f docker/Dockerfile.webhook -t junando-webhook:local .
 docker build -f docker/Dockerfile.worker  -t junando-worker:local  .
 docker build -f docker/Dockerfile.ingest  -t junando-ingest:local  .
 docker compose -f docker/docker-compose.prod.yml -f docker/docker-compose.prod.local.yml up -d
+
+# Optional LocalStack queue for SQS ingest local-dev
+# Put the SQS local env vars in .env.local
+# Queue bootstrap: docker/localstack/init/10-create-sqs-queue.sh
+# Config: docker/ingest.config.sqs.local.yaml
 
 # CDK
 pnpm cdk synth                # preview CloudFormation (no deploy)

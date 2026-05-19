@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { parse as parseYaml } from 'yaml';
 import { AlertType } from '@junando/core';
+import { parse as parseYaml } from 'yaml';
+import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
 // Sub-schemas
@@ -39,6 +39,7 @@ const LokiConfigSchema = z.object({
 
 const SqsRuntimeSchema = z.object({
   queueUrl: z.string().url(),
+  endpointUrl: z.string().url().optional(),
   waitTimeSeconds: z
     .number()
     .int()

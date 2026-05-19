@@ -19,6 +19,7 @@ COPY packages/core/ ./packages/core/
 COPY packages/ingest/ ./packages/ingest/
 COPY scripts/tsup.ingest.config.ts ./scripts/
 COPY scripts/ingest-server.ts ./scripts/
+COPY scripts/ingest/ ./scripts/ingest/
 COPY scripts/factories/ ./scripts/factories/
 
 RUN pnpm --filter @junando/core build
