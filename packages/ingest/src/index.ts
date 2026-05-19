@@ -20,6 +20,10 @@ export type {
   SqsMapper,
 } from './config/ingest-config.schema.js';
 
+// Mapper registry — public API for client repos implementing IMessageMapper
+export { getMapper, registerMapper } from './mappers/registry.js';
+export type { IMessageMapper } from './mappers/registry.js';
+
 export { LokiHttpError } from './ports/loki-http-client.port.js';
 export type {
   ILokiHttpClient,
