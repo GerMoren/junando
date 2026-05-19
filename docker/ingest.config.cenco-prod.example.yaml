@@ -1,0 +1,48 @@
+# ingest.config.cenco-prod.example.yaml
+# Production config for Junando as the Cenco error-manager SQS consumer.
+#
+# Deploy by mounting this file as a secret or ConfigMap and setting:
+#   INGEST_CONFIG_PATH=/etc/junando/ingest.config.yaml
+#
+# All SQS authentication is IAM-based (pod/task role).
+# No credentials block is required or supported.
+#
+# Replace every <PLACEHOLDER> token with environment-specific values.
+# Do NOT commit real ARNs, account IDs, or endpoint hostnames.
+
+ingest:
+  kind: sqs
+
+  sqs:
+    # Production SQS queue URL — provisioned by TI Cenco (issue #35).
+    # Format: https://sqs.<REGION>.amazonaws.com/<ACCOUNT_ID>/<QUEUE_NAME>
+    queueUrl: https://sqs.<REGION>.amazonaws.com/<ACCOUNT_ID>/cenco-error-manager
+
+    # Long-poll wait time in seconds (max 20). Reduces empty-receive API calls.
+    waitTimeSeconds: 20
+
+    # How long (seconds) a received message is hidden from other consumers.
+    # Must exceed the maximum processing time for a single batch.
+    visibilityTimeoutSeconds: 60
+
+    # Number of messages fetched per ReceiveMessage call (max 10).
+    batchSize: 10
+
+    # Maximum number of messages being processed concurrently.
+    maxInFlight: 20
+
+  mapper:
+    # Mapper registered in the image via side-effect import.
+    # Must match the kind exported by the cenco-error-v1 mapper module.
+    kind: cenco-error-v1
+
+  opensearch:
+    # OpenSearch domain endpoint — provisioned by Chjalmar (issue #35).
+    # Must be HTTPS. Do NOT use a local dev endpoint or plain HTTP here.
+    endpoint: https://<OPENSEARCH_DOMAIN_ENDPOINT>
+
+    # Index that receives all decoded Cenco traceability documents.
+    indexName: cenco-traceability
+
+    # AWS region of the OpenSearch domain (for SigV4 request signing).
+    region: <REGION>
