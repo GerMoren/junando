@@ -49,6 +49,7 @@ coverage/
 .engram/
 .windsurf/
 .pi/
+.pi-lens/
 artifacts/
 openspec/
 
