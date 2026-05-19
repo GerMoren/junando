@@ -118,6 +118,19 @@ describe('SqsSubscriber', () => {
     expect(registry.constructorCalls).toBe(1);
   });
 
+  it('SQS-01-B: passes endpoint override into the default SQSClient for local-dev queues', () => {
+    new SqsSubscriber({
+      config: makeConfig({ endpointUrl: 'http://localhost:4566' } as Partial<
+        SqsIngestConfig['ingest']['sqs']
+      >),
+      processMessage: vi.fn().mockResolvedValue(undefined),
+      logger: makeLogger(),
+    });
+
+    expect(SQSClient).toHaveBeenCalledWith({ endpoint: 'http://localhost:4566' });
+    expect(registry.constructorCalls).toBe(1);
+  });
+
   it('SQS-02: pollOnce uses configured receive params, hands raw messages to the processor, and deletes successes', async () => {
     const message = makeMessage('m-1');
     const logger = makeLogger();

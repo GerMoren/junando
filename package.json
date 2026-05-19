@@ -30,7 +30,8 @@
     "logs:worker": "aws logs tail /aws/lambda/junando-worker --follow --format short",
     "ingest:build": "tsup --config scripts/tsup.ingest.config.ts",
     "ingest:dev": "tsx scripts/ingest-server.ts",
-    "ingest:local": "tsx --env-file=.env.local scripts/ingest-local.ts",
+    "ingest:local": "tsx --env-file=.env.local scripts/ingest-local.ts -- --config ./docker/ingest.config.local.yaml",
+    "ingest:sqs:local": "tsx --env-file=.env.local scripts/ingest-server.ts",
     "worker:local": "tsx --env-file=.env.local scripts/worker-local.ts",
     "clean": "pnpm -r run clean && rm -rf node_modules"
   },

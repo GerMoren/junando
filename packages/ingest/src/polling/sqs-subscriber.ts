@@ -53,7 +53,9 @@ export class SqsSubscriber {
     this.config = deps.config.ingest.sqs;
     this.processMessage = deps.processMessage;
     this.logger = deps.logger;
-    this.sqsClient = deps.sqsClient ?? new SQSClient({});
+    this.sqsClient =
+      deps.sqsClient ??
+      new SQSClient(this.config.endpointUrl ? { endpoint: this.config.endpointUrl } : {});
     this.observer = deps.observer;
   }
 
