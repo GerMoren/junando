@@ -12,3 +12,5 @@ ingest:
     maxInFlight: 20
     # Optional local/dev override (for example LocalStack):
     # endpointUrl: http://localhost:4566
+  mapper:
+    kind: cenco-error-v1

@@ -48,3 +48,16 @@ services:
       - '../docs/dashboards/alert-volume.json:/var/lib/grafana/dashboards/alert-volume.json'
       - '../docs/dashboards/llm-performance.json:/var/lib/grafana/dashboards/llm-performance.json'
       - '../docs/dashboards/sqs-health.json:/var/lib/grafana/dashboards/sqs-health.json'
+
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    ports: ['9200:9200']
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9200/_cluster/health >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 10

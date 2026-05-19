@@ -47,8 +47,12 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-sqs": "^3.1045.0",
     "@aws-sdk/client-ssm": "^3.1045.0",
+    "@aws-sdk/credential-provider-node": "^3.972.39",
+    "@smithy/protocol-http": "^5.3.14",
+    "@smithy/signature-v4": "^5.3.14",
     "@types/ioredis": "^5.0.0",
     "bottleneck": "^2.19.5",
     "ioredis": "^5.10.1",

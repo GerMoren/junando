@@ -11,3 +11,5 @@ ingest:
     visibilityTimeoutSeconds: 60
     batchSize: 10
     maxInFlight: 10
+  mapper:
+    kind: cenco-error-v1

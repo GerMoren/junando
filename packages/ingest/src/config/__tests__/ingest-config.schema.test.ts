@@ -48,6 +48,8 @@ ingest:
   sqs:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
 ${overrides}
+  mapper:
+    kind: cenco-error-v1
 `.trim();
 }
 
@@ -121,6 +123,28 @@ ingest:
     expect(() => loadIngestConfig(minimalSqsYaml('    waitTimeSeconds: 21'))).toThrow(
       /waitTimeSeconds/i,
     );
+  });
+
+  it('CFG-01-J: throws when sqs mapper is missing', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+`.trim();
+    expect(() => loadIngestConfig(yaml)).toThrow(/mapper/i);
+  });
+
+  it('CFG-01-K: throws when sqs mapper.kind is empty', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+  mapper:
+    kind: ""
+`.trim();
+    expect(() => loadIngestConfig(yaml)).toThrow();
   });
 });
 
@@ -197,6 +221,8 @@ ingest:
   kind: sqs
   sqs:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+  mapper:
+    kind: cenco-error-v1
 `.trim();
     const config = loadIngestConfig(yaml);
 
@@ -222,6 +248,69 @@ ingest:
     expect((config.ingest.sqs as { endpointUrl?: string }).endpointUrl).toBe(
       'http://localhost:4566',
     );
+  });
+
+  it('CFG-02-G: valid kind=sqs config accepts an optional opensearch block', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+  opensearch:
+    endpoint: "https://search-cenco.us-east-1.es.amazonaws.com"
+    indexName: "cenco-traceability"
+    region: "us-east-1"
+  mapper:
+    kind: cenco-error-v1
+`.trim();
+    const config = loadIngestConfig(yaml);
+
+    expect(config.ingest.kind).toBe('sqs');
+    if (config.ingest.kind !== 'sqs') {
+      throw new Error('Expected sqs config');
+    }
+
+    expect(config.ingest.opensearch).toEqual({
+      endpoint: 'https://search-cenco.us-east-1.es.amazonaws.com',
+      indexName: 'cenco-traceability',
+      region: 'us-east-1',
+    });
+  });
+
+  it('CFG-02-H: opensearch block is optional on sqs config', () => {
+    const config = loadIngestConfig(
+      `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+  mapper:
+    kind: cenco-error-v1
+`.trim(),
+    );
+
+    if (config.ingest.kind !== 'sqs') throw new Error('Expected sqs config');
+    expect(config.ingest.opensearch).toBeUndefined();
+  });
+
+  it('CFG-02-J: valid kind=sqs config includes the mapper.kind field', () => {
+    const config = loadIngestConfig(minimalSqsYaml());
+    if (config.ingest.kind !== 'sqs') throw new Error('Expected sqs config');
+    expect(config.ingest.mapper).toEqual({ kind: 'cenco-error-v1' });
+  });
+
+  it('CFG-02-I: opensearch block rejects an invalid endpoint URL', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+  opensearch:
+    endpoint: "not-a-url"
+    indexName: "cenco-traceability"
+    region: "us-east-1"
+`.trim();
+    expect(() => loadIngestConfig(yaml)).toThrow(/endpoint/i);
   });
 });
 

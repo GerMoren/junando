@@ -51,6 +51,12 @@ const SqsRuntimeSchema = z.object({
   maxInFlight: z.number().int().positive().default(20),
 });
 
+const OpenSearchTargetSchema = z.object({
+  endpoint: z.string().url(),
+  indexName: z.string().min(1),
+  region: z.string().min(1),
+});
+
 function ensureUniqueRuleNames(rules: IngestRule[], ctx: z.RefinementCtx): void {
   const seen = new Set<string>();
   for (const rule of rules) {
@@ -79,9 +85,13 @@ const LegacyLokiIngestSectionSchema = z.object({
   rules: z.array(IngestRuleSchema).min(1),
 });
 
+const SqsMapperSchema = z.object({ kind: z.string().min(1) });
+
 const SqsIngestSectionSchema = z.object({
   kind: z.literal('sqs'),
   sqs: SqsRuntimeSchema,
+  opensearch: OpenSearchTargetSchema.optional(),
+  mapper: SqsMapperSchema,
 });
 
 const ExplicitIngestSectionSchema = z.discriminatedUnion('kind', [
@@ -114,6 +124,8 @@ const LegacyLokiIngestConfigSchema = z
 export type IngestRule = z.infer<typeof IngestRuleSchema>;
 export type LokiIngestSection = z.infer<typeof LokiIngestSectionSchema>;
 export type SqsIngestSection = z.infer<typeof SqsIngestSectionSchema>;
+export type OpenSearchTarget = z.infer<typeof OpenSearchTargetSchema>;
+export type SqsMapper = z.infer<typeof SqsMapperSchema>;
 export type LokiIngestConfig = { ingest: LokiIngestSection };
 export type SqsIngestConfig = { ingest: SqsIngestSection };
 export type IngestConfig = LokiIngestConfig | SqsIngestConfig;

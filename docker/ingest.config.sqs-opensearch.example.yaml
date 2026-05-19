@@ -1,0 +1,21 @@
+# ingest.config.sqs-opensearch.example.yaml
+# SQS → OpenSearch ingest example (issue #47).
+# When the optional `opensearch` block is present, the SQS subscriber writes
+# each decoded Cenco traceability message directly to the OpenSearch index.
+# NOTE: this path is INDEXER-ONLY. It does NOT run clustering, LLM analysis,
+# or notifier delivery. Use it for the traceability panel only.
+
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: https://sqs.us-east-1.amazonaws.com/123456789012/junando-cenco-phase-a
+    waitTimeSeconds: 20
+    visibilityTimeoutSeconds: 60
+    batchSize: 10
+    maxInFlight: 20
+  opensearch:
+    endpoint: https://search-cenco-traceability.us-east-1.es.amazonaws.com
+    indexName: cenco-traceability
+    region: us-east-1
+  mapper:
+    kind: cenco-error-v1
