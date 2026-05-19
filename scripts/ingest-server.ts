@@ -96,7 +96,7 @@ const runtime = createIngestRuntime({
 });
 
 // ---------------------------------------------------------------------------
-// 6. Signal handlers — drain in-flight work before exit
+// 5. Signal handlers — drain in-flight work before exit
 // ---------------------------------------------------------------------------
 
 async function shutdown(signal: string): Promise<void> {
