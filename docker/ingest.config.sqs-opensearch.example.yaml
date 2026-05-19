@@ -14,7 +14,8 @@ ingest:
     batchSize: 10
     maxInFlight: 20
   opensearch:
-    endpoint: https://search-cenco-traceability.us-east-1.es.amazonaws.com
+    # endpoint: https://search-cenco-traceability.us-east-1.es.amazonaws.com
+    endpoint: http://localhost:9200
     indexName: cenco-traceability
     region: us-east-1
   mapper:

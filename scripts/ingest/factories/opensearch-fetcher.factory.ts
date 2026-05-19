@@ -12,6 +12,8 @@ export interface CreateDefaultOpenSearchFetcherDeps {
   region: string;
   service?: string;
   fetchImpl?: typeof fetch;
+  /** Skip SigV4 signing — use for local dev with DISABLE_SECURITY_PLUGIN=true */
+  skipSigning?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,18 +21,34 @@ export interface CreateDefaultOpenSearchFetcherDeps {
 // Returns an OpenSearchHttpFetcher that signs each request with AWS SigV4
 // against the OpenSearch service (es). Credentials are resolved with the
 // standard AWS credential provider chain (env, profile, IMDS, etc.).
+//
+// For local dev with DISABLE_SECURITY_PLUGIN=true, pass skipSigning: true
+// to skip SigV4 and send plain HTTP requests.
 // ─────────────────────────────────────────────────────────────────────────────
 export function createDefaultOpenSearchFetcher(
   deps: CreateDefaultOpenSearchFetcherDeps,
 ): OpenSearchHttpFetcher {
+  const doFetch = deps.fetchImpl ?? fetch;
+
+  // Local dev shortcut: skip signing entirely when security plugin is disabled
+  if (deps.skipSigning) {
+    return async (request: SignedHttpRequest): Promise<OpenSearchHttpResponse> => {
+      const response = await doFetch(request.url, {
+        method: request.method,
+        headers: request.headers as Record<string, string>,
+        body: request.body as string,
+      });
+      const body = await response.text();
+      return { status: response.status, body };
+    };
+  }
+
   const signer = new SignatureV4({
     service: deps.service ?? "es",
     region: deps.region,
     credentials: defaultProvider(),
     sha256: Sha256,
   });
-
-  const doFetch = deps.fetchImpl ?? fetch;
 
   return async (request: SignedHttpRequest): Promise<OpenSearchHttpResponse> => {
     const url = new URL(request.url);
