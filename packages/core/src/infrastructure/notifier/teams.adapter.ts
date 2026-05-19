@@ -160,10 +160,25 @@ function buildAdaptiveCardPayload(card: object): object {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TeamsNotifier implements INotifier {
+  // Pre-computed at construction so the error path never re-parses the URL.
+  // If parsing happens inside the catch block and throws, the original error
+  // context (timeout, network failure, etc.) would be lost.
+  private readonly hostForErrors: string;
+
   constructor(
     private readonly webhookUrl: string,
     private readonly timeoutMs: number = TEAMS_WEBHOOK_TIMEOUT_MS,
-  ) {}
+  ) {
+    let host = 'unknown';
+    try {
+      host = new URL(webhookUrl).hostname;
+    } catch {
+      // Leave as 'unknown'. Config validation should have rejected invalid URLs
+      // upstream; this fallback exists only so the notifier can still produce
+      // a meaningful error message instead of throwing in its own catch block.
+    }
+    this.hostForErrors = host;
+  }
 
   async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
     const card = analysis ? buildAnalysisCard(cluster, analysis) : buildFallbackCard(cluster);
@@ -181,18 +196,24 @@ export class TeamsNotifier implements INotifier {
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        throw new TeamsNotifierError(`Teams webhook error ${res.status}: ${body}`);
+        // Round 2 hardening: never include the response body in error messages.
+        // Power Automate / Logic Apps echo parts of the request URL (including
+        // SAS tokens like sig=, code=, sv=, sp=) and chasing every encoding
+        // variant is a losing game. Status + host gives enough diagnostic
+        // signal without any leak surface.
+        throw new TeamsNotifierError(
+          `Teams webhook error ${res.status} (host: ${this.hostForErrors})`,
+        );
       }
     } catch (err) {
       if (err instanceof TeamsNotifierError) {
         throw err;
       }
       if (err instanceof Error && err.name === 'AbortError') {
-        // TNT-08: log host only — never full URL (no sig= or api-version= query)
-        const host = new URL(this.webhookUrl).hostname;
+        // TNT-08: log host only — never full URL (no sig= or api-version= query).
+        // TNT-10: host is pre-computed; no URL parsing in the error path.
         throw new TeamsNotifierError(
-          `Teams webhook timed out after ${this.timeoutMs}ms (host: ${host})`,
+          `Teams webhook timed out after ${this.timeoutMs}ms (host: ${this.hostForErrors})`,
         );
       }
       throw err;

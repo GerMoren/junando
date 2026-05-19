@@ -559,6 +559,16 @@ describe('Config — loadConfig', () => {
       process.env['NOTIFIER_TYPE'] = 'slack';
       await expect(loadConfig()).rejects.toThrow(/SLACK_CHANNEL/);
     });
+
+    // CFG-03: regression — slackSigningSecret must be required when notifierType=slack.
+    // Pre-PR #39 it was schema-required; PR #39 made it optional and superRefine
+    // forgot to enforce it, causing HTTP 500 in handler.ts when createHmac receives
+    // undefined. See issue #41.
+    it('CFG-03: slack notifierType without slackSigningSecret fails validation', async () => {
+      setEnv({ ...validConfig, SLACK_SIGNING_SECRET: undefined });
+      process.env['NOTIFIER_TYPE'] = 'slack';
+      await expect(loadConfig()).rejects.toThrow(/SLACK_SIGNING_SECRET/);
+    });
   });
 
   describe('CFG-04: teams requires valid webhook URL with api-version', () => {
@@ -582,6 +592,25 @@ describe('Config — loadConfig', () => {
       const config = await loadConfig();
       expect(config.notifierType).toBe('teams');
       expect(config.teamsWebhookUrl).toContain('api-version=');
+    });
+
+    // CFG-04: brittle substring check would have accepted api-version= anywhere
+    // in the URL (e.g. baked into the path). Validation must require it as a
+    // proper query parameter.
+    it('CFG-04: rejects teams URL where api-version= appears only in path, not as query param', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://logic.azure.com/workflows/api-version=fake/invoke';
+      await expect(loadConfig()).rejects.toThrow(/api-version/);
+    });
+
+    // CFG-05: URLs with api-version as a proper query parameter pass validation.
+    it('CFG-05: accepts teams URL with api-version as proper query param', async () => {
+      setEnv({ ...validConfig });
+      process.env['NOTIFIER_TYPE'] = 'teams';
+      process.env['TEAMS_WEBHOOK_URL'] = 'https://prod.example.powerautomate.com/workflows/abc/triggers/manual/invoke?api-version=2016-10-01';
+      const config = await loadConfig();
+      expect(config.teamsWebhookUrl).toContain('api-version=2016-10-01');
     });
   });
 

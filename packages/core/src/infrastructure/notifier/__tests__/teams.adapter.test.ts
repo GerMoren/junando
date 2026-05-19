@@ -150,16 +150,41 @@ describe('TeamsNotifier', () => {
     await expect(notifier.send(makeCluster(), makeAnalysis())).resolves.toBeUndefined();
   });
 
-  // ── TNT-05: throw on non-2xx ──────────────────────────────────────────────
+  // ── TNT-05: throw on non-2xx with status + host only (no body) ────────────
 
-  it('throws with response body text on HTTP 400 (TNT-05)', async () => {
+  it('throws TeamsNotifierError with status and host on HTTP 400 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'Bad Request' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow('Bad Request');
+    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    expect(err.message).toMatch(/Teams webhook error 400 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
-  it('throws with response body text on HTTP 500 (TNT-05)', async () => {
+  it('throws TeamsNotifierError with status and host on HTTP 500 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Internal Server Error' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow('Internal Server Error');
+    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    expect(err.message).toMatch(/Teams webhook error 500 \(host: prod\.example\.powerautomate\.com\)/);
+  });
+
+  // ── TNT-09: HTTP error message contains only status and host — never the response body ──
+  // Round 2 follow-up: sanitizing the body is brittle (encoded variants, Azure SAS
+  // params like code=, sv=, sp= all bypass narrow regexes). Omit body entirely.
+
+  it('TNT-09: HTTP error message contains only status and host — never the response body', async () => {
+    const webhookWithSecret = 'https://prod.example.powerautomate.com/invoke?api-version=1&sig=SUPER_SECRET_TOKEN_abc123XYZ';
+    const leakyBody = `request failed for url ${webhookWithSecret} with details: ` + 'XXXXX'.repeat(160);
+    mockFetch.mockResolvedValue({ ok: false, status: 502, text: async () => leakyBody });
+
+    const leakyNotifier = new TeamsNotifier(webhookWithSecret);
+    const err = await leakyNotifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    // No part of the body — verbatim URL, sig token, or arbitrary marker — leaks.
+    expect(err.message).not.toContain(webhookWithSecret);
+    expect(err.message).not.toContain('SUPER_SECRET_TOKEN_abc123XYZ');
+    expect(err.message).not.toContain('XXXXX');
+    // Message shape: status + host only.
+    expect(err.message).toMatch(/Teams webhook error 502 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
   // ── TNT-06: sanitization ──────────────────────────────────────────────────
@@ -218,5 +243,45 @@ describe('TeamsNotifier', () => {
     expect(result.message).toContain('100ms');
     expect(result.message).toContain('prod.example.powerautomate.com');
     expect(result.message).not.toContain('api-version');
+  });
+
+  // ── TNT-10: hostname is pre-computed at construction time ────────────────
+  // Prevents the catch block from doing `new URL(this.webhookUrl).hostname`,
+  // which would throw and shadow the original error if the URL ever became
+  // invalid (defense in depth — also more efficient).
+
+  it('TNT-10: hostname for error context is captured at construction, not in the catch path', async () => {
+    vi.useFakeTimers();
+
+    mockFetch.mockImplementation(
+      (_url: string, options: RequestInit) => new Promise<never>((_, reject) => {
+        const signal = options.signal as AbortSignal | undefined;
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      }),
+    );
+
+    const constructedHost = 'prod.example.powerautomate.com';
+    const notifierFast = new TeamsNotifier(`https://${constructedHost}/invoke?api-version=1`, 50);
+
+    // Mutate webhookUrl to an invalid value after construction. If the catch
+    // block parses lazily, it will throw inside the error handler and the
+    // original AbortError context will be lost.
+    (notifierFast as unknown as { webhookUrl: string }).webhookUrl = 'not-a-valid-url';
+
+    const sendPromise = notifierFast
+      .send(makeCluster(), makeAnalysis())
+      .catch((err) => err as Error);
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await sendPromise;
+
+    expect(result).toBeInstanceOf(TeamsNotifierError);
+    expect(result.message).toContain('50ms');
+    expect(result.message).toContain(constructedHost);
   });
 });
