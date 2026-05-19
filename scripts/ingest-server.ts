@@ -11,6 +11,7 @@ import { loadIngestConfig } from "@junando/ingest";
 import { readFileSync } from "node:fs";
 import { createProcessIncidentUseCase } from "./factories/process-incident.factory.js";
 import { createIngestRuntime } from "./ingest/runtime.js";
+import { assertMapperRegistered } from "./assert-mapper-registered.js";
 
 // ---------------------------------------------------------------------------
 // 1. Load and validate ingest config — fail fast on invalid
@@ -48,6 +49,12 @@ const logger = createLogger();
 const appConfig = await loadConfig();
 reinitLogger({ level: appConfig.logLevel });
 
+// ---------------------------------------------------------------------------
+// 2.5. Pre-flight: verify mapper is registered before announcing startup (SQS only)
+// ---------------------------------------------------------------------------
+
+assertMapperRegistered(ingestConfig, logger);
+
 if (ingestConfig.ingest.kind === "loki") {
   logger.info(
     {
@@ -66,8 +73,9 @@ if (ingestConfig.ingest.kind === "loki") {
       queueUrl: ingestConfig.ingest.sqs.queueUrl,
       batchSize: ingestConfig.ingest.sqs.batchSize,
       maxInFlight: ingestConfig.ingest.sqs.maxInFlight,
+      mapperKind: ingestConfig.ingest.mapper.kind,
     },
-    "junando ingest running in sqs mode",
+    `junando ingest running in sqs mode, mapper=${ingestConfig.ingest.mapper.kind}`,
   );
 }
 
@@ -88,7 +96,7 @@ const runtime = createIngestRuntime({
 });
 
 // ---------------------------------------------------------------------------
-// 6. Signal handlers — drain in-flight work before exit
+// 5. Signal handlers — drain in-flight work before exit
 // ---------------------------------------------------------------------------
 
 async function shutdown(signal: string): Promise<void> {
