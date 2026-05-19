@@ -76,8 +76,8 @@ export class SqsSubscriber {
       this.loopPromise = null;
     }
 
-    await Promise.allSettled([...this.pendingBatches]);
-    await Promise.allSettled([...this.inFlight]);
+    await Promise.allSettled(this.pendingBatches);
+    await Promise.allSettled(this.inFlight);
   }
 
   private async runLoop(): Promise<void> {
