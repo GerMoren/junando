@@ -1,0 +1,14 @@
+# ingest.config.sqs.example.yaml
+# Generic SQS ingest example.
+# Copy to a local file, set the queue URL for your environment, and keep secrets in env vars.
+
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: https://sqs.us-east-1.amazonaws.com/123456789012/junando-cenco-phase-a
+    waitTimeSeconds: 20
+    visibilityTimeoutSeconds: 60
+    batchSize: 10
+    maxInFlight: 20
+    # Optional local/dev override (for example LocalStack):
+    # endpointUrl: http://localhost:4566

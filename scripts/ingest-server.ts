@@ -6,16 +6,11 @@
  * and forwards them to ProcessIncidentUseCase. Drains in-flight work on
  * SIGTERM / SIGINT before exiting.
  */
-import { readFileSync } from "node:fs";
 import { createLogger, flushLoki, loadConfig, reinitLogger } from "@junando/core";
-import {
-  IngestRunner,
-  loadIngestConfig,
-  type IngestConfig,
-  type LokiIngestConfig,
-} from "@junando/ingest";
-import { LokiHttpClient } from "@junando/ingest/loki-http-client";
+import { loadIngestConfig } from "@junando/ingest";
+import { readFileSync } from "node:fs";
 import { createProcessIncidentUseCase } from "./factories/process-incident.factory.js";
+import { createIngestRuntime } from "./ingest/runtime.js";
 
 // ---------------------------------------------------------------------------
 // 1. Load and validate ingest config — fail fast on invalid
@@ -45,19 +40,6 @@ try {
   process.exit(1);
 }
 
-function requireLokiIngestConfig(config: IngestConfig): LokiIngestConfig {
-  if (config.ingest.kind !== "loki") {
-    console.error(
-      `ingest-server currently supports only kind=loki configs; received kind=${config.ingest.kind}`,
-    );
-    process.exit(1);
-  }
-
-  return config as LokiIngestConfig;
-}
-
-const lokiIngestConfig = requireLokiIngestConfig(ingestConfig);
-
 // ---------------------------------------------------------------------------
 // 2. Base app config + logger
 // ---------------------------------------------------------------------------
@@ -66,14 +48,28 @@ const logger = createLogger();
 const appConfig = await loadConfig();
 reinitLogger({ level: appConfig.logLevel });
 
-logger.info(
-  {
-    service: "junando-ingest",
-    intervalMs: lokiIngestConfig.ingest.intervalMs,
-    rules: lokiIngestConfig.ingest.rules.length,
-  },
-  `junando ingest running, intervalMs=${lokiIngestConfig.ingest.intervalMs}, rules=${lokiIngestConfig.ingest.rules.length}`,
-);
+if (ingestConfig.ingest.kind === "loki") {
+  logger.info(
+    {
+      service: "junando-ingest",
+      kind: "loki",
+      intervalMs: ingestConfig.ingest.intervalMs,
+      rules: ingestConfig.ingest.rules.length,
+    },
+    `junando ingest running in loki mode, intervalMs=${ingestConfig.ingest.intervalMs}, rules=${ingestConfig.ingest.rules.length}`,
+  );
+} else {
+  logger.info(
+    {
+      service: "junando-ingest",
+      kind: "sqs",
+      queueUrl: ingestConfig.ingest.sqs.queueUrl,
+      batchSize: ingestConfig.ingest.sqs.batchSize,
+      maxInFlight: ingestConfig.ingest.sqs.maxInFlight,
+    },
+    "junando ingest running in sqs mode",
+  );
+}
 
 // ---------------------------------------------------------------------------
 // 3. ProcessIncidentUseCase — via shared factory (Slice 0)
@@ -82,23 +78,11 @@ logger.info(
 const processIncidentUseCase = createProcessIncidentUseCase({ config: appConfig, logger });
 
 // ---------------------------------------------------------------------------
-// 4. LokiHttpClient
+// 4. Runtime selection
 // ---------------------------------------------------------------------------
 
-const lokiAuth = lokiIngestConfig.ingest.loki.auth;
-const lokiClient = new LokiHttpClient({
-  baseUrl: lokiIngestConfig.ingest.loki.url,
-  timeoutMs: lokiIngestConfig.ingest.loki.timeoutMs,
-  ...(lokiAuth !== undefined ? { auth: lokiAuth } : {}),
-});
-
-// ---------------------------------------------------------------------------
-// 5. IngestRunner
-// ---------------------------------------------------------------------------
-
-const runner = new IngestRunner({
-  config: lokiIngestConfig,
-  lokiClient,
+const runtime = createIngestRuntime({
+  ingestConfig,
   processIncidentUseCase,
   logger,
 });
@@ -108,8 +92,8 @@ const runner = new IngestRunner({
 // ---------------------------------------------------------------------------
 
 async function shutdown(signal: string): Promise<void> {
-  logger.info({ signal }, `${signal} received — stopping ingest runner`);
-  await runner.stop();
+  logger.info({ signal }, `${signal} received — stopping ingest runtime`);
+  await runtime.stop();
   await flushLoki();
   process.exit(0);
 }
@@ -121,4 +105,4 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 // 7. Start
 // ---------------------------------------------------------------------------
 
-runner.start();
+runtime.start();

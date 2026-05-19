@@ -210,6 +210,19 @@ ingest:
     expect(config.ingest.sqs.batchSize).toBe(10);
     expect(config.ingest.sqs.maxInFlight).toBe(20);
   });
+
+  it('CFG-02-F: valid kind=sqs config accepts an optional endpointUrl for local-dev runtimes', () => {
+    const config = loadIngestConfig(minimalSqsYaml('    endpointUrl: "http://localhost:4566"'));
+
+    expect(config.ingest.kind).toBe('sqs');
+    if (config.ingest.kind !== 'sqs') {
+      throw new Error('Expected sqs config');
+    }
+
+    expect((config.ingest.sqs as { endpointUrl?: string }).endpointUrl).toBe(
+      'http://localhost:4566',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
