@@ -58,3 +58,12 @@ export interface ILLMProvider {
 export interface INotifier {
   send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void>;
 }
+
+/**
+ * Indexer.
+ * Persists a typed document into a searchable index/store.
+ * Implementations: OpenSearchIndexer, InMemoryIndexer (tests)
+ */
+export interface IIndexer<TDocument> {
+  index(doc: TDocument): Promise<void>;
+}

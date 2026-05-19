@@ -14,14 +14,16 @@ export type {
   IngestRule,
   LokiIngestConfig,
   LokiIngestSection,
+  OpenSearchTarget,
   SqsIngestConfig,
   SqsIngestSection,
+  SqsMapper,
 } from './config/ingest-config.schema.js';
 
+export { LokiHttpError } from './ports/loki-http-client.port.js';
 export type {
   ILokiHttpClient,
   LokiQueryParams,
   LokiQueryResponse,
   LokiStreamResult,
 } from './ports/loki-http-client.port.js';
-export { LokiHttpError } from './ports/loki-http-client.port.js';

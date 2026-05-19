@@ -7,6 +7,29 @@ import type {
   SqsIngestConfig,
 } from "../../../packages/ingest/src/index.js";
 import { createIngestRuntime } from "../runtime.js";
+import { AlertType } from "../../../packages/core/src/index.js";
+import { registerMapper, type IMessageMapper } from "../mappers/registry.js";
+
+// Register a stub mapper for the kind used in test configs.
+// In production each deployment registers its own mapper before runtime starts.
+const stubMapper: IMessageMapper = {
+  kind: "test-mapper-v1",
+  decode: vi.fn().mockReturnValue({}),
+  toNormalizedAlerts: vi.fn().mockReturnValue([]),
+  toTraceabilityDocument: vi
+    .fn()
+    .mockReturnValue({
+      "@timestamp": "",
+      channel: "",
+      application: "",
+      messageType: "",
+      message: "",
+      fingerprint: "",
+      correlationId: "",
+    }),
+  resolveCorrelationId: vi.fn().mockReturnValue("test-corr-id"),
+};
+registerMapper(stubMapper);
 
 function makeLogger(): Logger {
   return {
@@ -31,7 +54,7 @@ function makeLokiConfig(): LokiIngestConfig {
           name: "high-error-rate",
           query: '{service="api"} |= "ERROR"',
           service: "api",
-          alertType: "http_500",
+          alertType: AlertType.Error,
           severity: "critical",
         },
       ],
@@ -50,6 +73,7 @@ function makeSqsConfig(): SqsIngestConfig {
         batchSize: 10,
         maxInFlight: 20,
       },
+      mapper: { kind: "test-mapper-v1" },
     },
   };
 }
@@ -62,7 +86,7 @@ describe("createIngestRuntime", () => {
     const createLokiClient = vi.fn().mockReturnValue({ queryRange: vi.fn() });
     const createLokiRunner = vi.fn().mockReturnValue(lokiRuntime);
     const createSqsSubscriber = vi.fn();
-    const createCencoPhaseAProcessor = vi.fn();
+    const createSqsTraceabilityProcessor = vi.fn();
 
     const runtime = createIngestRuntime({
       ingestConfig: makeLokiConfig(),
@@ -72,7 +96,7 @@ describe("createIngestRuntime", () => {
         createLokiClient,
         createLokiRunner,
         createSqsSubscriber,
-        createCencoPhaseAProcessor,
+        createSqsTraceabilityProcessor,
       },
     });
 
@@ -80,16 +104,16 @@ describe("createIngestRuntime", () => {
     expect(createLokiClient).toHaveBeenCalledTimes(1);
     expect(createLokiRunner).toHaveBeenCalledTimes(1);
     expect(createSqsSubscriber).not.toHaveBeenCalled();
-    expect(createCencoPhaseAProcessor).not.toHaveBeenCalled();
+    expect(createSqsTraceabilityProcessor).not.toHaveBeenCalled();
   });
 
-  it("selects the SQS runtime and wires the Cenco processor when kind=sqs", async () => {
+  it("selects the SQS runtime and wires the traceability processor when kind=sqs (no opensearch)", async () => {
     const logger = makeLogger();
     const useCase = { execute: vi.fn() } as unknown as Pick<ProcessIncidentUseCase, "execute">;
     const sqsRuntime = { start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined) };
     const createSqsSubscriber = vi.fn().mockReturnValue(sqsRuntime);
     const processMessage = vi.fn().mockResolvedValue(undefined);
-    const createCencoPhaseAProcessor = vi.fn().mockReturnValue(processMessage);
+    const createSqsTraceabilityProcessor = vi.fn().mockReturnValue(processMessage);
 
     const runtime = createIngestRuntime({
       ingestConfig: makeSqsConfig(),
@@ -99,14 +123,17 @@ describe("createIngestRuntime", () => {
         createLokiClient: vi.fn(),
         createLokiRunner: vi.fn(),
         createSqsSubscriber,
-        createCencoPhaseAProcessor,
+        createSqsTraceabilityProcessor,
       },
     });
 
     expect(runtime).toBe(sqsRuntime);
-    expect(createCencoPhaseAProcessor).toHaveBeenCalledWith({
-      processIncidentUseCase: useCase,
-    });
+    expect(createSqsTraceabilityProcessor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        processIncidentUseCase: useCase,
+        mapper: expect.objectContaining({ kind: "test-mapper-v1" }),
+      }),
+    );
     expect(createSqsSubscriber).toHaveBeenCalledTimes(1);
 
     const deps = createSqsSubscriber.mock.calls[0]?.[0] as {
@@ -117,7 +144,59 @@ describe("createIngestRuntime", () => {
 
     expect(deps.config).toEqual(makeSqsConfig());
     expect(deps.logger).toBe(logger);
-    await deps.processMessage({ MessageId: "msg-1", Body: "{}" } as Message);
+    await deps.processMessage({ MessageId: "msg-1", Body: "{}" });
     expect(processMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("wires the indexer processor when sqs config has an opensearch block", async () => {
+    const logger = makeLogger();
+    const useCase = { execute: vi.fn() } as unknown as Pick<ProcessIncidentUseCase, "execute">;
+    const sqsRuntime = { start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined) };
+    const createSqsSubscriber = vi.fn().mockReturnValue(sqsRuntime);
+    const processMessage = vi.fn().mockResolvedValue(undefined);
+    const createSqsIndexerProcessor = vi.fn().mockReturnValue(processMessage);
+    const createSqsTraceabilityProcessor = vi.fn();
+    const indexer = { index: vi.fn().mockResolvedValue(undefined) };
+    const createOpenSearchIndexer = vi.fn().mockReturnValue(indexer);
+
+    const sqsConfig: SqsIngestConfig = {
+      ingest: {
+        ...makeSqsConfig().ingest,
+        opensearch: {
+          endpoint: "https://search.example.com",
+          indexName: "traceability",
+          region: "us-east-1",
+        },
+      },
+    };
+
+    const runtime = createIngestRuntime({
+      ingestConfig: sqsConfig,
+      processIncidentUseCase: useCase,
+      logger,
+      factories: {
+        createLokiClient: vi.fn(),
+        createLokiRunner: vi.fn(),
+        createSqsSubscriber,
+        createSqsTraceabilityProcessor,
+        createSqsIndexerProcessor,
+        createOpenSearchIndexer,
+      },
+    });
+
+    expect(runtime).toBe(sqsRuntime);
+    expect(createOpenSearchIndexer).toHaveBeenCalledWith({
+      endpoint: "https://search.example.com",
+      indexName: "traceability",
+      region: "us-east-1",
+    });
+    expect(createSqsIndexerProcessor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        indexer,
+        mapper: expect.objectContaining({ kind: "test-mapper-v1" }),
+      }),
+    );
+    expect(createSqsTraceabilityProcessor).not.toHaveBeenCalled();
+    expect(createSqsSubscriber).toHaveBeenCalledTimes(1);
   });
 });

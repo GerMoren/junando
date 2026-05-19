@@ -2,6 +2,7 @@
 export * from './domain/entities/alert.js';
 export * from './domain/entities/cluster.js';
 export * from './domain/entities/incident.js';
+export type { TraceabilityDocument } from './domain/entities/traceability.js';
 
 // Domain — Value Objects
 export { Fingerprint } from './domain/value-objects/fingerprint.js';
@@ -10,6 +11,7 @@ export { Fingerprint } from './domain/value-objects/fingerprint.js';
 export type {
   IAlertQueue,
   IDeduplicationStore,
+  IIndexer,
   ILLMProvider,
   INotifier,
   ITraceRepository,
@@ -27,15 +29,22 @@ export {
   InMemoryDeduplicationStore,
   RedisDeduplicationStore,
 } from './infrastructure/dedup/redis-dedup.adapter.js';
+export { InMemoryIndexer, OpenSearchIndexer } from './infrastructure/indexer/opensearch.adapter.js';
+export type {
+  OpenSearchHttpFetcher,
+  OpenSearchHttpResponse,
+  OpenSearchIndexerDeps,
+  SignedHttpRequest,
+} from './infrastructure/indexer/opensearch.adapter.js';
 export {
   ClaudeProvider,
   createLLMProvider,
   GeminiProvider,
   MockLLMProvider,
 } from './infrastructure/llm/llm.adapter.js';
+export { createNotifier } from './infrastructure/notifier/factory.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
 export { TeamsNotifier, TeamsNotifierError } from './infrastructure/notifier/teams.adapter.js';
-export { createNotifier } from './infrastructure/notifier/factory.js';
 export { InMemoryAlertQueue, SQSAlertQueue } from './infrastructure/queue/sqs.adapter.js';
 export {
   LokiTraceRepository,
@@ -45,8 +54,8 @@ export {
 // Shared
 export { loadConfig } from './shared/config/index.js';
 export type { Config } from './shared/config/index.js';
+export * from './shared/constants.js';
 export { createLogger, reinitLogger } from './shared/logger/index.js';
 export type { Logger, LoggerOptions } from './shared/logger/index.js';
 export { flushLoki } from './shared/logger/loki-transport.js';
 export * as metrics from './shared/metrics/index.js';
-export * from './shared/constants.js';
