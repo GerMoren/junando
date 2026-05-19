@@ -37,38 +37,103 @@ const LokiConfigSchema = z.object({
   auth: LokiAuthSchema.optional(),
 });
 
-const IngestSectionSchema = z
+const SqsRuntimeSchema = z.object({
+  queueUrl: z.string().url(),
+  waitTimeSeconds: z
+    .number()
+    .int()
+    .min(1, 'waitTimeSeconds must be ≥ 1; this adapter requires long polling.')
+    .max(20)
+    .default(20),
+  visibilityTimeoutSeconds: z.number().int().positive().default(60),
+  batchSize: z.number().int().min(1).max(10).default(10),
+  maxInFlight: z.number().int().positive().default(20),
+});
+
+function ensureUniqueRuleNames(rules: IngestRule[], ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  for (const rule of rules) {
+    if (seen.has(rule.name)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Duplicate rule name: "${rule.name}"`,
+        path: ['rules'],
+      });
+      return;
+    }
+    seen.add(rule.name);
+  }
+}
+
+const LokiIngestSectionSchema = z.object({
+  kind: z.literal('loki'),
+  intervalMs: z.number().int().positive().default(30_000),
+  loki: LokiConfigSchema,
+  rules: z.array(IngestRuleSchema).min(1),
+});
+
+const LegacyLokiIngestSectionSchema = z.object({
+  intervalMs: z.number().int().positive().default(30_000),
+  loki: LokiConfigSchema,
+  rules: z.array(IngestRuleSchema).min(1),
+});
+
+const SqsIngestSectionSchema = z.object({
+  kind: z.literal('sqs'),
+  sqs: SqsRuntimeSchema,
+});
+
+const ExplicitIngestSectionSchema = z.discriminatedUnion('kind', [
+  LokiIngestSectionSchema,
+  SqsIngestSectionSchema,
+]);
+
+const ExplicitIngestConfigSchema = z
   .object({
-    intervalMs: z.number().int().positive().default(30_000),
-    loki: LokiConfigSchema,
-    rules: z.array(IngestRuleSchema).min(1),
+    ingest: ExplicitIngestSectionSchema,
   })
   .superRefine((data, ctx) => {
-    const names = data.rules.map((r) => r.name);
-    const seen = new Set<string>();
-    for (const name of names) {
-      if (seen.has(name)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Duplicate rule name: "${name}"`,
-          path: ['rules'],
-        });
-        return;
-      }
-      seen.add(name);
+    if (data.ingest.kind === 'loki') {
+      ensureUniqueRuleNames(data.ingest.rules, ctx);
     }
   });
 
-const IngestConfigSchema = z.object({
-  ingest: IngestSectionSchema,
-});
+const LegacyLokiIngestConfigSchema = z
+  .object({
+    ingest: LegacyLokiIngestSectionSchema,
+  })
+  .superRefine((data, ctx) => {
+    ensureUniqueRuleNames(data.ingest.rules, ctx);
+  });
 
 // ---------------------------------------------------------------------------
 // Exported types
 // ---------------------------------------------------------------------------
 
-export type IngestConfig = z.infer<typeof IngestConfigSchema>;
 export type IngestRule = z.infer<typeof IngestRuleSchema>;
+export type LokiIngestSection = z.infer<typeof LokiIngestSectionSchema>;
+export type SqsIngestSection = z.infer<typeof SqsIngestSectionSchema>;
+export type LokiIngestConfig = { ingest: LokiIngestSection };
+export type SqsIngestConfig = { ingest: SqsIngestSection };
+export type IngestConfig = LokiIngestConfig | SqsIngestConfig;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function normalizeLegacyConfig(raw: unknown): unknown {
+  const legacy = LegacyLokiIngestConfigSchema.safeParse(raw);
+  if (!legacy.success) {
+    return raw;
+  }
+
+  return {
+    ingest: {
+      kind: 'loki' as const,
+      ...legacy.data.ingest,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // loadIngestConfig — parse YAML string and validate
@@ -88,7 +153,6 @@ export function loadIngestConfig(yamlString: string): IngestConfig {
     throw new Error('Config YAML is empty. Provide a valid INGEST_CONFIG_PATH.');
   }
 
-  // parse — throws on malformed YAML
   let raw: unknown;
   try {
     raw = parseYaml(yamlString);
@@ -97,10 +161,11 @@ export function loadIngestConfig(yamlString: string): IngestConfig {
     throw new Error(`Failed to parse YAML config: ${msg}`);
   }
 
-  const result = IngestConfigSchema.safeParse(raw);
+  const normalized = normalizeLegacyConfig(raw);
+  const result = ExplicitIngestConfigSchema.safeParse(normalized);
   if (!result.success) {
     throw new Error(`Invalid ingest config: ${result.error.message}`);
   }
 
-  return Object.freeze(result.data);
+  return Object.freeze(result.data) as IngestConfig;
 }

@@ -6,25 +6,30 @@
  * and forwards them to ProcessIncidentUseCase. Drains in-flight work on
  * SIGTERM / SIGINT before exiting.
  */
-import { readFileSync } from 'node:fs';
-import { createLogger, flushLoki, loadConfig, reinitLogger } from '@junando/core';
-import { IngestRunner, loadIngestConfig } from '@junando/ingest';
-import { LokiHttpClient } from '@junando/ingest/loki-http-client';
-import { createProcessIncidentUseCase } from './factories/process-incident.factory.js';
+import { readFileSync } from "node:fs";
+import { createLogger, flushLoki, loadConfig, reinitLogger } from "@junando/core";
+import {
+  IngestRunner,
+  loadIngestConfig,
+  type IngestConfig,
+  type LokiIngestConfig,
+} from "@junando/ingest";
+import { LokiHttpClient } from "@junando/ingest/loki-http-client";
+import { createProcessIncidentUseCase } from "./factories/process-incident.factory.js";
 
 // ---------------------------------------------------------------------------
 // 1. Load and validate ingest config — fail fast on invalid
 // ---------------------------------------------------------------------------
 
-const configPath = process.env['INGEST_CONFIG_PATH'];
+const configPath = process.env["INGEST_CONFIG_PATH"];
 if (!configPath) {
-  console.error('INGEST_CONFIG_PATH environment variable is required');
+  console.error("INGEST_CONFIG_PATH environment variable is required");
   process.exit(1);
 }
 
 let rawYaml: string;
 try {
-  rawYaml = readFileSync(configPath, 'utf-8');
+  rawYaml = readFileSync(configPath, "utf-8");
 } catch (err) {
   const msg = err instanceof Error ? err.message : String(err);
   console.error(`Failed to read ingest config at "${configPath}": ${msg}`);
@@ -40,6 +45,19 @@ try {
   process.exit(1);
 }
 
+function requireLokiIngestConfig(config: IngestConfig): LokiIngestConfig {
+  if (config.ingest.kind !== "loki") {
+    console.error(
+      `ingest-server currently supports only kind=loki configs; received kind=${config.ingest.kind}`,
+    );
+    process.exit(1);
+  }
+
+  return config as LokiIngestConfig;
+}
+
+const lokiIngestConfig = requireLokiIngestConfig(ingestConfig);
+
 // ---------------------------------------------------------------------------
 // 2. Base app config + logger
 // ---------------------------------------------------------------------------
@@ -50,11 +68,11 @@ reinitLogger({ level: appConfig.logLevel });
 
 logger.info(
   {
-    service: 'junando-ingest',
-    intervalMs: ingestConfig.ingest.intervalMs,
-    rules: ingestConfig.ingest.rules.length,
+    service: "junando-ingest",
+    intervalMs: lokiIngestConfig.ingest.intervalMs,
+    rules: lokiIngestConfig.ingest.rules.length,
   },
-  `junando ingest running, intervalMs=${ingestConfig.ingest.intervalMs}, rules=${ingestConfig.ingest.rules.length}`,
+  `junando ingest running, intervalMs=${lokiIngestConfig.ingest.intervalMs}, rules=${lokiIngestConfig.ingest.rules.length}`,
 );
 
 // ---------------------------------------------------------------------------
@@ -67,10 +85,10 @@ const processIncidentUseCase = createProcessIncidentUseCase({ config: appConfig,
 // 4. LokiHttpClient
 // ---------------------------------------------------------------------------
 
-const lokiAuth = ingestConfig.ingest.loki.auth;
+const lokiAuth = lokiIngestConfig.ingest.loki.auth;
 const lokiClient = new LokiHttpClient({
-  baseUrl: ingestConfig.ingest.loki.url,
-  timeoutMs: ingestConfig.ingest.loki.timeoutMs,
+  baseUrl: lokiIngestConfig.ingest.loki.url,
+  timeoutMs: lokiIngestConfig.ingest.loki.timeoutMs,
   ...(lokiAuth !== undefined ? { auth: lokiAuth } : {}),
 });
 
@@ -79,7 +97,7 @@ const lokiClient = new LokiHttpClient({
 // ---------------------------------------------------------------------------
 
 const runner = new IngestRunner({
-  config: ingestConfig,
+  config: lokiIngestConfig,
   lokiClient,
   processIncidentUseCase,
   logger,
@@ -96,8 +114,8 @@ async function shutdown(signal: string): Promise<void> {
   process.exit(0);
 }
 
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-process.on('SIGINT', () => void shutdown('SIGINT'));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
 
 // ---------------------------------------------------------------------------
 // 7. Start
