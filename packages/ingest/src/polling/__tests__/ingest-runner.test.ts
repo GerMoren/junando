@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { IngestRunner } from '../ingest-runner.js';
 import { AlertType } from '@junando/core';
 import type { ILokiHttpClient, LokiQueryResponse } from '../../ports/loki-http-client.port.js';
-import type { IngestConfig } from '../../config/ingest-config.schema.js';
+import type { LokiIngestConfig } from '../../config/ingest-config.schema.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -26,9 +26,10 @@ const LOKI_EMPTY: LokiQueryResponse = {
   data: { resultType: 'streams', result: [] },
 };
 
-function makeConfig(intervalMs = 60_000): IngestConfig {
+function makeConfig(intervalMs = 60_000): LokiIngestConfig {
   return {
     ingest: {
+      kind: 'loki',
       intervalMs,
       loki: { url: 'http://loki:3100', timeoutMs: 10_000 },
       rules: [
@@ -134,8 +135,9 @@ describe('IngestRunner', () => {
   });
 
   it('LKI-02: one rule failure does not stop others (Promise.allSettled isolation)', async () => {
-    const twoRuleConfig: IngestConfig = {
+    const twoRuleConfig: LokiIngestConfig = {
       ingest: {
+        kind: 'loki',
         intervalMs: 60_000,
         loki: { url: 'http://loki:3100', timeoutMs: 10_000 },
         rules: [

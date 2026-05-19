@@ -6,7 +6,7 @@ import { AlertType } from '@junando/core';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function minimalValidYaml(overrides = '') {
+function minimalLegacyLokiYaml(overrides = '') {
   return `
 ingest:
   intervalMs: 5000
@@ -19,6 +19,34 @@ ingest:
       service: api
       alertType: http_500
       severity: critical
+${overrides}
+`.trim();
+}
+
+function minimalExplicitLokiYaml(overrides = '') {
+  return `
+ingest:
+  kind: loki
+  intervalMs: 5000
+  loki:
+    url: "http://loki:3100"
+    timeoutMs: 3000
+  rules:
+    - name: high-error-rate
+      query: '{service="api"} |= "ERROR"'
+      service: api
+      alertType: http_500
+      severity: critical
+${overrides}
+`.trim();
+}
+
+function minimalSqsYaml(overrides = '') {
+  return `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
 ${overrides}
 `.trim();
 }
@@ -39,6 +67,7 @@ describe('loadIngestConfig — CFG-01: fail-fast validation', () => {
   it('CFG-01-D: throws a Zod error when a required field is missing (rule.query)', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: "http://loki:3100"
   rules:
@@ -53,6 +82,7 @@ ingest:
   it('CFG-01-E: throws when loki.url is an empty string', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: ""
   rules:
@@ -64,6 +94,34 @@ ingest:
 `.trim();
     expect(() => loadIngestConfig(yaml)).toThrow();
   });
+
+  it('CFG-01-F: throws when sqs.queueUrl is missing', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    waitTimeSeconds: 20
+    visibilityTimeoutSeconds: 60
+    batchSize: 10
+    maxInFlight: 20
+`.trim();
+
+    expect(() => loadIngestConfig(yaml)).toThrow(/queueUrl/i);
+  });
+
+  it('CFG-01-G: throws when sqs.batchSize exceeds SQS max of 10', () => {
+    expect(() => loadIngestConfig(minimalSqsYaml('    batchSize: 11'))).toThrow(/batchSize/i);
+  });
+
+  it('CFG-01-H: throws when sqs.maxInFlight is non-positive', () => {
+    expect(() => loadIngestConfig(minimalSqsYaml('    maxInFlight: 0'))).toThrow(/maxInFlight/i);
+  });
+
+  it('CFG-01-I: throws when sqs.waitTimeSeconds exceeds 20', () => {
+    expect(() => loadIngestConfig(minimalSqsYaml('    waitTimeSeconds: 21'))).toThrow(
+      /waitTimeSeconds/i,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -71,9 +129,22 @@ ingest:
 // ---------------------------------------------------------------------------
 
 describe('loadIngestConfig — CFG-02: valid config', () => {
-  it('CFG-02-A: applies default intervalMs (30000) and timeoutMs (10000)', () => {
+  it('CFG-02-A: legacy Loki config still loads and normalizes to kind=loki', () => {
+    const config = loadIngestConfig(minimalLegacyLokiYaml());
+
+    expect(config.ingest.kind).toBe('loki');
+    if (config.ingest.kind !== 'loki') {
+      throw new Error('Expected loki config');
+    }
+
+    expect(config.ingest.intervalMs).toBe(5000);
+    expect(config.ingest.loki.timeoutMs).toBe(3000);
+  });
+
+  it('CFG-02-B: explicit kind=loki applies default intervalMs (30000) and timeoutMs (10000)', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: "http://loki:3100"
   rules:
@@ -84,18 +155,25 @@ ingest:
       severity: critical
 `.trim();
     const config = loadIngestConfig(yaml);
+
+    expect(config.ingest.kind).toBe('loki');
+    if (config.ingest.kind !== 'loki') {
+      throw new Error('Expected loki config');
+    }
+
     expect(config.ingest.intervalMs).toBe(30_000);
     expect(config.ingest.loki.timeoutMs).toBe(10_000);
   });
 
-  it('CFG-02-B: returned object is frozen', () => {
-    const config = loadIngestConfig(minimalValidYaml());
+  it('CFG-02-C: returned object is frozen', () => {
+    const config = loadIngestConfig(minimalLegacyLokiYaml());
     expect(Object.isFrozen(config)).toBe(true);
   });
 
-  it('CFG-02-C: throws when two rules share the same name', () => {
+  it('CFG-02-D: throws when two rules share the same name', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: "http://loki:3100"
   rules:
@@ -112,6 +190,39 @@ ingest:
 `.trim();
     expect(() => loadIngestConfig(yaml)).toThrow(/duplicate/i);
   });
+
+  it('CFG-02-E: valid kind=sqs config loads with defaults intact', () => {
+    const yaml = `
+ingest:
+  kind: sqs
+  sqs:
+    queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
+`.trim();
+    const config = loadIngestConfig(yaml);
+
+    expect(config.ingest.kind).toBe('sqs');
+    if (config.ingest.kind !== 'sqs') {
+      throw new Error('Expected sqs config');
+    }
+
+    expect(config.ingest.sqs.waitTimeSeconds).toBe(20);
+    expect(config.ingest.sqs.visibilityTimeoutSeconds).toBe(60);
+    expect(config.ingest.sqs.batchSize).toBe(10);
+    expect(config.ingest.sqs.maxInFlight).toBe(20);
+  });
+
+  it('CFG-02-F: valid kind=sqs config accepts an optional endpointUrl for local-dev runtimes', () => {
+    const config = loadIngestConfig(minimalSqsYaml('    endpointUrl: "http://localhost:4566"'));
+
+    expect(config.ingest.kind).toBe('sqs');
+    if (config.ingest.kind !== 'sqs') {
+      throw new Error('Expected sqs config');
+    }
+
+    expect((config.ingest.sqs as { endpointUrl?: string }).endpointUrl).toBe(
+      'http://localhost:4566',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -122,6 +233,7 @@ describe('loadIngestConfig — CFG-03: schema shape contract', () => {
   it('CFG-03-A: throws when alertType is an invalid enum value', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: "http://loki:3100"
   rules:
@@ -137,6 +249,7 @@ ingest:
   it('CFG-03-B: auth block with tokenEnv is accepted (env var name ref, not literal)', () => {
     const yaml = `
 ingest:
+  kind: loki
   loki:
     url: "http://loki:3100"
     auth:
@@ -149,18 +262,35 @@ ingest:
       alertType: http_500
       severity: critical
 `.trim();
-    // Should NOT throw — tokenEnv is an env var reference, not a literal secret
     const config = loadIngestConfig(yaml);
+
+    expect(config.ingest.kind).toBe('loki');
+    if (config.ingest.kind !== 'loki') {
+      throw new Error('Expected loki config');
+    }
+
     expect(config.ingest.loki.auth).toBeDefined();
   });
 
-  it('CFG-03: valid config resolves alertType to AlertType enum', () => {
-    const config = loadIngestConfig(minimalValidYaml());
+  it('CFG-03-C: valid config resolves alertType to AlertType enum', () => {
+    const config = loadIngestConfig(minimalExplicitLokiYaml());
+
+    expect(config.ingest.kind).toBe('loki');
+    if (config.ingest.kind !== 'loki') {
+      throw new Error('Expected loki config');
+    }
+
     expect(config.ingest.rules[0]?.alertType).toBe(AlertType.Error);
   });
 
-  it('CFG-03: valid config exposes all rule fields', () => {
-    const config = loadIngestConfig(minimalValidYaml());
+  it('CFG-03-D: valid config exposes all Loki rule fields', () => {
+    const config = loadIngestConfig(minimalExplicitLokiYaml());
+
+    expect(config.ingest.kind).toBe('loki');
+    if (config.ingest.kind !== 'loki') {
+      throw new Error('Expected loki config');
+    }
+
     const rule = config.ingest.rules[0];
     expect(rule).toBeDefined();
     if (!rule) return;

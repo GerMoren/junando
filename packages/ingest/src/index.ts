@@ -5,8 +5,18 @@
 export { IngestRunner } from './polling/ingest-runner.js';
 export type { IngestRunnerDeps } from './polling/ingest-runner.js';
 
+export { SqsSubscriber } from './polling/sqs-subscriber.js';
+export type { SqsSubscriberDeps, SqsSubscriberObserver } from './polling/sqs-subscriber.js';
+
 export { loadIngestConfig } from './config/ingest-config.schema.js';
-export type { IngestConfig, IngestRule } from './config/ingest-config.schema.js';
+export type {
+  IngestConfig,
+  IngestRule,
+  LokiIngestConfig,
+  LokiIngestSection,
+  SqsIngestConfig,
+  SqsIngestSection,
+} from './config/ingest-config.schema.js';
 
 export type {
   ILokiHttpClient,

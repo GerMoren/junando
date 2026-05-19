@@ -1,0 +1,17 @@
+name: junando-localstack
+services:
+  localstack:
+    image: localstack/localstack:4.8.0
+    ports:
+      - '4566:4566'
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: us-east-1
+      DEBUG: '0'
+    volumes:
+      - './localstack/init:/etc/localstack/init/ready.d:ro'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:4566/_localstack/health >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 10

@@ -1,6 +1,6 @@
 import type { ProcessIncidentUseCase } from '@junando/core';
 import type { ILokiHttpClient } from '../ports/loki-http-client.port.js';
-import type { IngestConfig, IngestRule } from '../config/ingest-config.schema.js';
+import type { IngestRule, LokiIngestConfig } from '../config/ingest-config.schema.js';
 import { mapLokiResultToAlerts } from '../mapping/log-to-alert.mapper.js';
 
 // ---------------------------------------------------------------------------
@@ -19,7 +19,7 @@ interface Logger {
 // ---------------------------------------------------------------------------
 
 export interface IngestRunnerDeps {
-  config: IngestConfig;
+  config: LokiIngestConfig;
   lokiClient: ILokiHttpClient;
   processIncidentUseCase: Pick<ProcessIncidentUseCase, 'execute'>;
   logger: Logger;
@@ -38,7 +38,7 @@ export interface IngestRunnerDeps {
  * stop() drains all in-flight promises before resolving.
  */
 export class IngestRunner {
-  private readonly config: IngestConfig;
+  private readonly config: LokiIngestConfig;
   private readonly lokiClient: ILokiHttpClient;
   private readonly useCase: Pick<ProcessIncidentUseCase, 'execute'>;
   private readonly logger: Logger;

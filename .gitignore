@@ -48,6 +48,10 @@ coverage/
 # AI / IDE internals
 .engram/
 .windsurf/
+.pi/
+.pi-lens/
+artifacts/
+openspec/
 
 # Temp / testing
 tmp/
