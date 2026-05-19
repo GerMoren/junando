@@ -150,41 +150,41 @@ describe('TeamsNotifier', () => {
     await expect(notifier.send(makeCluster(), makeAnalysis())).resolves.toBeUndefined();
   });
 
-  // ── TNT-05: throw on non-2xx ──────────────────────────────────────────────
+  // ── TNT-05: throw on non-2xx with status + host only (no body) ────────────
 
-  it('throws with response body text on HTTP 400 (TNT-05)', async () => {
+  it('throws TeamsNotifierError with status and host on HTTP 400 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'Bad Request' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow('Bad Request');
+    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    expect(err.message).toMatch(/Teams webhook error 400 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
-  it('throws with response body text on HTTP 500 (TNT-05)', async () => {
+  it('throws TeamsNotifierError with status and host on HTTP 500 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Internal Server Error' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow('Internal Server Error');
+    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    expect(err).toBeInstanceOf(TeamsNotifierError);
+    expect(err.message).toMatch(/Teams webhook error 500 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
-  // ── TNT-09: HTTP error body is truncated and webhook URL / sig token scrubbed ──
-  // Prevents credential leak to CloudWatch logs (e.g. when Azure/Power Automate
-  // echoes parts of the request URL back in error responses).
+  // ── TNT-09: HTTP error message contains only status and host — never the response body ──
+  // Round 2 follow-up: sanitizing the body is brittle (encoded variants, Azure SAS
+  // params like code=, sv=, sp= all bypass narrow regexes). Omit body entirely.
 
-  it('TNT-09: HTTP error message truncates body to 500 chars and scrubs webhook URL', async () => {
+  it('TNT-09: HTTP error message contains only status and host — never the response body', async () => {
     const webhookWithSecret = 'https://prod.example.powerautomate.com/invoke?api-version=1&sig=SUPER_SECRET_TOKEN_abc123XYZ';
-    const longLeak = `request failed for url ${webhookWithSecret} with details: ` + 'X'.repeat(800);
-    mockFetch.mockResolvedValue({ ok: false, status: 502, text: async () => longLeak });
+    const leakyBody = `request failed for url ${webhookWithSecret} with details: ` + 'XXXXX'.repeat(160);
+    mockFetch.mockResolvedValue({ ok: false, status: 502, text: async () => leakyBody });
 
     const leakyNotifier = new TeamsNotifier(webhookWithSecret);
     const err = await leakyNotifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
 
     expect(err).toBeInstanceOf(TeamsNotifierError);
-    // Webhook URL must not appear verbatim
+    // No part of the body — verbatim URL, sig token, or arbitrary marker — leaks.
     expect(err.message).not.toContain(webhookWithSecret);
-    // sig token must not appear verbatim
     expect(err.message).not.toContain('SUPER_SECRET_TOKEN_abc123XYZ');
-    // body portion is truncated to <= 500 chars and ends with the truncation marker
-    // (overall message contains the prefix "Teams webhook error 502: " plus body)
-    const colonIdx = err.message.indexOf(': ');
-    const bodyPart = err.message.slice(colonIdx + 2);
-    expect(bodyPart.length).toBeLessThanOrEqual(501); // 500 chars + '…'
-    expect(bodyPart.endsWith('…')).toBe(true);
+    expect(err.message).not.toContain('XXXXX');
+    // Message shape: status + host only.
+    expect(err.message).toMatch(/Teams webhook error 502 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
   // ── TNT-06: sanitization ──────────────────────────────────────────────────
