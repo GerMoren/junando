@@ -1,6 +1,6 @@
 # How to implement a mapper for Junando
 
-A **mapper** bridges the gap between a specific SQS message schema (owned by a client) and the generic Junando domain types. It must implement `IMessageMapper` from `registry.ts`.
+A **mapper** bridges the gap between a specific SQS message schema (owned by a client) and the generic Junando domain types. It must implement `IMessageMapper` from `@junando/ingest`.
 
 ## Interface
 
@@ -21,7 +21,7 @@ export interface IMessageMapper {
 import type { Message } from '@aws-sdk/client-sqs';
 import { AlertType, type NormalizedAlert } from '@junando/core';
 import type { TraceabilityDocument } from '@junando/core';
-import { registerMapper, type IMessageMapper } from '@junando/ingest'; // or from registry.ts path
+import { registerMapper, type IMessageMapper } from '@junando/ingest';
 
 interface MyClientPayload {
   eventId: string;
