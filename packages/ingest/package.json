@@ -14,8 +14,8 @@
     }
   },
   "scripts": {
-    "prepare": "[ -d src ] && tsup src/index.ts --format esm --dts --tsconfig tsconfig.build.json || true",
-    "build": "tsup src/index.ts --format esm --dts --tsconfig tsconfig.build.json",
+    "prepare": "[ -d src ] && tsup || true",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
