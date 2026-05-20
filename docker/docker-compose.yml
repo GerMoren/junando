@@ -42,12 +42,14 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_INSTALL_PLUGINS=grafana-opensearch-datasource
     volumes:
       - './grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml'
       - './grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml'
       - '../docs/dashboards/alert-volume.json:/var/lib/grafana/dashboards/alert-volume.json'
       - '../docs/dashboards/llm-performance.json:/var/lib/grafana/dashboards/llm-performance.json'
       - '../docs/dashboards/sqs-health.json:/var/lib/grafana/dashboards/sqs-health.json'
+      - '../docs/dashboards/cenco-traceability.json:/var/lib/grafana/dashboards/cenco-traceability.json'
 
   opensearch:
     image: opensearchproject/opensearch:2.13.0
