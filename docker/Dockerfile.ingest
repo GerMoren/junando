@@ -12,7 +12,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/core/package.json ./packages/core/
 COPY packages/ingest/package.json ./packages/ingest/
 
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile
 
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/core/ ./packages/core/
