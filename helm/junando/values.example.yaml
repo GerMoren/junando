@@ -1,0 +1,97 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# values.example.yaml — production-like override example
+# Copy this file, fill in real values, and pass via:
+#   helm install junando helm/junando -f values.example.yaml
+# DO NOT commit real secrets. Use sealed-secrets, SOPS, or Vault instead.
+# ─────────────────────────────────────────────────────────────────────────────
+
+webhook:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "1.3.0"
+  ingress:
+    enabled: true
+    className: "nginx"
+    host: "junando.example.com"
+    tls:
+      - secretName: junando-tls
+        hosts:
+          - junando.example.com
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+worker:
+  enabled: true
+  replicaCount: 2
+  image:
+    tag: "1.3.0"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+
+ingest:
+  enabled: true
+  replicaCount: 1
+  image:
+    tag: "1.3.0"
+  configMountPath: /etc/junando/ingest
+  config:
+    ingest:
+      kind: loki
+      intervalMs: 60000
+      loki:
+        # url: replace with your Grafana Cloud or self-hosted Loki push URL.
+        # Embedded credentials format: https://user:token@logs-prod-024.grafana.net/loki/api/v1/push
+        url: "https://user:replace-me@logs-prod-024.grafana.net/loki/api/v1/push"
+        timeoutMs: 15000
+      rules:
+        - name: high-error-rate
+          query: '{app="my-service"} |= "ERROR"'
+          service: my-service
+          alertType: LOG_ANOMALY
+          severity: high
+          windowMs: 300000
+
+serviceAccount:
+  create: true
+  # irsaRoleArn: set your EKS IAM role ARN for SQS/SSM access.
+  irsaRoleArn: "arn:aws:iam::123456789012:role/junando-ingest"
+
+secrets:
+  # Replace ALL values below with real credentials before deploying.
+  LLM_PROVIDER: "gemini"
+  LLM_API_KEY: "replace-with-real-api-key"
+  LLM_MODEL: "gemini-2.0-flash"
+  LLM_FALLBACK_MODELS: "google/gemma-4-31b-it:free,meta-llama/llama-3.3-70b-instruct:free"
+  LLM_FALLBACK_TIMEOUT_MS: "60000"
+  NOTIFIER_TYPE: "slack"
+  SLACK_BOT_TOKEN: "xoxb-replace-with-real-token"
+  SLACK_SIGNING_SECRET: "replace-with-signing-secret"
+  SLACK_CHANNEL: "#alerts"
+  TEAMS_WEBHOOK_URL: ""
+  LOKI_URL: "https://user:replace-me@logs-prod-024.grafana.net/loki/api/v1/push"
+  REDIS_URL: "redis://redis.example.com:6379"
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-alerts"
+  DEDUP_TTL_SECONDS: "300"
+  CLUSTER_WINDOW_MS: "120000"
+  LOG_LEVEL: "info"
+  NODE_ENV: "production"
+  JUNANDO_WEBHOOK_URL: "http://junando-webhook:4000/webhook"
+
+redis:
+  enabled: false

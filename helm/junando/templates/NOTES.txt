@@ -1,0 +1,38 @@
+NOTES.txt
+Thank you for installing {{ .Chart.Name }} {{ .Chart.AppVersion }}!
+
+Release name: {{ .Release.Name }}
+Namespace:    {{ .Release.Namespace }}
+
+Services deployed:
+{{- if .Values.webhook.enabled }}
+  ✓ webhook  — http://{{ include "junando.fullname" . }}-webhook:{{ .Values.webhook.service.port }}
+{{- else }}
+  ✗ webhook  — disabled
+{{- end }}
+{{- if .Values.worker.enabled }}
+  ✓ worker   — no Service (queue-driven)
+{{- else }}
+  ✗ worker   — disabled
+{{- end }}
+{{- if .Values.ingest.enabled }}
+  ✓ ingest   — no Service (poller)
+{{- else }}
+  ✗ ingest   — disabled
+{{- end }}
+
+{{- if .Values.webhook.ingress.enabled }}
+
+Ingress enabled — webhook reachable at:
+  http{{ if .Values.webhook.ingress.tls }}s{{ end }}://{{ .Values.webhook.ingress.host }}/
+{{- end }}
+
+{{- if .Values.webhook.hpa.enabled }}
+
+HPA enabled for webhook:
+  min {{ .Values.webhook.hpa.minReplicas }} / max {{ .Values.webhook.hpa.maxReplicas }} replicas
+  CPU target: {{ .Values.webhook.hpa.targetCPUUtilizationPercentage }}%
+{{- end }}
+
+IMPORTANT: Fill in all required secrets before production use.
+See helm/junando/values.example.yaml for a complete configuration example.

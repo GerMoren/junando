@@ -1,0 +1,47 @@
+{{/*
+worker-deployment.yaml — Deployment for the Junando background worker.
+No Service rendered for this workload (queue-driven, no inbound traffic).
+Uses exec probes (no HTTP server).
+Only rendered when worker.enabled is true.
+*/}}
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "junando.fullname" . }}-worker
+  labels:
+    {{- include "junando.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "junando.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "junando.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: {{ include "junando.serviceAccountName" . }}
+      containers:
+        - name: worker
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "junando.fullname" . }}-secrets
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "echo ok"]
+            initialDelaySeconds: {{ .Values.worker.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.periodSeconds }}
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "echo ok"]
+            initialDelaySeconds: {{ .Values.worker.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.periodSeconds }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+{{- end }}
