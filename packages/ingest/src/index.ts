@@ -24,6 +24,11 @@ export type {
 export { getMapper, registerMapper } from './mappers/registry.js';
 export type { IMessageMapper } from './mappers/registry.js';
 
+// Re-export domain types needed by mapper implementors so they only import from @junando/ingest
+// (@junando/core is bundled into this package and not installed separately by consumers)
+export { AlertType } from '@junando/core';
+export type { NormalizedAlert, TraceabilityDocument } from '@junando/core';
+
 export { LokiHttpError } from './ports/loki-http-client.port.js';
 export type {
   ILokiHttpClient,
