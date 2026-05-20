@@ -1,0 +1,253 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "grafana-opensearch-datasource",
+      "name": "OpenSearch",
+      "version": "2.13.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "description": "Cenco traceability events from OpenSearch — searchable panel for CR, Calidad and business users.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 10,
+      "title": "Filters",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [],
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+          "metrics": [{ "id": "1", "type": "logs" }],
+          "query": "$query",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Log stream",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "@timestamp" },
+            "properties": [
+              { "id": "custom.width", "value": 180 },
+              { "id": "unit", "value": "dateTimeAsIso" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "uploadId" },
+            "properties": [{ "id": "custom.width", "value": 260 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "channel" },
+            "properties": [{ "id": "custom.width", "value": 120 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "application" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "messageType" },
+            "properties": [{ "id": "custom.width", "value": 140 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "message" },
+            "properties": [{ "id": "custom.width", "value": 400 }]
+          }
+        ]
+      },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 9 },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "@timestamp" }]
+      },
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [],
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+          "metrics": [{ "id": "1", "settings": { "size": "500" }, "type": "raw_data" }],
+          "query": "$query",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Traceability events",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 10, "lineWidth": 1 }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "alias": "Events by messageType",
+          "bucketAggs": [
+            {
+              "field": "messageType.keyword",
+              "id": "2",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_term", "size": "10" },
+              "type": "terms"
+            },
+            {
+              "field": "@timestamp",
+              "id": "3",
+              "settings": { "interval": "auto", "min_doc_count": "1", "trimEdges": "0" },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "$query",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Event volume by messageType",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["cenco", "traceability", "opensearch"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "", "value": "" },
+        "description": "Free-text Lucene query — e.g. uploadId:abc123 AND channel:CENCO",
+        "hide": 0,
+        "label": "Search query",
+        "name": "query",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+        "definition": "{\"find\":\"terms\",\"field\":\"channel.keyword\"}",
+        "description": "Filter by channel",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Channel",
+        "multi": true,
+        "name": "channel",
+        "options": [],
+        "query": "{\"find\":\"terms\",\"field\":\"channel.keyword\"}",
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+        "definition": "{\"find\":\"terms\",\"field\":\"application.keyword\"}",
+        "description": "Filter by application",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Application",
+        "multi": true,
+        "name": "application",
+        "options": [],
+        "query": "{\"find\":\"terms\",\"field\":\"application.keyword\"}",
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch-local" },
+        "definition": "{\"find\":\"terms\",\"field\":\"messageType.keyword\"}",
+        "description": "Filter by messageType",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Message type",
+        "multi": true,
+        "name": "messageType",
+        "options": [],
+        "query": "{\"find\":\"terms\",\"field\":\"messageType.keyword\"}",
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "", "value": "" },
+        "description": "Filter by uploadId",
+        "hide": 0,
+        "label": "Upload ID",
+        "name": "uploadId",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Cenco Traceability",
+  "uid": "cenco-traceability-v1",
+  "version": 1
+}

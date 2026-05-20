@@ -12,3 +12,16 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     isDefault: true
+  - name: OpenSearch
+    uid: opensearch-local
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: http://opensearch:9200
+    isDefault: false
+    jsonData:
+      database: cenco-traceability
+      flavor: opensearch
+      version: 2.13.0
+      timeField: '@timestamp'
+      logMessageField: message
+      logLevelField: messageType
