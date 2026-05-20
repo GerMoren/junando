@@ -1,0 +1,52 @@
+{{/*
+webhook-deployment.yaml — Deployment for the Junando webhook HTTP server.
+Exposes port 4000, uses httpGet probes on /healthz.
+Only rendered when webhook.enabled is true.
+*/}}
+{{- if .Values.webhook.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "junando.fullname" . }}-webhook
+  labels:
+    {{- include "junando.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+spec:
+  replicas: {{ .Values.webhook.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "junando.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: webhook
+  template:
+    metadata:
+      labels:
+        {{- include "junando.labels" . | nindent 8 }}
+        app.kubernetes.io/component: webhook
+    spec:
+      serviceAccountName: {{ include "junando.serviceAccountName" . }}
+      containers:
+        - name: webhook
+          image: "{{ .Values.webhook.image.repository }}:{{ .Values.webhook.image.tag }}"
+          imagePullPolicy: {{ .Values.webhook.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "junando.fullname" . }}-secrets
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.webhook.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.webhook.probes.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ .Values.webhook.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.webhook.probes.periodSeconds }}
+          resources:
+            {{- toYaml .Values.webhook.resources | nindent 12 }}
+{{- end }}

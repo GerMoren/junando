@@ -1,0 +1,59 @@
+{{/*
+ingest-deployment.yaml — Deployment for the Junando ingest poller.
+Mounts the ingest ConfigMap at configMountPath and sets INGEST_CONFIG_PATH.
+No Service rendered (no inbound traffic).
+Uses exec probes (no HTTP server).
+Only rendered when ingest.enabled is true.
+*/}}
+{{- if .Values.ingest.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "junando.fullname" . }}-ingest
+  labels:
+    {{- include "junando.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingest
+spec:
+  replicas: {{ .Values.ingest.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "junando.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ingest
+  template:
+    metadata:
+      labels:
+        {{- include "junando.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ingest
+    spec:
+      serviceAccountName: {{ include "junando.serviceAccountName" . }}
+      containers:
+        - name: ingest
+          image: "{{ .Values.ingest.image.repository }}:{{ .Values.ingest.image.tag }}"
+          imagePullPolicy: {{ .Values.ingest.image.pullPolicy }}
+          env:
+            - name: INGEST_CONFIG_PATH
+              value: {{ .Values.ingest.configMountPath }}/config.yaml
+          envFrom:
+            - secretRef:
+                name: {{ include "junando.fullname" . }}-secrets
+          volumeMounts:
+            - name: ingest-config
+              mountPath: {{ .Values.ingest.configMountPath }}
+              readOnly: true
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "echo ok"]
+            initialDelaySeconds: {{ .Values.ingest.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.probes.periodSeconds }}
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "echo ok"]
+            initialDelaySeconds: {{ .Values.ingest.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.probes.periodSeconds }}
+          resources:
+            {{- toYaml .Values.ingest.resources | nindent 12 }}
+      volumes:
+        - name: ingest-config
+          configMap:
+            name: {{ include "junando.fullname" . }}-ingest-config
+{{- end }}

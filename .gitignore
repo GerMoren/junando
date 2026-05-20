@@ -62,3 +62,4 @@ cdk.out/
 
 # Docker local data (preventivo)
 docker/*/data/
+values.local.yaml

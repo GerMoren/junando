@@ -1,0 +1,11 @@
+apiVersion: v2
+name: junando
+description: Helm chart for Junando — webhook, worker, and ingest services
+type: application
+version: 0.1.0
+appVersion: "latest"
+dependencies:
+  - name: redis
+    version: "20.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

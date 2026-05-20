@@ -1,0 +1,41 @@
+name: Helm Lint
+
+on:
+  pull_request:
+    paths:
+      - "helm/**"
+
+jobs:
+  helm-lint:
+    name: Lint and dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Add bitnami repo
+        run: helm repo add bitnami https://charts.bitnami.com/bitnami
+
+      - name: Update chart dependencies
+        run: helm dependency update helm/junando
+
+      - name: Lint (default values)
+        run: helm lint helm/junando
+
+      - name: Template dry-run (default values)
+        run: helm template junando helm/junando
+
+      - name: Template dry-run (all toggles on)
+        run: |
+          helm template junando helm/junando \
+            --set webhook.ingress.enabled=true \
+            --set webhook.hpa.enabled=true
+
+      - name: Template dry-run (example values)
+        run: helm template junando helm/junando -f helm/junando/values.example.yaml

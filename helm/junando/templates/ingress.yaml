@@ -1,0 +1,34 @@
+{{/*
+ingress.yaml — Ingress for the webhook Service.
+Only rendered when both webhook.enabled and webhook.ingress.enabled are true.
+*/}}
+{{- if and .Values.webhook.enabled .Values.webhook.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "junando.fullname" . }}-webhook
+  labels:
+    {{- include "junando.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.webhook.ingress.className }}
+spec:
+  ingressClassName: {{ .Values.webhook.ingress.className }}
+  {{- else }}
+spec:
+  {{- end }}
+  {{- if .Values.webhook.ingress.tls }}
+  tls:
+    {{- toYaml .Values.webhook.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.webhook.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "junando.fullname" . }}-webhook
+                port:
+                  number: {{ .Values.webhook.service.port }}
+{{- end }}

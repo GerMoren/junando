@@ -1,0 +1,222 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# values.yaml — Junando Helm chart defaults
+# Every key is documented with an inline comment.
+# Override any of these via --set or a custom values file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# global.imageRegistry: optional prefix for all image repositories.
+# Useful when pulling through a corporate registry mirror.
+global:
+  imageRegistry: ""
+
+# ── webhook ───────────────────────────────────────────────────────────────────
+# The HTTP server that receives Slack/Teams events and pushes them to the queue.
+webhook:
+  # enabled: set to false to skip all webhook resources.
+  enabled: true
+
+  # replicaCount: number of Deployment replicas.
+  replicaCount: 1
+
+  image:
+    # repository: OCI image path (without tag).
+    repository: ghcr.io/germoren/junando-webhook
+    # tag: image tag to deploy. Defaults to chart appVersion ("latest").
+    tag: "latest"
+    # pullPolicy: Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+
+  service:
+    # type: Kubernetes Service type (ClusterIP, NodePort, LoadBalancer).
+    type: ClusterIP
+    # port: port exposed by the Service (and the container).
+    port: 4000
+
+  ingress:
+    # enabled: render an Ingress resource for the webhook Service.
+    enabled: false
+    # className: ingressClassName field (e.g. "nginx", "traefik").
+    className: ""
+    # host: hostname for the Ingress rule (e.g. "junando.example.com").
+    host: ""
+    # tls: list of IngressTLS objects. Example:
+    #   - secretName: junando-tls
+    #     hosts: [junando.example.com]
+    tls: []
+
+  hpa:
+    # enabled: render a HorizontalPodAutoscaler for the webhook Deployment.
+    enabled: false
+    # minReplicas: minimum number of replicas kept by the HPA.
+    minReplicas: 1
+    # maxReplicas: maximum number of replicas the HPA can scale to.
+    maxReplicas: 5
+    # targetCPUUtilizationPercentage: average CPU utilization target (0-100).
+    targetCPUUtilizationPercentage: 70
+
+  resources:
+    requests:
+      # cpu: minimum CPU reservation.
+      cpu: "100m"
+      # memory: minimum memory reservation.
+      memory: "128Mi"
+    limits:
+      # cpu: maximum CPU the container may consume.
+      cpu: "500m"
+      # memory: maximum memory the container may consume.
+      memory: "512Mi"
+
+  probes:
+    # initialDelaySeconds: seconds before liveness/readiness probes start.
+    initialDelaySeconds: 10
+    # periodSeconds: how often (in seconds) to run the probe.
+    periodSeconds: 10
+
+# ── worker ────────────────────────────────────────────────────────────────────
+# Background processor that dequeues alerts and invokes the LLM pipeline.
+worker:
+  # enabled: set to false to skip all worker resources.
+  enabled: true
+
+  # replicaCount: number of Deployment replicas.
+  replicaCount: 1
+
+  image:
+    # repository: OCI image path (without tag).
+    repository: ghcr.io/germoren/junando-worker
+    # tag: image tag to deploy.
+    tag: "latest"
+    # pullPolicy: Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  probes:
+    # initialDelaySeconds: seconds before exec probes start.
+    initialDelaySeconds: 10
+    # periodSeconds: how often (in seconds) to run the probe.
+    periodSeconds: 10
+
+# ── ingest ────────────────────────────────────────────────────────────────────
+# Long-running Loki/SQS poller that converts log streams to alert events.
+ingest:
+  # enabled: set to false to skip all ingest resources (Deployment + ConfigMap).
+  enabled: true
+
+  # replicaCount: number of Deployment replicas.
+  replicaCount: 1
+
+  image:
+    # repository: OCI image path (without tag).
+    repository: ghcr.io/germoren/junando-ingest
+    # tag: image tag to deploy.
+    tag: "latest"
+    # pullPolicy: Kubernetes image pull policy.
+    pullPolicy: IfNotPresent
+
+  # configMountPath: directory inside the container where config.yaml is mounted.
+  # INGEST_CONFIG_PATH will be set to <configMountPath>/config.yaml.
+  configMountPath: /etc/junando/ingest
+
+  # config: ingest configuration rendered as config.yaml inside the ConfigMap.
+  # This is a YAML object matching the IngestConfig schema.
+  config:
+    ingest:
+      kind: loki
+      intervalMs: 30000
+      loki:
+        url: ""
+        timeoutMs: 10000
+      rules: []
+
+  serviceAccount:
+    # annotations: extra annotations merged into the ServiceAccount.
+    # Useful for GCP Workload Identity or other IRSA-like mechanisms.
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  probes:
+    # initialDelaySeconds: seconds before exec probes start.
+    initialDelaySeconds: 10
+    # periodSeconds: how often (in seconds) to run the probe.
+    periodSeconds: 10
+
+# ── serviceAccount ────────────────────────────────────────────────────────────
+serviceAccount:
+  # create: whether to create the ServiceAccount resource.
+  create: true
+  # name: override the auto-generated ServiceAccount name.
+  name: ""
+  # irsaRoleArn: if non-empty, add the EKS IRSA annotation
+  # (eks.amazonaws.com/role-arn) to the ServiceAccount.
+  # Example: "arn:aws:iam::123456789012:role/junando-ingest"
+  irsaRoleArn: ""
+
+# ── secrets ───────────────────────────────────────────────────────────────────
+# All values are base64-encoded into an Opaque Secret and injected via envFrom.
+# Default empty string → the key is present but blank.
+# Fill these in your environment-specific values override.
+secrets:
+  # LLM_PROVIDER: LLM backend to use (gemini | claude | openrouter | qwen).
+  LLM_PROVIDER: ""
+  # LLM_API_KEY: API key for the selected LLM provider.
+  LLM_API_KEY: ""
+  # LLM_MODEL: specific model identifier (optional; uses provider default if empty).
+  LLM_MODEL: ""
+  # LLM_FALLBACK_MODELS: comma-separated fallback model list (optional).
+  LLM_FALLBACK_MODELS: ""
+  # LLM_FALLBACK_TIMEOUT_MS: timeout in ms before falling back (optional; default 60000).
+  LLM_FALLBACK_TIMEOUT_MS: ""
+  # NOTIFIER_TYPE: notification backend (slack | teams).
+  NOTIFIER_TYPE: ""
+  # SLACK_BOT_TOKEN: Slack bot OAuth token (required when NOTIFIER_TYPE=slack).
+  SLACK_BOT_TOKEN: ""
+  # SLACK_SIGNING_SECRET: Slack signing secret for request verification.
+  SLACK_SIGNING_SECRET: ""
+  # SLACK_CHANNEL: default Slack channel for alerts (e.g. "#alerts").
+  SLACK_CHANNEL: ""
+  # TEAMS_WEBHOOK_URL: Power Automate webhook URL (required when NOTIFIER_TYPE=teams).
+  TEAMS_WEBHOOK_URL: ""
+  # LOKI_URL: Loki push endpoint URL (may include embedded credentials).
+  LOKI_URL: ""
+  # REDIS_URL: Redis connection URL (redis:// or rediss://).
+  REDIS_URL: ""
+  # SQS_QUEUE_URL: AWS SQS queue URL for the worker.
+  SQS_QUEUE_URL: ""
+  # DEDUP_TTL_SECONDS: deduplication TTL in seconds (default 300).
+  DEDUP_TTL_SECONDS: ""
+  # CLUSTER_WINDOW_MS: alert clustering window in milliseconds (default 120000).
+  CLUSTER_WINDOW_MS: ""
+  # LOG_LEVEL: application log level (trace | debug | info | warn | error).
+  LOG_LEVEL: ""
+  # NODE_ENV: runtime environment (development | test | production).
+  NODE_ENV: ""
+  # JUNANDO_WEBHOOK_URL: internal webhook URL used by ingest to post alerts.
+  JUNANDO_WEBHOOK_URL: ""
+
+# ── redis sub-chart ───────────────────────────────────────────────────────────
+# bitnami/redis dependency. Disabled by default — bring your own Redis or
+# set REDIS_URL in secrets to point to an external instance.
+redis:
+  # enabled: render the bitnami/redis sub-chart.
+  enabled: false
+  auth:
+    # enabled: require Redis AUTH. Keep false for cluster-internal Redis.
+    enabled: false
+  master:
+    persistence:
+      # enabled: use a PersistentVolumeClaim for Redis data.
+      enabled: false
