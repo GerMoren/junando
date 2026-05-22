@@ -1,19 +1,21 @@
 {
   "name": "@junando/ingest",
-  "version": "0.1.0",
-  "private": false,
+  "version": "0.6.0",
+  "description": "Alert ingestion adapter — maps external monitoring payloads into Junando's domain model",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "development": "./src/index.ts",
-      "default": "./dist/index.js"
-    },
-    "./loki-http-client": {
-      "development": "./src/adapters/loki/loki-http-client.ts",
-      "default": "./dist/adapters/loki/loki-http-client.js"
-    }
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GerMoren/junando.git",
+    "directory": "packages/ingest"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "prepare": "[ -d src ] && tsup || true",
@@ -31,5 +33,15 @@
     "@types/node": "^24.12.4",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./loki-http-client": {
+      "development": "./src/adapters/loki/loki-http-client.ts",
+      "default": "./dist/adapters/loki/loki-http-client.js"
+    }
   }
 }
