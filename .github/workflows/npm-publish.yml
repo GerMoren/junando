@@ -1,6 +1,9 @@
 name: Publish to npm
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       dist-tag:
@@ -44,25 +47,29 @@ jobs:
         run: node scripts/verify-package-files.mjs
 
       - name: Publish @junando/core
-        run: pnpm publish --provenance --access public --tag "${{ inputs.dist-tag }}" --no-git-checks
+        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
         working-directory: packages/core
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
 
       - name: Publish @junando/ingest
-        run: pnpm publish --provenance --access public --tag "${{ inputs.dist-tag }}" --no-git-checks
+        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
         working-directory: packages/ingest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
 
       - name: Publish @junando/webhook
-        run: pnpm publish --provenance --access public --tag "${{ inputs.dist-tag }}" --no-git-checks
+        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
         working-directory: packages/webhook
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
 
       - name: Publish @junando/worker
-        run: pnpm publish --provenance --access public --tag "${{ inputs.dist-tag }}" --no-git-checks
+        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
         working-directory: packages/worker
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
