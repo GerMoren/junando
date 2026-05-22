@@ -1,16 +1,28 @@
 {
   "name": "@junando/worker",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.6.0",
+  "description": "AWS Lambda SQS worker — processes alert events and dispatches notifications for Junando",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/handler.js",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GerMoren/junando.git",
+    "directory": "packages/worker"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@junando/core": "workspace:*",
+    "@junando/core": "^0.6.0",
     "@aws-sdk/client-sqs": "^3.600.0",
     "@aws-sdk/client-ssm": "^3.600.0",
     "ioredis": "^5.4.1",

@@ -1,10 +1,22 @@
 {
   "name": "@junando/core",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.6.0",
+  "description": "Core domain types, interfaces, and shared utilities for the Junando alerting platform",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GerMoren/junando.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --tsconfig tsconfig.build.json",
     "typecheck": "tsc --noEmit",

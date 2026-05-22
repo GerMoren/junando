@@ -1,0 +1,58 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    name: Build and publish packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for --provenance
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r run build
+
+      - name: Publish @junando/core
+        run: pnpm publish --provenance --no-git-checks
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @junando/ingest
+        run: pnpm publish --provenance --no-git-checks
+        working-directory: packages/ingest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @junando/webhook
+        run: pnpm publish --provenance --no-git-checks
+        working-directory: packages/webhook
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @junando/worker
+        run: pnpm publish --provenance --no-git-checks
+        working-directory: packages/worker
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
