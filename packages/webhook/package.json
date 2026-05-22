@@ -22,7 +22,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@junando/core": "^0.6.0",
+    "@junando/core": "workspace:*",
     "@aws-sdk/client-sqs": "^3.600.0",
     "zod": "^3.23.0"
   },
