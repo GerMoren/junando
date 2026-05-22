@@ -1,12 +1,13 @@
 {
   "name": "@junando/webhook",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "AWS Lambda webhook handler — receives and enqueues external alert payloads for Junando",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/handler.js",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "repository": {
     "type": "git",
