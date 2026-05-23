@@ -1,6 +1,6 @@
 {
   "name": "@junando/core",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "description": "Core domain types, interfaces, and shared utilities for the Junando alerting platform",
   "license": "Apache-2.0",
   "type": "module",
