@@ -38,6 +38,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Quickstart smoke
+        run: pnpm run quickstart -- --ci
+
       - name: Typecheck
         run: pnpm typecheck
 

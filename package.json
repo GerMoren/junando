@@ -20,6 +20,7 @@
     "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
     "generate:alert": "tsx --env-file=.env.local scripts/generate-alert.ts",
+    "quickstart": "tsx scripts/quickstart.ts",
     "generate:alert:prod": "tsx --env-file=.env.production scripts/generate-alert.ts",
     "simulate:incident": "tsx --env-file=.env.local scripts/simulate-incident.ts",
     "simulate:incident:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --target=webhook",
