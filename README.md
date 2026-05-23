@@ -198,6 +198,8 @@ Junando is designed to fail gracefully:
 - Grafana setup: [`docs/runbooks/grafana-setup.md`](docs/runbooks/grafana-setup.md)
 - Dashboards: [`docs/dashboards/`](docs/dashboards/)
 - Architecture deep dive: [`docs/architecture/system-deep-dive.md`](docs/architecture/system-deep-dive.md)
+- Compatibility matrix: [`docs/compatibility.md`](docs/compatibility.md)
+- API stability policy: [`docs/api-stability.md`](docs/api-stability.md)
 
 ---
 
