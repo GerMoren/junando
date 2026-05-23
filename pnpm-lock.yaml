@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  ioredis: ^5.10.1
+
 importers:
 
   .:
@@ -194,7 +197,7 @@ importers:
         specifier: workspace:*
         version: link:../core
       ioredis:
-        specifier: ^5.4.1
+        specifier: ^5.10.1
         version: 5.10.1
       zod:
         specifier: ^3.23.0
