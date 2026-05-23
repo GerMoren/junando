@@ -37,7 +37,7 @@ const cdkStack = readFileSync(
   "utf8",
 );
 const runtimeMatch = cdkStack.match(/lambda\.Runtime\.(NODEJS_\d+_X)/);
-const lambdaRuntime = runtimeMatch
+const lambdaRuntime = runtimeMatch?.[1]
   ? runtimeMatch[1].replace("NODEJS_", "nodejs").replace("_X", ".x").toLowerCase()
   : "unknown";
 
