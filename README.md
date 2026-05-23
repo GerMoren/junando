@@ -55,6 +55,12 @@ In another terminal:
 pnpm run generate:alert
 ```
 
+Or run a one-command smoke check:
+
+```bash
+pnpm run quickstart
+```
+
 ### 3) Verify
 
 - Webhook health: `http://localhost:4000/health`
