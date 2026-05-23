@@ -1,0 +1,72 @@
+name: junando-example
+
+# Two modes:
+#   docker compose up                       -> use published junando-webhook image (default)
+#   docker compose --profile dev up         -> build junando-webhook from the monorepo source
+#
+# The published mode is intended for users evaluating Junando.
+# The dev mode is for contributors who change core/webhook code and want to see
+# the effect end-to-end without publishing.
+
+services:
+  demo-app:
+    build: ./app
+    ports: ['3001:3001']
+    environment:
+      - PORT=3001
+      - LOG_LEVEL=info
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports: ['9090:9090']
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports: ['9093:9093']
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  loki:
+    image: grafana/loki:3.0.0
+    ports: ['3100:3100']
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 5
+
+  # Default: pull the published image. No build needed.
+  junando-webhook:
+    profiles: ['', 'default']
+    image: ghcr.io/germoren/junando-webhook:latest
+    ports: ['4000:4000']
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Dev profile: build from the monorepo Dockerfile. Same service name so
+  # alertmanager.yml does not need to change.
+  junando-webhook-dev:
+    profiles: ['dev']
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.webhook
+    container_name: junando-webhook
+    ports: ['4000:4000']
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
