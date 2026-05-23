@@ -297,6 +297,26 @@ pnpm cdk destroy PharoStack-dev   # tear down dev stack
 
 ---
 
+## Documentation Hygiene
+
+### Compatibility Matrix
+
+`docs/compatibility.md` is **auto-generated** from real values in `package.json` files and the CDK stack.
+
+- **Never edit `docs/compatibility.md` by hand.** It carries an `AUTO-GENERATED` header and CI will fail the diff.
+- After bumping any package version, changing the Node `engines` field, switching Lambda runtime in `packages/cdk/lib/junando-stack.ts`, adding/removing key runtime dependencies, or changing `tsup` ESM/CJS outputs, run:
+
+  ```bash
+  pnpm run docs:compat
+  ```
+
+  Then commit the regenerated `docs/compatibility.md` together with the source change.
+
+- CI runs `pnpm run docs:compat:check` and fails if the file is stale. This is the canonical signal that you forgot to regenerate.
+- The generator lives at `scripts/generate-compat-matrix.ts`. If you add a new fact worth tracking (a new key dependency, a new package, a new runtime target), edit the generator — not the markdown.
+
+---
+
 ## Local Dev URLs
 
 | Service         | URL                                 |

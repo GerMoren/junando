@@ -21,6 +21,8 @@
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
     "generate:alert": "tsx --env-file=.env.local scripts/generate-alert.ts",
     "quickstart": "tsx scripts/quickstart.ts",
+    "docs:compat": "tsx scripts/generate-compat-matrix.ts",
+    "docs:compat:check": "tsx scripts/generate-compat-matrix.ts --check",
     "generate:alert:prod": "tsx --env-file=.env.production scripts/generate-alert.ts",
     "simulate:incident": "tsx --env-file=.env.local scripts/simulate-incident.ts",
     "simulate:incident:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --target=webhook",
