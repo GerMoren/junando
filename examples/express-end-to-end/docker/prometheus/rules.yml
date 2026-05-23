@@ -1,0 +1,17 @@
+groups:
+  - name: demo-app
+    interval: 10s
+    rules:
+      - alert: CheckoutEndpointFailing
+        expr: rate(http_errors_total{route="/api/checkout"}[30s]) > 0
+        for: 15s
+        labels:
+          severity: critical
+          service: demo-app
+          team: payments
+        annotations:
+          summary: 'Checkout endpoint returning 5xx errors'
+          description: |
+            The /api/checkout endpoint on demo-app is returning errors at a rate of
+            {{ $value }} req/s. Likely cause: payment provider unreachable.
+          runbook_url: 'https://example.com/runbooks/checkout'

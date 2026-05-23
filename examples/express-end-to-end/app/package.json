@@ -1,0 +1,17 @@
+{
+  "name": "express-end-to-end-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Canonical end-to-end Junando example: Express app -> Prometheus -> Alertmanager -> Junando -> Slack",
+  "scripts": {
+    "start": "node --env-file=.env src/server.js",
+    "dev": "node --env-file=.env --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "prom-client": "^15.1.3"
+  }
+}
