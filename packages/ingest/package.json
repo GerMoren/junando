@@ -1,10 +1,11 @@
 {
   "name": "@junando/ingest",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Alert ingestion adapter — maps external monitoring payloads into Junando's domain model",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
@@ -38,11 +39,15 @@
   "exports": {
     ".": {
       "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
       "default": "./dist/index.js"
     },
     "./loki-http-client": {
       "development": "./src/adapters/loki/loki-http-client.ts",
-      "default": "./dist/adapters/loki/loki-http-client.js"
+      "import": "./dist/loki-http-client.js",
+      "require": "./dist/loki-http-client.cjs",
+      "default": "./dist/loki-http-client.js"
     }
   }
 }

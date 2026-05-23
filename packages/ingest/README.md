@@ -51,8 +51,8 @@ import { SqsSubscriber, registerMapper, type IMessageMapper } from '@junando/ing
 import type { NormalizedAlert } from '@junando/ingest'
 
 // Implement your mapper
-const cencoMapper: IMessageMapper = {
-  source: 'cenco-pim',
+const myMapper: IMessageMapper = {
+  source: 'my-monitoring-tool',
   map(raw: unknown): NormalizedAlert[] {
     // transform raw SQS message to NormalizedAlert[]
   },
@@ -88,6 +88,18 @@ await subscriber.start()
 - Node.js >= 24
 - Access to a Loki instance (for `IngestRunner`)
 - AWS SQS queue (for `SqsSubscriber`)
+
+## Module formats
+
+`@junando/ingest` ships both **ESM** and **CJS** bundles — compatible with NestJS, Next.js, and any CommonJS project out of the box.
+
+```ts
+// ESM
+import { IngestRunner } from '@junando/ingest'
+
+// CommonJS
+const { IngestRunner } = require('@junando/ingest')
+```
 
 ## License
 
