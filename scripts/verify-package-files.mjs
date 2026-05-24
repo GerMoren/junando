@@ -11,7 +11,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const PACKAGES = ["core", "ingest", "webhook", "worker"];
+const PACKAGES = ["core", "ingest", "webhook", "worker", "create-junando-app"];
 const REQUIRED_FIELDS = ["name", "version", "description", "license", "main", "files", "repository", "publishConfig"];
 
 let failed = false;
@@ -20,8 +20,9 @@ for (const pkg of PACKAGES) {
   const pkgPath = resolve(root, "packages", pkg, "package.json");
   const json = JSON.parse(readFileSync(pkgPath, "utf-8"));
   const distPath = resolve(root, "packages", pkg, "dist");
+  const displayName = pkg === "create-junando-app" ? "create-junando-app" : `@junando/${pkg}`;
 
-  console.log(`\n📦 @junando/${pkg}`);
+  console.log(`\n📦 ${displayName}`);
 
   // Check required fields
   for (const field of REQUIRED_FIELDS) {

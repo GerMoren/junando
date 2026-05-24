@@ -1,5 +1,7 @@
 # Express end-to-end example
 
+> **This example is the template used by `create-junando-app`. Changes here ship to new users on next release.**
+
 The canonical Junando demo. A broken Express endpoint triggers a Prometheus alert, Alertmanager forwards it to Junando, Junando asks an LLM for a structured diagnosis, and the result lands in Slack with the original `correlationId` intact.
 
 ```
