@@ -60,19 +60,19 @@ describe('scaffold', () => {
     await expect(scaffold({ targetDir, projectName: 'my-app', templateDir, skipInstall: true })).rejects.toThrow();
   });
 
-  it('renames _gitignore to .gitignore in scaffolded output (npm publish workaround)', async () => {
+  it('renames app/_gitignore to app/.gitignore in scaffolded output (npm publish workaround)', async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'scaffold-test-'));
     const templateDir = join(tmpDir, 'template');
     const targetDir = join(tmpDir, 'output', 'my-app');
     await mkdir(templateDir, { recursive: true });
     await createSyntheticTemplate(templateDir);
-    await writeFile(join(templateDir, '_gitignore'), 'node_modules\n.env\n');
+    await writeFile(join(templateDir, 'app', '_gitignore'), 'node_modules\n.env\n');
 
     await scaffold({ targetDir, projectName: 'my-app', templateDir, skipInstall: true });
 
-    await expect(access(join(targetDir, '.gitignore'))).resolves.toBeUndefined();
-    await expect(access(join(targetDir, '_gitignore'))).rejects.toThrow();
-    const contents = await readFile(join(targetDir, '.gitignore'), 'utf-8');
+    await expect(access(join(targetDir, 'app', '.gitignore'))).resolves.toBeUndefined();
+    await expect(access(join(targetDir, 'app', '_gitignore'))).rejects.toThrow();
+    const contents = await readFile(join(targetDir, 'app', '.gitignore'), 'utf-8');
     expect(contents).toContain('node_modules');
     expect(contents).toContain('.env');
   });

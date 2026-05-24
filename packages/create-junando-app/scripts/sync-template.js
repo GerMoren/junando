@@ -40,12 +40,14 @@ if (await exists(lockFile)) {
 }
 
 // CRITICAL: npm strips any .gitignore from published tarballs.
-// Rename to _gitignore so it survives publish; scaffold renames it back on copy.
-const gitignoreSrc = join(templateDir, '.gitignore');
-const gitignoreDst = join(templateDir, '_gitignore');
+// Rename app/.gitignore → app/_gitignore so it survives publish.
+// Scaffold renames it back on copy. It lives in app/ (not template root) because
+// that's where the user runs `git init` after scaffolding.
+const gitignoreSrc = join(templateDir, 'app', '.gitignore');
+const gitignoreDst = join(templateDir, 'app', '_gitignore');
 if (await exists(gitignoreSrc)) {
   await rename(gitignoreSrc, gitignoreDst);
-  console.log('[sync-template] Renamed .gitignore → _gitignore (npm publish workaround)');
+  console.log('[sync-template] Renamed app/.gitignore → app/_gitignore (npm publish workaround)');
 }
 
 console.log('[sync-template] Done.');

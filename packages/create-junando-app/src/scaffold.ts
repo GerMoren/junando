@@ -1,4 +1,4 @@
-import { cp, readdir, rm, rename, access } from 'node:fs/promises';
+import { cp, readdir, rename, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { rewritePackageJson } from './helpers/rewrite-package-json.js';
@@ -35,13 +35,14 @@ export async function scaffold({
   // Copy template → target
   await cp(templateDir, targetDir, { recursive: true });
 
-  // Rename _gitignore → .gitignore (workaround for npm stripping .gitignore on publish)
-  const renamedGitignore = join(targetDir, '_gitignore');
+  // Rename app/_gitignore → app/.gitignore (workaround for npm stripping .gitignore on publish).
+  // Lives in app/ because that's where the user runs `git init` after scaffolding.
+  const renamedGitignore = join(targetDir, 'app', '_gitignore');
   try {
     await access(renamedGitignore);
-    await rename(renamedGitignore, join(targetDir, '.gitignore'));
+    await rename(renamedGitignore, join(targetDir, 'app', '.gitignore'));
   } catch {
-    // No _gitignore in template — fine.
+    // No app/_gitignore in template — fine.
   }
 
   // Rewrite app/package.json name
