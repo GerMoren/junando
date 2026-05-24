@@ -49,3 +49,7 @@ export type {
   PrometheusInstantResult,
 } from './ports/prometheus-http-client.port.js';
 
+// Prometheus behavior — runner
+export { PrometheusIngestRunner } from './polling/prometheus-ingest-runner.js';
+export type { PrometheusIngestRunnerDeps, PrometheusIngestRunnerOpts } from './polling/prometheus-ingest-runner.js';
+
