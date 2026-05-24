@@ -3,6 +3,7 @@ import { SlackNotifier } from '../slack.adapter.js';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
 import { AlertType } from '../../../shared/constants.js';
+import * as metricsModule from '../../../shared/metrics/index.js';
 
 function makeCluster(overrides: Partial<AlertCluster> = {}): AlertCluster {
   return {
@@ -184,5 +185,56 @@ describe('SlackNotifier', () => {
     const analysis = makeAnalysis();
 
     await expect(notifier.send(cluster, analysis)).rejects.toThrow('Slack API error: 500');
+  });
+});
+
+describe('SlackNotifier — notificationsTotal emission', () => {
+  const mockFetch = vi.fn();
+  let notifier: SlackNotifier;
+  let incSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+    notifier = new SlackNotifier('test-token', 'test-channel');
+    incSpy = vi.spyOn(metricsModule.notificationsTotal, 'inc');
+  });
+
+  it('increments notificationsTotal with channel=slack, outcome=success on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ channel: 'slack', outcome: 'success' });
+  });
+
+  it('increments notificationsTotal with channel=slack, outcome=failure on HTTP error', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+
+    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow();
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ channel: 'slack', outcome: 'failure' });
+  });
+
+  it('does not double-increment on a single send call', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(incSpy).toHaveBeenCalledTimes(1);
   });
 });

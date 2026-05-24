@@ -3,6 +3,7 @@ import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import type { INotifier } from '../../domain/ports/index.js';
 import { HTTP_TIMEOUT_MS, SLACK_API_URL, URGENCY_EMOJI } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
+import { notificationsTotal } from '../../shared/metrics/index.js';
 
 const logger = createLogger();
 
@@ -32,19 +33,26 @@ export class SlackNotifier implements INotifier {
       ? this.buildAnalysisMessage(cluster, analysis)
       : this.buildFallbackMessage(cluster);
 
-    const res = await fetch(SLACK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.botToken}`,
-      },
-      body: JSON.stringify({ channel: this.channel, ...payload }),
-      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS.Default),
-    });
+    try {
+      const res = await fetch(SLACK_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.botToken}`,
+        },
+        body: JSON.stringify({ channel: this.channel, ...payload }),
+        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS.Default),
+      });
 
-    if (!res.ok) throw new Error(`Slack API error: ${res.status}`);
-    const body = (await res.json()) as { ok: boolean; error?: string };
-    if (!body.ok) throw new Error(`Slack error: ${body.error}`);
+      if (!res.ok) throw new Error(`Slack API error: ${res.status}`);
+      const body = (await res.json()) as { ok: boolean; error?: string };
+      if (!body.ok) throw new Error(`Slack error: ${body.error}`);
+
+      notificationsTotal.inc({ channel: 'slack', outcome: 'success' });
+    } catch (err) {
+      notificationsTotal.inc({ channel: 'slack', outcome: 'failure' });
+      throw err;
+    }
   }
 
   private buildAnalysisMessage(
@@ -160,16 +168,22 @@ export class ConsoleNotifier implements INotifier {
   }> = [];
 
   async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
-    this.sent.push({ cluster, analysis });
-    logger.info(
-      {
-        cluster: {
-          serviceName: cluster.serviceName,
-          alertType: cluster.alertType,
+    try {
+      this.sent.push({ cluster, analysis });
+      logger.info(
+        {
+          cluster: {
+            serviceName: cluster.serviceName,
+            alertType: cluster.alertType,
+          },
+          analysis: analysis ?? 'unavailable',
         },
-        analysis: analysis ?? 'unavailable',
-      },
-      '--- Junando Notification ---',
-    );
+        '--- Junando Notification ---',
+      );
+      notificationsTotal.inc({ channel: 'unknown', outcome: 'success' });
+    } catch (err) {
+      notificationsTotal.inc({ channel: 'unknown', outcome: 'failure' });
+      throw err;
+    }
   }
 }

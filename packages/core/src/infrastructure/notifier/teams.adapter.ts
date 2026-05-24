@@ -2,6 +2,7 @@ import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import type { INotifier } from '../../domain/ports/index.js';
 import { TEAMS_WEBHOOK_TIMEOUT_MS, URGENCY_EMOJI } from '../../shared/constants.js';
+import { notificationsTotal } from '../../shared/metrics/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TeamsNotifierError — domain error type for Teams adapter failures.
@@ -205,17 +206,23 @@ export class TeamsNotifier implements INotifier {
           `Teams webhook error ${res.status} (host: ${this.hostForErrors})`,
         );
       }
+
+      notificationsTotal.inc({ channel: 'teams', outcome: 'success' });
     } catch (err) {
       if (err instanceof TeamsNotifierError) {
+        notificationsTotal.inc({ channel: 'teams', outcome: 'failure' });
         throw err;
       }
       if (err instanceof Error && err.name === 'AbortError') {
         // TNT-08: log host only — never full URL (no sig= or api-version= query).
         // TNT-10: host is pre-computed; no URL parsing in the error path.
-        throw new TeamsNotifierError(
+        const timeoutErr = new TeamsNotifierError(
           `Teams webhook timed out after ${this.timeoutMs}ms (host: ${this.hostForErrors})`,
         );
+        notificationsTotal.inc({ channel: 'teams', outcome: 'failure' });
+        throw timeoutErr;
       }
+      notificationsTotal.inc({ channel: 'teams', outcome: 'failure' });
       throw err;
     } finally {
       clearTimeout(timer);
