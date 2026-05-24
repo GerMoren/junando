@@ -46,6 +46,7 @@ export { createNotifier } from './infrastructure/notifier/factory.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
 export { TeamsNotifier, TeamsNotifierError } from './infrastructure/notifier/teams.adapter.js';
 export { InMemoryAlertQueue, SQSAlertQueue } from './infrastructure/queue/sqs.adapter.js';
+export { startSqsLagPoller } from './infrastructure/queue/sqs-lag-poller.js';
 export {
   LokiTraceRepository,
   MockTraceRepository,
