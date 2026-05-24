@@ -73,7 +73,10 @@ jobs:
           DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
 
       - name: Publish create-junando-app
-        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
+        # NOTE: --provenance omitted intentionally for first-time publish.
+        # OIDC trusted publisher cannot be configured until the package exists on npm.
+        # Will be re-added in a follow-up PR once the package is registered.
+        run: pnpm publish --access public --tag "${DIST_TAG}" --no-git-checks
         working-directory: packages/create-junando-app
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
