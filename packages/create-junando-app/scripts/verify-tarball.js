@@ -4,7 +4,7 @@
  *
  * Checks:
  *   - dist/cli.js exists, starts with shebang, has executable mode bit
- *   - template/ exists with key files (_gitignore, .env.example, app/package.json)
+ *   - template/ exists with key files (app/_gitignore, app/.env.example, app/package.json)
  *   - node_modules and pnpm-lock.yaml NOT shipped
  */
 import { execSync } from 'node:child_process';
@@ -34,8 +34,8 @@ if (!cliFirstLine.startsWith('#!/usr/bin/env node')) {
 
 // 2. Template critical files
 const required = [
-  'template/_gitignore',
-  'template/.env.example',
+  'template/app/_gitignore',
+  'template/app/.env.example',
   'template/app/package.json',
   'template/README.md',
 ];
@@ -57,7 +57,7 @@ try {
 }
 
 const shipped = new Set(manifest.files.map((f) => f.path));
-const mustShip = ['dist/cli.js', 'template/_gitignore', 'template/.env.example', 'template/app/package.json'];
+const mustShip = ['dist/cli.js', 'template/app/_gitignore', 'template/app/.env.example', 'template/app/package.json'];
 for (const f of mustShip) {
   if (!shipped.has(f)) {
     die(`tarball is missing ${f}. Files: ${[...shipped].join(', ')}`);
