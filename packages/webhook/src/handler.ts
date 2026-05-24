@@ -100,6 +100,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
 async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
   const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
+  const start = Date.now();
 
   const correlationId = randomUUID();
 
@@ -203,6 +204,7 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
   const parsed = AlertmanagerPayloadSchema.safeParse(raw);
   if (!parsed.success) {
     metrics.webhookRequestsTotal.inc({ endpoint: '/webhook/alert', status: '422' });
+    metrics.latency.observe({ status: 'error' }, (Date.now() - start) / 1000);
     return {
       statusCode: 422,
       body: JSON.stringify({
@@ -220,7 +222,6 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
     return { statusCode: 200, body: JSON.stringify({ accepted: 0 }) };
   }
 
-  // Registrar métricas
   metrics.alertsReceived.inc({ status: 'accepted' }, alerts.length);
   metrics.webhookRequestsTotal.inc({ endpoint: '/webhook/alert', status: '200' });
 
@@ -304,6 +305,7 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
     }
   }
 
+  metrics.latency.observe({ status: 'success' }, (Date.now() - start) / 1000);
   return {
     statusCode: 200,
     body: JSON.stringify({ accepted: alerts.length, correlationId }),
