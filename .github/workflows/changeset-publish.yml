@@ -18,7 +18,7 @@ jobs:
   publish:
     name: Publish packages to npm
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: version packages') }}
+    if: "github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: version packages')"
     environment: npm
 
     steps:
