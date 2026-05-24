@@ -1,0 +1,76 @@
+import { cp, readdir, rm, rename, access } from 'node:fs/promises';
+import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { rewritePackageJson } from './helpers/rewrite-package-json.js';
+
+export interface ScaffoldOptions {
+  targetDir: string;
+  projectName: string;
+  templateDir: string;
+  skipInstall?: boolean;
+}
+
+export async function scaffold({
+  targetDir,
+  projectName,
+  templateDir,
+  skipInstall = false,
+}: ScaffoldOptions): Promise<void> {
+  // Check if target dir exists and is non-empty (only treat ENOENT as "missing")
+  let entries: string[] = [];
+  try {
+    entries = await readdir(targetDir);
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') {
+      throw err;
+    }
+  }
+  if (entries.length > 0) {
+    throw new Error(
+      `Target directory "${targetDir}" already exists and is non-empty. Remove it first or choose a different name.`,
+    );
+  }
+
+  // Copy template → target
+  await cp(templateDir, targetDir, { recursive: true });
+
+  // Rename _gitignore → .gitignore (workaround for npm stripping .gitignore on publish)
+  const renamedGitignore = join(targetDir, '_gitignore');
+  try {
+    await access(renamedGitignore);
+    await rename(renamedGitignore, join(targetDir, '.gitignore'));
+  } catch {
+    // No _gitignore in template — fine.
+  }
+
+  // Rewrite app/package.json name
+  const pkgPath = join(targetDir, 'app', 'package.json');
+  await rewritePackageJson(pkgPath, (pkg) => ({ ...(pkg as object), name: projectName }));
+
+  if (!skipInstall) {
+    await runPnpmInstall(join(targetDir, 'app'));
+  }
+}
+
+function runPnpmInstall(cwd: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('pnpm', ['install'], { cwd, stdio: 'inherit', shell: false });
+
+    child.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        reject(new Error('pnpm not found on PATH. Install pnpm (https://pnpm.io/installation) and try again.'));
+      } else {
+        reject(err);
+      }
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`pnpm install exited with code ${String(code)}`));
+      }
+    });
+  });
+}

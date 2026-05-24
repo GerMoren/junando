@@ -1,0 +1,39 @@
+{
+  "name": "create-junando-app",
+  "version": "0.6.4",
+  "description": "Scaffold a new Junando alerting app from the express-end-to-end template",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "create-junando-app": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "files": [
+    "dist",
+    "template",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GerMoren/junando.git",
+    "directory": "packages/create-junando-app"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prebuild": "node scripts/sync-template.js",
+    "build": "tsup src/cli.ts --format esm --dts --tsconfig tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist template",
+    "prepublishOnly": "pnpm clean && pnpm build && node scripts/verify-tarball.js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

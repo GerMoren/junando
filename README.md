@@ -13,6 +13,19 @@ and sends enriched incident summaries to Slack or Teams with correlation IDs.
 
 ---
 
+## Quick start
+
+```bash
+pnpm create junando-app my-app
+cd my-app/app
+cp .env.example .env  # edit with your LLM/Slack keys
+pnpm dev
+```
+
+See `examples/express-end-to-end/README.md` for what gets scaffolded.
+
+---
+
 ## Why Junando
 
 Modern observability tools are good at collecting data, but incidents still require humans to manually connect:
