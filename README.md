@@ -18,9 +18,11 @@ and sends enriched incident summaries to Slack or Teams with correlation IDs.
 ```bash
 pnpm create junando-app my-app
 cd my-app/app
-cp .env.example .env  # edit with your LLM/Slack keys
 pnpm dev
 ```
+
+The scaffold creates `.env` from `.env.example` with placeholder values.
+Edit it with your real LLM/Slack keys when you wire the full pipeline.
 
 See `examples/express-end-to-end/README.md` for what gets scaffolded.
 
