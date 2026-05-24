@@ -71,3 +71,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
+
+      - name: Publish create-junando-app
+        run: pnpm publish --provenance --access public --tag "${DIST_TAG}" --no-git-checks
+        working-directory: packages/create-junando-app
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag || 'latest' }}
