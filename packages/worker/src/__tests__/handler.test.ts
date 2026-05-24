@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handler } from '../handler.js';
 import type { SQSEvent } from 'aws-lambda';
 import * as core from '@junando/core';
+import { AlertType } from '@junando/core';
 
 // Hoist mocks so they are available when vi.mock factory runs
 const mockExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -69,7 +70,7 @@ describe('Worker Handler', () => {
                 alertName: 'HighErrorRate',
                 status: 'firing',
                 serviceName: 'checkout',
-                alertType: 'http_500',
+                alertType: AlertType.Error,
                 endpointPath: '/pay',
                 startsAt: '2026-05-12T14:37:46.000Z',
                 labels: {},
@@ -132,7 +133,7 @@ describe('Worker Handler', () => {
                 alertName: 'HighErrorRate',
                 status: 'firing',
                 serviceName: 'checkout',
-                alertType: 'http_500',
+                alertType: AlertType.Error,
                 endpointPath: '/pay',
                 startsAt: '2026-05-12T14:37:46.000Z',
                 labels: {},
@@ -178,7 +179,7 @@ describe('Worker Handler — alertsProcessed counter', () => {
           alertName: 'HighErrorRate',
           status: 'firing',
           serviceName: 'checkout',
-          alertType: 'http_500',
+          alertType: AlertType.Error,
           endpointPath: '/pay',
           startsAt: '2026-05-12T14:37:46.000Z',
           labels: {},
