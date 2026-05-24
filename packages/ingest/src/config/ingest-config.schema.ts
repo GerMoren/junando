@@ -94,9 +94,33 @@ const SqsIngestSectionSchema = z.object({
   mapper: SqsMapperSchema,
 });
 
+// ---------------------------------------------------------------------------
+// Prometheus schema arm
+// ---------------------------------------------------------------------------
+
+const PrometheusRuleSchema = z.object({
+  name: z.string().min(1),
+  query: z.string().min(1),
+  service: z.string().min(1),
+  alertType: z.nativeEnum(AlertType),
+  severity: z.string().min(1),
+  threshold: z.number().finite(),
+  comparator: z.enum(['>', '<', '>=', '<=']).default('>'),
+  windowMs: z.number().int().positive().optional(),
+});
+
+const PrometheusIngestSectionSchema = z.object({
+  kind: z.literal('prometheus'),
+  endpoint: z.string().url(),
+  tokenEnv: z.string().min(1).optional(),
+  intervalMs: z.number().int().positive(),
+  rules: z.array(PrometheusRuleSchema).min(1),
+});
+
 const ExplicitIngestSectionSchema = z.discriminatedUnion('kind', [
   LokiIngestSectionSchema,
   SqsIngestSectionSchema,
+  PrometheusIngestSectionSchema,
 ]);
 
 const ExplicitIngestConfigSchema = z
@@ -124,11 +148,14 @@ const LegacyLokiIngestConfigSchema = z
 export type IngestRule = z.infer<typeof IngestRuleSchema>;
 export type LokiIngestSection = z.infer<typeof LokiIngestSectionSchema>;
 export type SqsIngestSection = z.infer<typeof SqsIngestSectionSchema>;
+export type PrometheusIngestSection = z.infer<typeof PrometheusIngestSectionSchema>;
+export type PrometheusRule = z.infer<typeof PrometheusRuleSchema>;
 export type OpenSearchTarget = z.infer<typeof OpenSearchTargetSchema>;
 export type SqsMapper = z.infer<typeof SqsMapperSchema>;
 export type LokiIngestConfig = { ingest: LokiIngestSection };
 export type SqsIngestConfig = { ingest: SqsIngestSection };
-export type IngestConfig = LokiIngestConfig | SqsIngestConfig;
+export type PrometheusIngestConfig = { ingest: PrometheusIngestSection };
+export type IngestConfig = LokiIngestConfig | SqsIngestConfig | PrometheusIngestConfig;
 
 // ---------------------------------------------------------------------------
 // Helpers
