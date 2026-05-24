@@ -18,7 +18,7 @@ jobs:
   publish:
     name: Publish packages to npm
     runs-on: ubuntu-latest
-    if: startsWith(github.event.head_commit.message, 'chore: version packages') || github.event_name == 'workflow_dispatch'
+    if: "github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: version packages')"
     environment: npm
 
     steps:
@@ -50,7 +50,7 @@ jobs:
       - name: Publish packages
         uses: changesets/action@v1
         with:
-          publish: pnpm changeset publish --tag ${{ inputs.dist-tag || 'latest' }}
+          publish: pnpm changeset publish --tag ${{ inputs['dist-tag'] || 'latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
