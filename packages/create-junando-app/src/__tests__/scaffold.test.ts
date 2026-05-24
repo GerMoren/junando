@@ -76,4 +76,46 @@ describe('scaffold', () => {
     expect(contents).toContain('node_modules');
     expect(contents).toContain('.env');
   });
+
+  it('copies app/.env.example to app/.env so pnpm dev works out of the box', async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'scaffold-test-'));
+    const templateDir = join(tmpDir, 'template');
+    const targetDir = join(tmpDir, 'output', 'my-app');
+    await mkdir(templateDir, { recursive: true });
+    await createSyntheticTemplate(templateDir);
+    await writeFile(join(templateDir, 'app', '.env.example'), 'LOG_LEVEL=info\n');
+
+    await scaffold({ targetDir, projectName: 'my-app', templateDir, skipInstall: true });
+
+    await expect(access(join(targetDir, 'app', '.env'))).resolves.toBeUndefined();
+    const envContents = await readFile(join(targetDir, 'app', '.env'), 'utf-8');
+    expect(envContents).toBe('LOG_LEVEL=info\n');
+  });
+
+  it('does not overwrite existing app/.env if it somehow exists', async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'scaffold-test-'));
+    const templateDir = join(tmpDir, 'template');
+    const targetDir = join(tmpDir, 'output', 'my-app');
+    await mkdir(templateDir, { recursive: true });
+    await createSyntheticTemplate(templateDir);
+    await writeFile(join(templateDir, 'app', '.env.example'), 'LOG_LEVEL=info\n');
+    await writeFile(join(templateDir, 'app', '.env'), 'LOG_LEVEL=debug\n');
+
+    await scaffold({ targetDir, projectName: 'my-app', templateDir, skipInstall: true });
+
+    const envContents = await readFile(join(targetDir, 'app', '.env'), 'utf-8');
+    expect(envContents).toBe('LOG_LEVEL=debug\n');
+  });
+
+  it('does not create app/.env if app/.env.example is missing', async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'scaffold-test-'));
+    const templateDir = join(tmpDir, 'template');
+    const targetDir = join(tmpDir, 'output', 'my-app');
+    await mkdir(templateDir, { recursive: true });
+    await createSyntheticTemplate(templateDir);
+
+    await scaffold({ targetDir, projectName: 'my-app', templateDir, skipInstall: true });
+
+    await expect(access(join(targetDir, 'app', '.env'))).rejects.toThrow();
+  });
 });

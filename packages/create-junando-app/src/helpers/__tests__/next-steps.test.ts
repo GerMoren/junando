@@ -16,4 +16,14 @@ describe('buildNextStepsMessage', () => {
     const msg = buildNextStepsMessage('my-cool-app');
     expect(msg).toContain('pnpm dev');
   });
+
+  it('does not instruct users to copy .env.example (scaffold did it already)', () => {
+    const msg = buildNextStepsMessage('my-cool-app');
+    expect(msg).not.toContain('cp .env.example');
+  });
+
+  it('mentions editing .env so users know to set their keys', () => {
+    const msg = buildNextStepsMessage('my-cool-app');
+    expect(msg.toLowerCase()).toContain('.env');
+  });
 });

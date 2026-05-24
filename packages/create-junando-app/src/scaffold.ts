@@ -1,4 +1,4 @@
-import { cp, readdir, rename, access } from 'node:fs/promises';
+import { cp, readdir, rename, access, copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { rewritePackageJson } from './helpers/rewrite-package-json.js';
@@ -43,6 +43,26 @@ export async function scaffold({
     await rename(renamedGitignore, join(targetDir, 'app', '.gitignore'));
   } catch {
     // No app/_gitignore in template — fine.
+  }
+
+  // Copy app/.env.example → app/.env so `pnpm dev` (which uses --env-file=.env)
+  // works out of the box. Do not overwrite if .env already exists.
+  const envExample = join(targetDir, 'app', '.env.example');
+  const envFile = join(targetDir, 'app', '.env');
+  try {
+    await access(envExample);
+    let envExists = false;
+    try {
+      await access(envFile);
+      envExists = true;
+    } catch {
+      // .env missing — that's the expected case.
+    }
+    if (!envExists) {
+      await copyFile(envExample, envFile);
+    }
+  } catch {
+    // No app/.env.example in template — fine.
   }
 
   // Rewrite app/package.json name
