@@ -194,6 +194,7 @@ Junando is designed to fail gracefully:
 ## Related documentation
 
 - End-to-end example (Express): [`examples/express-end-to-end/`](examples/express-end-to-end/)
+- NestJS integration guide: [`docs/integrations/nestjs.md`](docs/integrations/nestjs.md)
 - Ops runbook: [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
 - Structured logging: [`docs/structured-logging.md`](docs/structured-logging.md)
 - Grafana setup: [`docs/runbooks/grafana-setup.md`](docs/runbooks/grafana-setup.md)

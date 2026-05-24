@@ -15,7 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "oxlint --deny-warnings packages/*/src",
     "format": "prettier --write packages/*/src scripts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && pnpm --filter @junando/nestjs-snippets run build",
     "dev:webhook": "tsx --env-file=.env.local --watch scripts/dev-server.ts | pino-pretty",
     "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
