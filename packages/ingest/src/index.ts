@@ -15,6 +15,9 @@ export type {
   LokiIngestConfig,
   LokiIngestSection,
   OpenSearchTarget,
+  PrometheusIngestConfig,
+  PrometheusIngestSection,
+  PrometheusRule,
   SqsIngestConfig,
   SqsIngestSection,
   SqsMapper,
@@ -36,3 +39,13 @@ export type {
   LokiQueryResponse,
   LokiStreamResult,
 } from './ports/loki-http-client.port.js';
+
+// Prometheus infra — port types + concrete client
+export { PrometheusHttpClient } from './adapters/prometheus/prometheus-http-client.js';
+export { MissingEnvError, PrometheusHttpError, PrometheusParseError } from './ports/prometheus-http-client.port.js';
+export type {
+  PrometheusHttpClientPort,
+  PrometheusInstantResponse,
+  PrometheusInstantResult,
+} from './ports/prometheus-http-client.port.js';
+

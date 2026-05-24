@@ -65,7 +65,7 @@ if (ingestConfig.ingest.kind === "loki") {
     },
     `junando ingest running in loki mode, intervalMs=${ingestConfig.ingest.intervalMs}, rules=${ingestConfig.ingest.rules.length}`,
   );
-} else {
+} else if (ingestConfig.ingest.kind === "sqs") {
   logger.info(
     {
       service: "junando-ingest",
@@ -76,6 +76,17 @@ if (ingestConfig.ingest.kind === "loki") {
       mapperKind: ingestConfig.ingest.mapper.kind,
     },
     `junando ingest running in sqs mode, mapper=${ingestConfig.ingest.mapper.kind}`,
+  );
+} else {
+  logger.info(
+    {
+      service: "junando-ingest",
+      kind: "prometheus",
+      endpoint: ingestConfig.ingest.endpoint,
+      intervalMs: ingestConfig.ingest.intervalMs,
+      rules: ingestConfig.ingest.rules.length,
+    },
+    `junando ingest running in prometheus mode, intervalMs=${ingestConfig.ingest.intervalMs}, rules=${ingestConfig.ingest.rules.length}`,
   );
 }
 
