@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@junando/core",
+      "@junando/ingest",
+      "@junando/webhook",
+      "@junando/worker",
+      "create-junando-app"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": ["@junando/cdk", "@junando/nestjs-snippets"]
+}

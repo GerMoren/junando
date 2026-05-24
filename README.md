@@ -220,6 +220,33 @@ Junando is designed to fail gracefully:
 
 ---
 
+## Releasing
+
+Junando uses [Changesets](https://github.com/changesets/changesets) for versioning and publishing.
+
+All five publishable packages (`@junando/core`, `@junando/ingest`, `@junando/webhook`, `@junando/worker`, `create-junando-app`) are versioned together in lockstep.
+
+### Contributor flow
+
+1. Make your changes in a feature branch.
+2. Run `pnpm changeset` and follow the prompts to describe the change (patch / minor / major).
+3. Commit the generated `.changeset/*.md` file alongside your code changes.
+4. Open a PR. The changeset file is what tells the release tooling what changed.
+
+### Release flow (automated)
+
+When a changeset PR merges to `main`:
+
+1. **`changeset-version.yml`** runs automatically and opens (or updates) a `"chore: version packages"` PR with bumped `package.json` versions and CHANGELOG entries.
+2. A maintainer reviews and merges the Version PR.
+3. **`changeset-publish.yml`** detects the `"chore: version packages"` commit, verifies package contents, and publishes all five packages to npm.
+
+### Manual publish (non-`latest` dist-tag)
+
+Trigger the `Changeset Publish` workflow manually from the GitHub Actions UI and set the `dist-tag` input (e.g. `next`, `beta`).
+
+---
+
 ## Contributing
 
 Please read [`AGENT.md`](AGENT.md) before submitting changes.
