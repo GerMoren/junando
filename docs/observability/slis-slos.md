@@ -97,3 +97,8 @@ Each gap below is sized for a single PR. They are listed in the order an operato
 - Targets above are starting points. Calibration requires production traffic, which we do not yet have at meaningful volume. Expect the numbers to tighten over time.
 - The legacy in-memory counter module at `packages/core/src/shared/metrics/simple.ts` is superseded by the `prom-client`-based `index.ts` and should not be extended.
 - Dashboards and alerting rules that consume these metrics live under `docs/dashboards/` and `docs/runbooks/`. They will be updated as each gap in **Future Work** is closed.
+
+## Grafana Dashboard
+
+The **Junando SLIs** dashboard (`docs/dashboards/junando-slis.json`) surfaces all four SLIs as Grafana panels.
+See [`docs/dashboards/README.md`](../dashboards/README.md) for provisioning instructions and the full panel-to-metric mapping table.
