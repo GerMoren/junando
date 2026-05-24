@@ -10,6 +10,19 @@ docker compose -f docker/docker-compose.yml up grafana
 
 The `Junando SLIs` dashboard loads automatically. No manual import is needed.
 
+## Importing into Grafana Cloud (or any external Grafana)
+
+The dashboard JSON hardcodes `datasource.uid: "prometheus-local"`, which only exists in the local compose stack (`docker/grafana/datasources.yml`). External Grafana instances use a different Prometheus datasource UID.
+
+To import:
+
+1. In Grafana → **Dashboards → New → Import**.
+2. Upload `docs/dashboards/junando-slis.json` (or paste its contents).
+3. When prompted to resolve the missing `prometheus-local` datasource, select your Prometheus datasource (in Grafana Cloud this is typically `grafanacloud-<org>-prom`).
+4. Save.
+
+Panels will remain "No data" until your environment is scraping `junando_*` metrics. In Grafana Cloud this means configuring Grafana Alloy / Agent / `remote_write` to ship metrics from your app's `/metrics` endpoint to Cloud Prometheus.
+
 ## Dashboard: Junando SLIs (`junando-slis.json`)
 
 UID: `junando-slis` — stable across versions (do not change).
