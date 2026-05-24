@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { loadIngestConfig } from '../ingest-config.schema.js';
-import { AlertType } from '@junando/core';
 
 // ---------------------------------------------------------------------------
 // Helpers

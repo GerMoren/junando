@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { PrometheusHttpClient } from '../prometheus-http-client.js';
 import {
   PrometheusHttpError,
@@ -51,10 +51,6 @@ function makeFetchBadJson() {
     json: () => Promise.reject(new SyntaxError('Unexpected token')),
     text: () => Promise.resolve('not json'),
   });
-}
-
-function makeFetchNetworkThrow(err: Error) {
-  return vi.fn().mockRejectedValue(err);
 }
 
 // ---------------------------------------------------------------------------
