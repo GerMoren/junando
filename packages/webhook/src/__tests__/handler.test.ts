@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handler } from '../handler.js';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { createHmac } from 'node:crypto';
+import * as core from '@junando/core';
 
 // Mock SQSAlertQueue.sendMessage from @junando/core
 const mockSendMessage = vi.fn().mockResolvedValue(undefined);
@@ -154,5 +155,73 @@ describe('Webhook Handler', () => {
     const [params] = mockSendMessage.mock.calls[0] as [{ messageBody: string }];
     const body = JSON.parse(params.messageBody);
     expect(body.alerts[0].annotations.summary.length).toBeLessThan(260000);
+  });
+});
+
+describe('Webhook Handler — latency instrumentation', () => {
+  let observeSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSendMessage.mockResolvedValue(undefined);
+    process.env.SQS_QUEUE_URL = 'https://sqs.test';
+    observeSpy = vi.spyOn(core.metrics.latency, 'observe');
+  });
+
+  const validAlertEvent = (): Partial<APIGatewayProxyEventV2> => ({
+    rawPath: '/webhook/alert',
+    body: JSON.stringify({
+      version: '4',
+      groupKey: 'test-group',
+      status: 'firing',
+      receiver: 'test-receiver',
+      externalURL: 'http://localhost',
+      groupLabels: {},
+      commonLabels: {},
+      commonAnnotations: {},
+      alerts: [
+        {
+          status: 'firing',
+          labels: { alertname: 'TestAlert', service: 'web' },
+          annotations: {},
+          startsAt: '2026-05-12T14:37:46.000Z',
+          endsAt: '2026-05-12T14:40:46.000Z',
+          fingerprint: 'fp-lat',
+        },
+      ],
+    }),
+  });
+
+  it('calls latency.observe with status=success on successful alert processing', async () => {
+    const event = validAlertEvent();
+    const result = await handler(event as APIGatewayProxyEventV2);
+
+    expect(result).toMatchObject({ statusCode: 200 });
+    expect(observeSpy).toHaveBeenCalledOnce();
+    const [labels, elapsed] = observeSpy.mock.calls[0] as [{ status: string }, number];
+    expect(labels.status).toBe('success');
+    expect(elapsed).toBeGreaterThanOrEqual(0);
+    expect(elapsed).toBeLessThan(0.05); // well within 50ms budget
+  });
+
+  it('calls latency.observe with status=error on validation failure', async () => {
+    const event: Partial<APIGatewayProxyEventV2> = {
+      rawPath: '/webhook/alert',
+      body: JSON.stringify({ invalid: 'payload' }),
+    };
+
+    const result = await handler(event as APIGatewayProxyEventV2);
+    expect(result).toMatchObject({ statusCode: 422 });
+    expect(observeSpy).toHaveBeenCalledOnce();
+    const [labels] = observeSpy.mock.calls[0] as [{ status: string }, number];
+    expect(labels.status).toBe('error');
+  });
+
+  it('calls latency.observe with elapsed > 0', async () => {
+    const event = validAlertEvent();
+    await handler(event as APIGatewayProxyEventV2);
+
+    const [, elapsed] = observeSpy.mock.calls[0] as [{ status: string }, number];
+    expect(elapsed).toBeGreaterThanOrEqual(0);
   });
 });

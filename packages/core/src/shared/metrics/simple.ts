@@ -1,3 +1,7 @@
+/**
+ * @deprecated Use `packages/core/src/shared/metrics/index.ts` (prom-client registry) instead.
+ * This module uses plain in-memory counters with no Prometheus support and will be removed.
+ */
 // Simple in-memory metrics without external dependencies
 // These get reset when the server restarts
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProcessIncidentUseCase } from '../process-incident.use-case.js';
 import type { NormalizedAlert } from '../../../domain/entities/alert.js';
 import type {
@@ -9,6 +9,7 @@ import type {
 } from '../../../domain/ports/index.js';
 import type { Logger } from '../../../shared/logger/index.js';
 import { AlertType } from '../../../shared/constants.js';
+import * as metricsModule from '../../../shared/metrics/index.js';
 
 function makeAlert(overrides: Partial<NormalizedAlert> = {}): NormalizedAlert {
   return {
@@ -190,5 +191,83 @@ describe('ProcessIncidentUseCase — onClustersBuilt callback', () => {
     vi.mocked(mockDedup.isNew).mockResolvedValue(false);
 
     await expect(uc.execute([makeAlert()], 'corr-no-cb')).resolves.toBeUndefined();
+  });
+});
+
+describe('ProcessIncidentUseCase — dedup counter emission', () => {
+  const mockDedup: IDeduplicationStore = { isNew: vi.fn(), reset: vi.fn() };
+  const mockTraces: ITraceRepository = { findByTraceId: vi.fn() };
+  const mockLlm: ILLMProvider = { analyze: vi.fn() };
+  const mockNotifier: INotifier = { send: vi.fn() };
+  const mockLogger = {
+    child: vi.fn().mockReturnThis(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+    level: 'info',
+  } as unknown as Logger;
+
+  let dedupNewSpy: ReturnType<typeof vi.spyOn>;
+  let dedupDuplicateSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dedupNewSpy = vi.spyOn(metricsModule.dedupNew, 'inc');
+    dedupDuplicateSpy = vi.spyOn(metricsModule.dedupDuplicate, 'inc');
+    vi.mocked(mockTraces.findByTraceId).mockResolvedValue([]);
+    vi.mocked(mockLlm.analyze).mockResolvedValue({
+      probable_cause: 'test',
+      impacted_services: [],
+      recommended_steps: [],
+      urgency_level: 'low',
+      requires_rollback: false,
+    });
+    vi.mocked(mockNotifier.send).mockResolvedValue(undefined);
+  });
+
+  it('increments dedupNew when cluster is new', async () => {
+    vi.mocked(mockDedup.isNew).mockResolvedValue(true);
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup, traces: mockTraces, llm: mockLlm, notifier: mockNotifier,
+      logger: mockLogger, dedupTtlSeconds: 300,
+    });
+
+    await uc.execute([makeAlert({ serviceName: 'svc-dedup-new' })], 'corr-new');
+
+    expect(dedupNewSpy).toHaveBeenCalledOnce();
+    expect(dedupNewSpy).toHaveBeenCalledWith(expect.objectContaining({ source: expect.any(String) }));
+    expect(dedupDuplicateSpy).not.toHaveBeenCalled();
+  });
+
+  it('increments dedupDuplicate when cluster is duplicate', async () => {
+    vi.mocked(mockDedup.isNew).mockResolvedValue(false);
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup, traces: mockTraces, llm: mockLlm, notifier: mockNotifier,
+      logger: mockLogger, dedupTtlSeconds: 300,
+    });
+
+    await uc.execute([makeAlert({ serviceName: 'svc-dedup-dup' })], 'corr-dup');
+
+    expect(dedupDuplicateSpy).toHaveBeenCalledOnce();
+    expect(dedupDuplicateSpy).toHaveBeenCalledWith(expect.objectContaining({ source: expect.any(String) }));
+    expect(dedupNewSpy).not.toHaveBeenCalled();
+  });
+
+  it('never increments both counters in the same cluster', async () => {
+    vi.mocked(mockDedup.isNew).mockResolvedValue(true);
+    const uc = new ProcessIncidentUseCase({
+      dedup: mockDedup, traces: mockTraces, llm: mockLlm, notifier: mockNotifier,
+      logger: mockLogger, dedupTtlSeconds: 300,
+    });
+
+    await uc.execute([makeAlert({ serviceName: 'svc-dedup-both' })], 'corr-both');
+
+    const newCalls = dedupNewSpy.mock.calls.length;
+    const dupCalls = dedupDuplicateSpy.mock.calls.length;
+    // Exactly one fires, never both
+    expect(newCalls + dupCalls).toBe(1);
   });
 });

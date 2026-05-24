@@ -50,6 +50,7 @@ services:
       - '../docs/dashboards/llm-performance.json:/var/lib/grafana/dashboards/llm-performance.json'
       - '../docs/dashboards/sqs-health.json:/var/lib/grafana/dashboards/sqs-health.json'
       - '../docs/dashboards/cenco-traceability.json:/var/lib/grafana/dashboards/cenco-traceability.json'
+      - '../docs/dashboards/junando-slis.json:/var/lib/grafana/dashboards/junando-slis.json'
 
   opensearch:
     image: opensearchproject/opensearch:2.13.0

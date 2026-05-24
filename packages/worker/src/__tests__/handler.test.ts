@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handler } from '../handler.js';
 import type { SQSEvent } from 'aws-lambda';
+import * as core from '@junando/core';
 
 // Hoist mocks so they are available when vi.mock factory runs
 const mockExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -145,5 +146,74 @@ describe('Worker Handler', () => {
 
     // Must not throw even when lokiUrl is absent
     await expect(freshHandler(event as SQSEvent)).resolves.not.toThrow();
+  });
+});
+
+describe('Worker Handler — alertsProcessed counter', () => {
+  const baseConfig = {
+    redisUrl: 'redis://localhost:6379',
+    lokiUrl: 'http://localhost:3100',
+    slackBotToken: 'xoxb-test',
+    slackChannel: '#test',
+    llmProvider: 'gemini' as const,
+    llmApiKey: 'test-key',
+    logLevel: 'error' as const,
+    dedupTtlSeconds: 300,
+  };
+
+  let incSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLoadConfig.mockResolvedValue(baseConfig);
+    incSpy = vi.spyOn(core.metrics.alertsProcessed, 'inc');
+  });
+
+  const validRecord = () => ({
+    body: JSON.stringify({
+      correlationId: 'b17d0c84-f818-4039-b9c8-34ed977d6953',
+      alerts: [
+        {
+          fingerprint: 'fp-worker',
+          alertName: 'HighErrorRate',
+          status: 'firing',
+          serviceName: 'checkout',
+          alertType: 'http_500',
+          endpointPath: '/pay',
+          startsAt: '2026-05-12T14:37:46.000Z',
+          labels: {},
+          annotations: {},
+        },
+      ],
+    }),
+  });
+
+  it('increments alertsProcessed with result=success on happy path', async () => {
+    mockExecute.mockResolvedValueOnce(undefined);
+    const event: Partial<SQSEvent> = { Records: [validRecord() as any] };
+
+    await handler(event as SQSEvent);
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ result: 'success' });
+  });
+
+  it('increments alertsProcessed with result=failure when execute throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('use case error'));
+    const event: Partial<SQSEvent> = { Records: [validRecord() as any] };
+
+    await expect(handler(event as SQSEvent)).rejects.toThrow('use case error');
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ result: 'failure' });
+  });
+
+  it('increments exactly once per job regardless of path', async () => {
+    mockExecute.mockResolvedValueOnce(undefined);
+    const event: Partial<SQSEvent> = { Records: [validRecord() as any] };
+
+    await handler(event as SQSEvent);
+
+    expect(incSpy).toHaveBeenCalledTimes(1);
   });
 });

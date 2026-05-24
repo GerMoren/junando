@@ -3,6 +3,7 @@ import { TeamsNotifier, TeamsNotifierError } from '../teams.adapter.js';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
 import { AlertType } from '../../../shared/constants.js';
+import * as metricsModule from '../../../shared/metrics/index.js';
 
 function makeCluster(overrides: Partial<AlertCluster> = {}): AlertCluster {
   return {
@@ -283,5 +284,44 @@ describe('TeamsNotifier', () => {
     expect(result).toBeInstanceOf(TeamsNotifierError);
     expect(result.message).toContain('50ms');
     expect(result.message).toContain(constructedHost);
+  });
+});
+
+describe('TeamsNotifier — notificationsTotal emission', () => {
+  const mockFetch = vi.fn();
+  let notifier: TeamsNotifier;
+  let incSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+    notifier = new TeamsNotifier(VALID_WEBHOOK);
+    incSpy = vi.spyOn(metricsModule.notificationsTotal, 'inc');
+  });
+
+  it('increments notificationsTotal with channel=teams, outcome=success on success', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ channel: 'teams', outcome: 'success' });
+  });
+
+  it('increments notificationsTotal with channel=teams, outcome=failure on HTTP error', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 });
+
+    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow();
+
+    expect(incSpy).toHaveBeenCalledOnce();
+    expect(incSpy).toHaveBeenCalledWith({ channel: 'teams', outcome: 'failure' });
+  });
+
+  it('does not double-increment on a single send call', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(incSpy).toHaveBeenCalledTimes(1);
   });
 });

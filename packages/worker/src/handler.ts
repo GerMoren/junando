@@ -10,6 +10,7 @@ import {
   reinitLogger,
   loadConfig,
   flushLoki,
+  startSqsLagPoller,
 } from '@junando/core';
 import type { SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
@@ -32,6 +33,14 @@ export type SQSMessage = z.infer<typeof SQSMessageSchema>;
 // This allows SSM secrets to be read at runtime (avoids SecureString CDK issue)
 let useCase: ProcessIncidentUseCase;
 let logger: ReturnType<typeof createLogger> = createLogger();
+
+// Start SQS lag poller at module scope when QUEUE_URL is available.
+// setInterval fires in warm Lambda containers; no-op if QUEUE_URL is not set.
+export let sqsLagPollerCleanup: (() => void) | undefined;
+if (process.env['QUEUE_URL']) {
+  const intervalMs = Number(process.env['SQS_LAG_POLL_INTERVAL_MS'] ?? '15000');
+  sqsLagPollerCleanup = startSqsLagPoller(process.env['QUEUE_URL'], intervalMs);
+}
 
 async function getUseCase(): Promise<ProcessIncidentUseCase> {
   if (useCase) {
@@ -102,6 +111,12 @@ async function _handler(event: SQSEvent): Promise<void> {
     }
 
     // If this throws, SQS retries automatically. After max retries → DLQ.
-    await useCaseInstance.execute(parsed.alerts, parsed.correlationId);
+    try {
+      await useCaseInstance.execute(parsed.alerts, parsed.correlationId);
+      metrics.alertsProcessed.inc({ result: 'success' });
+    } catch (err) {
+      metrics.alertsProcessed.inc({ result: 'failure' });
+      throw err;
+    }
   }
 }

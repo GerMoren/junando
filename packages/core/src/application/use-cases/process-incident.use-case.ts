@@ -7,6 +7,7 @@ import type {
 } from '../../domain/ports/index.js';
 import { ClusteringService } from '../../domain/services/clustering.service.js';
 import type { Logger } from '../../shared/logger/index.js';
+import { dedupNew, dedupDuplicate } from '../../shared/metrics/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProcessIncidentUseCase — Application layer.
@@ -50,8 +51,10 @@ export class ProcessIncidentUseCase {
       const isNew = await dedup.isNew(cluster.fingerprint, dedupTtlSeconds);
       if (!isNew) {
         log2.debug('Duplicate cluster — skipping');
+        dedupDuplicate.inc({ source: 'alertmanager' });
         continue;
       }
+      dedupNew.inc({ source: 'alertmanager' });
 
       // 3. Extract representative traces from the trace repository
       const spanLists = await Promise.all(
