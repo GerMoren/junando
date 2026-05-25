@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Observability — Grafana SLI dashboard pack** (issue #78): new `Junando SLIs` dashboard (`docs/dashboards/junando-slis.json`) auto-provisioned by the compose Grafana stack. Four panels: ingest latency p95, dedup ratio, incident throughput, notification outcomes. Cloud import instructions in `docs/dashboards/README.md`.
+- **Metrics — webhook latency instrumentation** (issue #101): `junando_webhook_duration_seconds` histogram with SLI buckets and a `status` label, observed synchronously inside the webhook critical path (preserves <50ms budget).
+- **Metrics — alerts processed counter** (issue #102): `junando_alerts_processed_total{result}` incremented per processed SQS batch in the worker handler.
+- **Metrics — notification outcomes** (issue #103): `junando_notifications_total{channel, outcome}` emitted by the Slack and Teams adapters on every send attempt (`success` / `failure`).
+- **Metrics — SQS queue lag** (issue #104): new `startSqsLagPoller()` exported from `@junando/core` and wired into the worker. Emits `junando_sqs_queue_lag{queue_name}` via `setInterval` (warm-container only on AWS Lambda).
+- **Metrics — dedup counter pair**: `junando_dedup_new_total` and `junando_dedup_duplicate_total` incremented inside `ProcessIncidentUseCase`, enabling the dedup ratio panel.
+- **Ingest — Prometheus metrics adapter** (issue #27): new public API in `@junando/ingest`:
+  - `IPrometheusHttpClient` port + `PrometheusInstantResponse` / `PrometheusInstantResult` types.
+  - `PrometheusHttpClient` — fetch-based implementation with bearer auth via `tokenEnv`.
+  - `MissingEnvError`, `PrometheusHttpError`, `PrometheusParseError` typed errors.
+  - `PrometheusIngestRunner` — polling loop with in-flight guard and `Promise.allSettled` fan-out (mirrors the Loki runner topology).
+  - `mapMetricResultToAlerts` — pure mapper with in-adapter threshold evaluation (`>`, `<`, `>=`, `<=`).
+  - Config schema: new `kind: 'prometheus'` discriminated union arm with per-rule `query`, `service`, `alertType`, `severity`, `threshold`, `comparator`, `windowMs?`.
+
+### Changed
+
+- **Metrics — `alertsProcessed` label set**: added `result` label. Resets Prometheus series accumulation (acceptable as a new SLI baseline; previous emission was always 0).
+- **Metrics — `latency` histogram**: switched to SLI buckets and added `status` label. Same series reset note applies.
+
+### Internal
+
+- `packages/worker/src/__tests__/handler.test.ts` now uses `AlertType.Error` instead of the raw string `'http_500'` (3 sites). No behavior change.
+
 ## [0.7.4] — 2026-05-24
 
 ### Added
