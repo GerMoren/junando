@@ -35,7 +35,10 @@ jobs:
       - name: Create Version PR
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          # Bump versions, then regenerate dependent docs so the Version PR
+          # is born with docs/compatibility.md in sync. Otherwise CI fails
+          # on `docs:compat:check` for every release.
+          version: pnpm changeset version && pnpm run docs:compat
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
