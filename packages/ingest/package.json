@@ -1,6 +1,6 @@
 {
   "name": "@junando/ingest",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "description": "Alert ingestion adapter — maps external monitoring payloads into Junando's domain model",
   "license": "Apache-2.0",
   "type": "module",
