@@ -1,6 +1,6 @@
 {
   "name": "create-junando-app",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "description": "Scaffold a new Junando alerting app from the express-end-to-end template",
   "license": "Apache-2.0",
   "type": "module",
