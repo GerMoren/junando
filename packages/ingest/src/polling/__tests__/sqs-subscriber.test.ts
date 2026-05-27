@@ -260,7 +260,8 @@ describe('SqsSubscriber', () => {
     expect(observer.onProcessFailure).toHaveBeenCalledWith(1);
     expect(observer.onDeleteSuccess).toHaveBeenCalledWith(1);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('SQS message processing failed for m-failure: boom'),
+      expect.objectContaining({ step: 'processMessage', messageId: 'm-failure' }),
+      'SQS message processing failed',
     );
   });
 
@@ -292,7 +293,8 @@ describe('SqsSubscriber', () => {
     expect(sqsClient.send).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledTimes(2);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('SQS message processing failed for m-1: bad payload'),
+      expect.objectContaining({ step: 'processMessage', messageId: 'm-1' }),
+      'SQS message processing failed',
     );
   });
 
@@ -550,7 +552,7 @@ describe('SqsSubscriber', () => {
       expect(indexer.index).not.toHaveBeenCalled();
     });
 
-    it('SQS-IDX-06: indexer.index throws — logger.warn called, onIndexFailure emitted, message still deleted', async () => {
+    it('SQS-IDX-06: indexer.index throws — logger.error called, onIndexFailure emitted, message still deleted', async () => {
       const message = makeMessage('m-1');
       const indexError = new Error('index failed');
       const indexer = makeIndexer();
@@ -579,7 +581,10 @@ describe('SqsSubscriber', () => {
       await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
       await flushMicrotasks();
 
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('index failed'));
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: indexError, step: 'index', messageId: 'm-1' }),
+        'Indexing failed',
+      );
       expect(observer.onIndexFailure).toHaveBeenCalledWith(message, indexError);
       // message should still be deleted (DeleteMessageBatchCommand was sent)
       const deleteSent = sqsClient.send.mock.calls.some(

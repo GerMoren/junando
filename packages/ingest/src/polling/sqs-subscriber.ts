@@ -12,6 +12,7 @@ interface Logger {
   info(msg: string, ...args: unknown[]): void;
   warn(msg: string, ...args: unknown[]): void;
   error(msg: string, ...args: unknown[]): void;
+  error(obj: Record<string, unknown>, msg: string): void;
   debug(msg: string, ...args: unknown[]): void;
 }
 
@@ -139,8 +140,7 @@ export class SqsSubscriber {
         return;
       }
 
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`SQS receive failed: ${msg}`);
+      this.logger.error({ err, step: 'receive' }, 'SQS receive failed');
     } finally {
       if (this.receiveAbortController === abortController) {
         this.receiveAbortController = null;
@@ -182,8 +182,8 @@ export class SqsSubscriber {
       );
       this.observer?.onDeleteSuccess?.(successfulMessages.length);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.error(`SQS delete failed: ${msg}`);
+      const messageIds = successfulMessages.map((result) => result.message.MessageId ?? 'unknown');
+      this.logger.error({ err, messageIds }, 'SQS delete failed');
     }
   }
 
@@ -207,7 +207,8 @@ export class SqsSubscriber {
     } catch (err) {
       this.observer?.onProcessFailure?.(1);
       this.logger.error(
-        `SQS message processing failed for ${message.MessageId ?? 'unknown'}: ${formatError(err)}`,
+        { err, step: 'processMessage', messageId: message.MessageId ?? 'unknown' },
+        'SQS message processing failed',
       );
       return { message, success: false };
     }
@@ -224,8 +225,9 @@ export class SqsSubscriber {
       await this.indexer.index(doc);
       this.observer?.onIndexSuccess?.(message, doc);
     } catch (err) {
-      this.logger.warn(
-        `Indexing failed for ${message.MessageId ?? 'unknown'}: ${formatError(err)}`,
+      this.logger.error(
+        { err, step: 'index', messageId: message.MessageId ?? 'unknown' },
+        'Indexing failed',
       );
       this.observer?.onIndexFailure?.(message, err);
     }
@@ -251,8 +253,4 @@ export class SqsSubscriber {
 
 function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
-}
-
-function formatError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
