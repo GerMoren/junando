@@ -4,8 +4,10 @@ import {
   SQSClient,
   type Message,
 } from '@aws-sdk/client-sqs';
+import type { IIndexer, TraceabilityDocument } from '@junando/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SqsIngestConfig } from '../../config/ingest-config.schema.js';
+import type { IMessageMapper } from '../../mappers/registry.js';
 import { SqsSubscriber, type SqsSubscriberObserver } from '../sqs-subscriber.js';
 
 interface MockRegistry {
@@ -64,6 +66,29 @@ function makeObserver(): Required<SqsSubscriberObserver> {
     onDeleteSuccess: vi.fn(),
     setInFlight: vi.fn(),
     observePollDurationMs: vi.fn(),
+    onIndexSuccess: vi.fn(),
+    onIndexFailure: vi.fn(),
+  };
+}
+
+function makeIndexer(): { index: ReturnType<typeof vi.fn> } & IIndexer<TraceabilityDocument> {
+  return { index: vi.fn().mockResolvedValue(undefined) };
+}
+
+function makeMapper(): IMessageMapper {
+  const stubDoc: TraceabilityDocument = {
+    correlationId: 'corr-1',
+    fingerprint: 'fp-1',
+    sourceSystem: 'test',
+    timestamp: '2026-01-01T00:00:00.000Z',
+    payload: {},
+  };
+  return {
+    kind: 'test',
+    decode: vi.fn().mockReturnValue({ raw: 'decoded' }),
+    toNormalizedAlerts: vi.fn().mockReturnValue([]),
+    toTraceabilityDocument: vi.fn().mockReturnValue(stubDoc),
+    resolveCorrelationId: vi.fn().mockReturnValue('corr-1'),
   };
 }
 
@@ -406,5 +431,194 @@ describe('SqsSubscriber', () => {
     firstDone.resolve();
     await stopPromise;
     expect(stopResolved).toBe(true);
+  });
+
+  describe('Indexer integration', () => {
+    it('SQS-IDX-01: constructor throws when indexer is provided but mapper is absent', () => {
+      const indexer = makeIndexer();
+      expect(
+        () =>
+          new SqsSubscriber({
+            config: makeConfig(),
+            processMessage: vi.fn().mockResolvedValue(undefined),
+            logger: makeLogger(),
+            indexer,
+          }),
+      ).toThrow(/mapper/i);
+    });
+
+    it('SQS-IDX-02: constructor succeeds when both indexer and mapper are provided', () => {
+      const indexer = makeIndexer();
+      const mapper = makeMapper();
+      expect(
+        () =>
+          new SqsSubscriber({
+            config: makeConfig(),
+            processMessage: vi.fn().mockResolvedValue(undefined),
+            logger: makeLogger(),
+            indexer,
+            mapper,
+          }),
+      ).not.toThrow();
+    });
+
+    it('SQS-IDX-03: no indexer provided — baseline behavior unchanged', async () => {
+      const message = makeMessage('m-1');
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) return { Successful: [{ Id: '0' }] };
+          throw new Error('Unexpected command');
+        }),
+      };
+      const processMessage = vi.fn().mockResolvedValue(undefined);
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage,
+        logger: makeLogger(),
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(processMessage).toHaveBeenCalledWith(message);
+      expect(sqsClient.send).toHaveBeenCalledTimes(2);
+    });
+
+    it('SQS-IDX-04: happy path — decode → toTraceabilityDocument → index called; onIndexSuccess emitted', async () => {
+      const message = makeMessage('m-1');
+      const indexer = makeIndexer();
+      const mapper = makeMapper();
+      const observer = makeObserver();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) return { Successful: [{ Id: '0' }] };
+          throw new Error('Unexpected command');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockResolvedValue(undefined),
+        logger: makeLogger(),
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+        observer,
+        indexer,
+        mapper,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(mapper.decode).toHaveBeenCalledWith(message);
+      expect(mapper.toTraceabilityDocument).toHaveBeenCalledWith({ raw: 'decoded' }, message);
+      expect(indexer.index).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: 'corr-1' }),
+      );
+      expect(observer.onIndexSuccess).toHaveBeenCalledWith(
+        message,
+        expect.objectContaining({ correlationId: 'corr-1' }),
+      );
+    });
+
+    it('SQS-IDX-05: processMessage fails — indexer.index is NOT called', async () => {
+      const message = makeMessage('m-1');
+      const indexer = makeIndexer();
+      const mapper = makeMapper();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          throw new Error('Should not delete');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockRejectedValue(new Error('process failed')),
+        logger: makeLogger(),
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+        indexer,
+        mapper,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(indexer.index).not.toHaveBeenCalled();
+    });
+
+    it('SQS-IDX-06: indexer.index throws — logger.warn called, onIndexFailure emitted, message still deleted', async () => {
+      const message = makeMessage('m-1');
+      const indexError = new Error('index failed');
+      const indexer = makeIndexer();
+      (indexer.index as ReturnType<typeof vi.fn>).mockRejectedValue(indexError);
+      const mapper = makeMapper();
+      const observer = makeObserver();
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) return { Successful: [{ Id: '0' }] };
+          throw new Error('Unexpected command');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockResolvedValue(undefined),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+        observer,
+        indexer,
+        mapper,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('index failed'));
+      expect(observer.onIndexFailure).toHaveBeenCalledWith(message, indexError);
+      // message should still be deleted (DeleteMessageBatchCommand was sent)
+      const deleteSent = sqsClient.send.mock.calls.some(
+        ([cmd]) => cmd instanceof DeleteMessageBatchCommand,
+      );
+      expect(deleteSent).toBe(true);
+    });
+
+    it('SQS-IDX-07: observer without onIndexSuccess/onIndexFailure hooks — no throw', async () => {
+      const message = makeMessage('m-1');
+      const indexer = makeIndexer();
+      const mapper = makeMapper();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) return { Successful: [{ Id: '0' }] };
+          throw new Error('Unexpected command');
+        }),
+      };
+      // observer without index hooks
+      const observer: SqsSubscriberObserver = {
+        onReceive: vi.fn(),
+        onProcessSuccess: vi.fn(),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockResolvedValue(undefined),
+        logger: makeLogger(),
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+        observer,
+        indexer,
+        mapper,
+      });
+
+      await expect(
+        (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1),
+      ).resolves.not.toThrow();
+      await flushMicrotasks();
+    });
   });
 });
