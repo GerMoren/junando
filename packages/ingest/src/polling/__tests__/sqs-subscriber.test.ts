@@ -619,6 +619,8 @@ describe('SqsSubscriber', () => {
         (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1),
       ).resolves.not.toThrow();
       await flushMicrotasks();
+      // indexer still called even when observer lacks hooks
+      expect(indexer.index).toHaveBeenCalledOnce();
     });
   });
 });
