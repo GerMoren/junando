@@ -23,6 +23,7 @@
     "quickstart": "tsx scripts/quickstart.ts",
     "docs:compat": "tsx scripts/generate-compat-matrix.ts",
     "docs:compat:check": "tsx scripts/generate-compat-matrix.ts --check",
+    "version:packages": "changeset version && pnpm run docs:compat",
     "generate:alert:prod": "tsx --env-file=.env.production scripts/generate-alert.ts",
     "simulate:incident": "tsx --env-file=.env.local scripts/simulate-incident.ts",
     "simulate:incident:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --target=webhook",
