@@ -1,5 +1,11 @@
 # @junando/webhook
 
+## 0.8.3
+
+### Patch Changes
+
+- @junando/core@0.8.3
+
 ## 0.8.2
 
 ### Patch Changes
