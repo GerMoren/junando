@@ -4,7 +4,9 @@ import {
   SQSClient,
   type Message,
 } from '@aws-sdk/client-sqs';
+import type { IIndexer, TraceabilityDocument } from '@junando/core';
 import type { SqsIngestConfig } from '../config/ingest-config.schema.js';
+import type { IMessageMapper } from '../mappers/registry.js';
 
 interface Logger {
   info(msg: string, ...args: unknown[]): void;
@@ -20,6 +22,8 @@ export interface SqsSubscriberObserver {
   onDeleteSuccess?(count: number): void;
   setInFlight?(count: number): void;
   observePollDurationMs?(durationMs: number): void;
+  onIndexSuccess?(message: Message, doc: TraceabilityDocument): void;
+  onIndexFailure?(message: Message, error: unknown): void;
 }
 
 export interface SqsSubscriberDeps {
@@ -28,6 +32,8 @@ export interface SqsSubscriberDeps {
   logger: Logger;
   sqsClient?: Pick<SQSClient, 'send'>;
   observer?: SqsSubscriberObserver;
+  indexer?: IIndexer<TraceabilityDocument>;
+  mapper?: IMessageMapper;
 }
 
 interface ProcessResult {
@@ -41,6 +47,8 @@ export class SqsSubscriber {
   private readonly logger: Logger;
   private readonly sqsClient: Pick<SQSClient, 'send'>;
   private readonly observer: SqsSubscriberObserver | undefined;
+  private readonly indexer: IIndexer<TraceabilityDocument> | undefined;
+  private readonly mapper: IMessageMapper | undefined;
 
   private loopPromise: Promise<void> | null = null;
   private readonly inFlight = new Set<Promise<ProcessResult>>();
@@ -50,6 +58,13 @@ export class SqsSubscriber {
   private stopping = false;
 
   constructor(deps: SqsSubscriberDeps) {
+    if (deps.indexer && !deps.mapper) {
+      throw new Error(
+        'SqsSubscriber: indexer provided but mapper is missing. ' +
+          'Both indexer and mapper must be supplied together.',
+      );
+    }
+
     this.config = deps.config.ingest.sqs;
     this.processMessage = deps.processMessage;
     this.logger = deps.logger;
@@ -57,6 +72,8 @@ export class SqsSubscriber {
       deps.sqsClient ??
       new SQSClient(this.config.endpointUrl ? { endpoint: this.config.endpointUrl } : {});
     this.observer = deps.observer;
+    this.indexer = deps.indexer;
+    this.mapper = deps.mapper;
   }
 
   start(): void {
@@ -185,6 +202,7 @@ export class SqsSubscriber {
     try {
       await this.processMessage(message);
       this.observer?.onProcessSuccess?.(1);
+      await this.tryIndex(message);
       return { message, success: true };
     } catch (err) {
       this.observer?.onProcessFailure?.(1);
@@ -192,6 +210,24 @@ export class SqsSubscriber {
         `SQS message processing failed for ${message.MessageId ?? 'unknown'}: ${formatError(err)}`,
       );
       return { message, success: false };
+    }
+  }
+
+  private async tryIndex(message: Message): Promise<void> {
+    if (!this.indexer || !this.mapper) {
+      return;
+    }
+
+    try {
+      const decoded = this.mapper.decode(message);
+      const doc = this.mapper.toTraceabilityDocument(decoded, message);
+      await this.indexer.index(doc);
+      this.observer?.onIndexSuccess?.(message, doc);
+    } catch (err) {
+      this.logger.warn(
+        `Indexing failed for ${message.MessageId ?? 'unknown'}: ${formatError(err)}`,
+      );
+      this.observer?.onIndexFailure?.(message, err);
     }
   }
 
