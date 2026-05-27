@@ -51,8 +51,11 @@ jobs:
         uses: changesets/action@v1
         with:
           # OIDC-only: no NODE_AUTH_TOKEN so npm CLI falls through to Trusted
-          # Publisher token exchange. --provenance requests the attestation
-          # that requires a clean OIDC setup. See issue #110.
-          publish: pnpm changeset publish --tag ${{ inputs['dist-tag'] || 'latest' }} --provenance
+          # Publisher token exchange. Provenance is requested via the
+          # NPM_CONFIG_PROVENANCE env var (npm CLI honors it as if --provenance
+          # were passed). `changeset publish` does NOT accept --provenance as
+          # a CLI flag. See issue #110.
+          publish: pnpm changeset publish --tag ${{ inputs['dist-tag'] || 'latest' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          NPM_CONFIG_PROVENANCE: 'true'
