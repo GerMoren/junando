@@ -36,9 +36,10 @@ jobs:
         uses: changesets/action@v1
         with:
           # Bump versions, then regenerate dependent docs so the Version PR
-          # is born with docs/compatibility.md in sync. Otherwise CI fails
-          # on `docs:compat:check` for every release.
-          version: pnpm changeset version && pnpm run docs:compat
+          # is born with docs/compatibility.md in sync. Chained via package
+          # script because changesets/action@v1 parses `version:` as a single
+          # command (not shell), so `cmd1 && cmd2` would be misread as args.
+          version: pnpm run version:packages
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
