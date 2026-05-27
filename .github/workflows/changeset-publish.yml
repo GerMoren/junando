@@ -50,7 +50,9 @@ jobs:
       - name: Publish packages
         uses: changesets/action@v1
         with:
-          publish: pnpm changeset publish --tag ${{ inputs['dist-tag'] || 'latest' }}
+          # OIDC-only: no NODE_AUTH_TOKEN so npm CLI falls through to Trusted
+          # Publisher token exchange. --provenance requests the attestation
+          # that requires a clean OIDC setup. See issue #110.
+          publish: pnpm changeset publish --tag ${{ inputs['dist-tag'] || 'latest' }} --provenance
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
