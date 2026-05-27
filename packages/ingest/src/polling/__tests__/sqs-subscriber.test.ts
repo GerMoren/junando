@@ -260,7 +260,8 @@ describe('SqsSubscriber', () => {
     expect(observer.onProcessFailure).toHaveBeenCalledWith(1);
     expect(observer.onDeleteSuccess).toHaveBeenCalledWith(1);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('SQS message processing failed for m-failure: boom'),
+      expect.objectContaining({ step: 'processMessage', messageId: 'm-failure' }),
+      'SQS message processing failed',
     );
   });
 
@@ -292,7 +293,8 @@ describe('SqsSubscriber', () => {
     expect(sqsClient.send).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledTimes(2);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('SQS message processing failed for m-1: bad payload'),
+      expect.objectContaining({ step: 'processMessage', messageId: 'm-1' }),
+      'SQS message processing failed',
     );
   });
 
@@ -550,7 +552,7 @@ describe('SqsSubscriber', () => {
       expect(indexer.index).not.toHaveBeenCalled();
     });
 
-    it('SQS-IDX-06: indexer.index throws — logger.warn called, onIndexFailure emitted, message still deleted', async () => {
+    it('SQS-IDX-06: indexer.index throws — logger.error called, onIndexFailure emitted, message still deleted', async () => {
       const message = makeMessage('m-1');
       const indexError = new Error('index failed');
       const indexer = makeIndexer();
@@ -579,7 +581,10 @@ describe('SqsSubscriber', () => {
       await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
       await flushMicrotasks();
 
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('index failed'));
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: indexError, step: 'index', messageId: 'm-1' }),
+        'Indexing failed',
+      );
       expect(observer.onIndexFailure).toHaveBeenCalledWith(message, indexError);
       // message should still be deleted (DeleteMessageBatchCommand was sent)
       const deleteSent = sqsClient.send.mock.calls.some(
@@ -587,6 +592,140 @@ describe('SqsSubscriber', () => {
       );
       expect(deleteSent).toBe(true);
     });
+
+  describe('Structured error logging', () => {
+    it('SQS-ERR-01: receive catch emits structured log with err instance and step=receive', async () => {
+      const receiveError = new Error('network timeout');
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn().mockRejectedValue(receiveError),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn(),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: receiveError, step: 'receive' }),
+        'SQS receive failed',
+      );
+    });
+
+    it('SQS-ERR-02: delete catch emits structured log with err instance and messageIds', async () => {
+      const message = makeMessage('m-1');
+      const deleteError = new Error('delete failed');
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) throw deleteError;
+          throw new Error('Unexpected command');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockResolvedValue(undefined),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: deleteError, messageIds: ['m-1'] }),
+        'SQS delete failed',
+      );
+    });
+
+    it('SQS-ERR-03: processMessage catch emits structured log with err, step=processMessage, and messageId', async () => {
+      const message = makeMessage('m-2');
+      const processError = new Error('bad message');
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          throw new Error('Unexpected command');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockRejectedValue(processError),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: processError, step: 'processMessage', messageId: 'm-2' }),
+        'SQS message processing failed',
+      );
+    });
+
+    it('SQS-ERR-04: index catch emits structured log with err, step=index, and messageId', async () => {
+      const message = makeMessage('m-3');
+      const indexError = new Error('index boom');
+      const indexer = makeIndexer();
+      (indexer.index as ReturnType<typeof vi.fn>).mockRejectedValue(indexError);
+      const mapper = makeMapper();
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn(async (command: unknown) => {
+          if (command instanceof ReceiveMessageCommand) return { Messages: [message] };
+          if (command instanceof DeleteMessageBatchCommand) return { Successful: [{ Id: '0' }] };
+          throw new Error('Unexpected command');
+        }),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn().mockResolvedValue(undefined),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+        indexer,
+        mapper,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+      await flushMicrotasks();
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ err: indexError, step: 'index', messageId: 'm-3' }),
+        'Indexing failed',
+      );
+    });
+
+    it('SQS-ERR-05: err field is the original Error instance (strict identity)', async () => {
+      const receiveError = new Error('identity check');
+      const logger = makeLogger();
+      const sqsClient = {
+        send: vi.fn().mockRejectedValue(receiveError),
+      };
+
+      const subscriber = new SqsSubscriber({
+        config: makeConfig(),
+        processMessage: vi.fn(),
+        logger,
+        sqsClient: sqsClient as Pick<SQSClient, 'send'>,
+      });
+
+      await (subscriber as unknown as { pollOnce(n: number): Promise<void> }).pollOnce(1);
+
+      const callArg = (logger.error as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+        err: unknown;
+      };
+      expect(callArg.err).toBe(receiveError);
+    });
+  });
 
     it('SQS-IDX-07: observer without onIndexSuccess/onIndexFailure hooks — no throw', async () => {
       const message = makeMessage('m-1');
