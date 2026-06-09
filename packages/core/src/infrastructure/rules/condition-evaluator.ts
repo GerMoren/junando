@@ -62,9 +62,7 @@ const MATCHER_MAP: Record<string, MatcherFactory> = {
   labels: (value) => {
     const expected = value as Record<string, string>;
     return (cluster) => {
-      // AlertCluster doesn't have labels yet — if condition specifies labels, match fails
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clusterLabels = (cluster as any).labels as Record<string, string> | undefined;
+      const clusterLabels = cluster.labels;
       if (!clusterLabels) return false;
       return Object.entries(expected).every(
         ([key, val]) => clusterLabels[key] === val,

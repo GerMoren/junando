@@ -57,7 +57,14 @@ export interface ILLMProvider {
  * Implementations: SlackNotifier, TeamsNotifier, ConsoleNotifier (local dev/tests)
  */
 export interface INotifier {
-  send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void>;
+  /**
+   * Deliver an incident diagnosis to a ChatOps channel.
+   * @param channel — optional channel override for multi-channel routing.
+   *   When provided, implementations MAY route to the specified channel
+   *   instead of their default. Backward-compatible — existing call sites
+   *   work unchanged.
+   */
+  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<void>;
 }
 
 /**

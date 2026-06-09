@@ -181,7 +181,7 @@ export class TeamsNotifier implements INotifier {
     this.hostForErrors = host;
   }
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
     const card = analysis ? buildAnalysisCard(cluster, analysis) : buildFallbackCard(cluster);
     const payload = buildAdaptiveCardPayload(card);
 
