@@ -13,6 +13,7 @@ import { OpenSearchIndexer } from "../../packages/core/src/index.js";
 import { LokiHttpClient } from "../../packages/ingest/src/adapters/loki/loki-http-client.js";
 import {
   IngestRunner,
+  IngestService,
   SqsSubscriber,
   type IngestConfig,
   type IngestRunnerDeps,
@@ -22,10 +23,8 @@ import {
   type SqsSubscriberDeps,
 } from "../../packages/ingest/src/index.js";
 import { createDefaultOpenSearchFetcher } from "./factories/opensearch-fetcher.factory.js";
-import type { IMessageMapper } from "./mappers/registry.js";
 import { getMapper } from "./mappers/registry.js";
-import { createSqsIndexerProcessor } from "./processors/sqs-indexer.processor.js";
-import { createSqsTraceabilityProcessor } from "./processors/sqs-traceability.processor.js";
+import { createTraceabilityIncidentProcessor } from "./processors/traceability-incident.processor.js";
 
 export interface ManagedIngestRuntime {
   start(): void;
@@ -38,14 +37,9 @@ interface RuntimeFactories {
   }) => IngestRunnerDeps["lokiClient"];
   createLokiRunner?: (deps: IngestRunnerDeps) => ManagedIngestRuntime;
   createSqsSubscriber?: (deps: SqsSubscriberDeps) => ManagedIngestRuntime;
-  createSqsTraceabilityProcessor?: (deps: {
-    mapper: IMessageMapper;
+  createTraceabilityIncidentProcessor?: (deps: {
     processIncidentUseCase: Pick<ProcessIncidentUseCase, "execute">;
-  }) => (message: Message) => Promise<void>;
-  createSqsIndexerProcessor?: (deps: {
-    mapper: IMessageMapper;
-    indexer: Pick<IIndexer<TraceabilityDocument>, "index">;
-  }) => (message: Message) => Promise<void>;
+  }) => ReturnType<typeof import("./processors/traceability-incident.processor.js").createTraceabilityIncidentProcessor>;
   createOpenSearchIndexer?: (
     target: OpenSearchTarget,
   ) => Pick<IIndexer<TraceabilityDocument>, "index">;
@@ -79,40 +73,74 @@ export function createIngestRuntime(deps: CreateIngestRuntimeDeps): ManagedInges
   const createSqsSubscriber =
     factories.createSqsSubscriber ?? ((subscriberDeps) => new SqsSubscriber(subscriberDeps));
 
-  const processMessage = buildSqsProcessor(sqsIngestConfig, deps, factories);
+  const opensearchTarget = sqsIngestConfig.ingest.opensearch;
+
+  if (opensearchTarget) {
+    // Indexing-only path: inline indexing (no IngestService needed since
+    // toTraceabilityDocument requires the raw decoded payload, not NormalizedAlert).
+    const createOpenSearchIndexer =
+      factories.createOpenSearchIndexer ?? defaultCreateOpenSearchIndexer;
+    const indexer = createOpenSearchIndexer(opensearchTarget);
+    const mapper = getMapper(sqsIngestConfig.ingest.mapper.kind);
+
+    return createSqsSubscriber({
+      config: sqsIngestConfig,
+      processMessage: buildIndexerProcessor({ mapper, indexer, logger: deps.logger }),
+      logger: deps.logger,
+    });
+  }
+
+  // Traceability path: use IngestService for transport-agnostic processing.
+  const createProcessor =
+    factories.createTraceabilityIncidentProcessor ?? createTraceabilityIncidentProcessor;
+  const processor = createProcessor({
+    processIncidentUseCase: deps.processIncidentUseCase!,
+  });
+  const ingestService = new IngestService(processor);
 
   return createSqsSubscriber({
     config: sqsIngestConfig,
-    processMessage,
+    processMessage: buildTraceabilityProcessor(
+      sqsIngestConfig.ingest.mapper.kind,
+      ingestService,
+      deps.logger,
+    ),
     logger: deps.logger,
   });
 }
 
-function buildSqsProcessor(
-  sqsIngestConfig: SqsIngestConfig,
-  deps: CreateIngestRuntimeDeps,
-  factories: RuntimeFactories,
+function buildTraceabilityProcessor(
+  mapperKind: string,
+  ingestService: IngestService,
+  logger: Logger,
 ): (message: Message) => Promise<void> {
-  const mapper = getMapper(sqsIngestConfig.ingest.mapper.kind);
+  return async (message: Message): Promise<void> => {
+    const mapper = getMapper(mapperKind);
+    const decoded = mapper.decode(message);
+    const alerts = mapper.toNormalizedAlerts(decoded);
 
-  const opensearchTarget = sqsIngestConfig.ingest.opensearch;
-  if (opensearchTarget) {
-    const createOpenSearchIndexer =
-      factories.createOpenSearchIndexer ?? defaultCreateOpenSearchIndexer;
-    const buildIndexerProcessor = factories.createSqsIndexerProcessor ?? createSqsIndexerProcessor;
+    for (const alert of alerts) {
+      const result = await ingestService.process(alert);
+      if (result.status === "error") {
+        logger.error(
+          { err: result.error, fingerprint: alert.fingerprint },
+          "IngestService processing failed",
+        );
+      }
+    }
+  };
+}
 
-    return buildIndexerProcessor({
-      mapper,
-      indexer: createOpenSearchIndexer(opensearchTarget),
-    });
-  }
-
-  const buildTraceabilityProcessor =
-    factories.createSqsTraceabilityProcessor ?? createSqsTraceabilityProcessor;
-  return buildTraceabilityProcessor({
-    mapper,
-    processIncidentUseCase: deps.processIncidentUseCase!,
-  });
+function buildIndexerProcessor(deps: {
+  mapper: ReturnType<typeof getMapper>;
+  indexer: Pick<IIndexer<TraceabilityDocument>, "index">;
+  logger: Logger;
+}): (message: Message) => Promise<void> {
+  return async (message: Message): Promise<void> => {
+    const decoded = deps.mapper.decode(message);
+    const doc = deps.mapper.toTraceabilityDocument(decoded, message);
+    await deps.indexer.index(doc);
+  };
 }
 
 function defaultCreateLokiClient(deps: {

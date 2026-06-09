@@ -53,3 +53,9 @@ export type {
 export { PrometheusIngestRunner } from './polling/prometheus-ingest-runner.js';
 export type { PrometheusIngestRunnerDeps, PrometheusIngestRunnerOpts } from './polling/prometheus-ingest-runner.js';
 
+// Transport-agnostic ingest entry point — IngestService + port + types
+export { IngestService } from './services/ingest-service.js';
+export type { IncidentProcessor } from './ports/incident-processor.port.js';
+export type { PipelineOptions, ResolvedPipelineOptions } from './types/pipeline-options.js';
+export type { IncidentResult, IncidentStatus } from './types/incident-result.js';
+
