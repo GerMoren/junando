@@ -3,11 +3,12 @@ import type {
   IDeduplicationStore,
   ILLMProvider,
   INotifier,
+  IRuleEngine,
   ITraceRepository,
 } from '../../domain/ports/index.js';
 import { ClusteringService } from '../../domain/services/clustering.service.js';
 import type { Logger } from '../../shared/logger/index.js';
-import { dedupNew, dedupDuplicate } from '../../shared/metrics/index.js';
+import { dedupNew, dedupDuplicate, suppressedClusters } from '../../shared/metrics/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProcessIncidentUseCase — Application layer.
@@ -24,6 +25,7 @@ interface Dependencies {
   dedupTtlSeconds: number;
   clustering?: ClusteringService;
   onClustersBuilt?: (count: number) => void;
+  ruleEngine?: IRuleEngine;
 }
 
 export class ProcessIncidentUseCase {
@@ -34,7 +36,7 @@ export class ProcessIncidentUseCase {
   }
 
   async execute(alerts: NormalizedAlert[], correlationId: string): Promise<void> {
-    const { dedup, traces, llm, notifier, logger, dedupTtlSeconds } = this.deps;
+    const { dedup, traces, llm, notifier, logger, dedupTtlSeconds, ruleEngine } = this.deps;
     const log = logger.child({ correlationId, useCase: 'ProcessIncident' });
 
     log.info({ alertCount: alerts.length }, 'Processing alert batch');
@@ -56,7 +58,34 @@ export class ProcessIncidentUseCase {
       }
       dedupNew.inc({ source: 'alertmanager' });
 
-      // 3. Extract representative traces from the trace repository
+      // 3. PRE-LLM rule engine hook — evaluate rules before LLM
+      // ────────────────────────────────────────────────────────────────────
+      let preLlmRouteChannels: string[] = [];
+      let preLlmEscalateChannels: string[] = [];
+
+      if (ruleEngine) {
+        const preResult = ruleEngine.evaluatePreLlm(cluster);
+
+        if (preResult.suppressed) {
+          log2.info({ matchedRuleId: preResult.matchedRuleId }, 'Cluster suppressed by rule engine');
+          if (preResult.matchedRuleId) {
+            suppressedClusters.inc({ rule_id: preResult.matchedRuleId });
+          }
+          continue; // Skip LLM, traces, and notification entirely
+        }
+
+        // Collect route and escalate channels from PRE-LLM actions
+        for (const action of preResult.actions) {
+          if (action.type === 'route' && 'channel' in action) {
+            preLlmRouteChannels.push(action.channel);
+          }
+          if (action.type === 'escalate' && 'channel' in action) {
+            preLlmEscalateChannels.push(action.channel);
+          }
+        }
+      }
+
+      // 4. Extract representative traces from the trace repository
       const spanLists = await Promise.all(
         cluster.representativeTraceIds.map((id) =>
           traces.findByTraceId(id).catch((err) => {
@@ -68,7 +97,7 @@ export class ProcessIncidentUseCase {
       const allSpans = spanLists.flat();
       log2.info({ spanCount: allSpans.length }, 'Traces extracted');
 
-      // 4. LLM inference — fail gracefully, notify anyway with null analysis
+      // 5. LLM inference — fail gracefully, notify anyway with null analysis
       let analysis = null;
       try {
         analysis = await llm.analyze(cluster, allSpans);
@@ -77,9 +106,47 @@ export class ProcessIncidentUseCase {
         log2.warn({ err }, 'LLM inference failed — notifying without diagnosis');
       }
 
-      // 5. Notify via ChatOps
+      // 6. POST-LLM rule engine hook — evaluate rules after LLM analysis
+      // ────────────────────────────────────────────────────────────────────
+      let postLlmEscalateChannels: string[] = [];
+
+      if (ruleEngine && analysis) {
+        const postResult = ruleEngine.evaluatePostLlm(cluster, analysis);
+
+        // Collect escalate channels from POST-LLM actions
+        for (const action of postResult.actions) {
+          if (action.type === 'escalate' && 'channel' in action) {
+            postLlmEscalateChannels.push(action.channel);
+          }
+          // Tag actions: attach metadata to cluster for observability
+          if (action.type === 'tag' && 'key' in action) {
+            log2.info({ tagKey: action.key, tagValue: (action as { value: string }).value }, 'Tag attached to cluster');
+          }
+        }
+
+        // Apply tags from postResult to cluster
+        if (postResult.tags && Object.keys(postResult.tags).length > 0) {
+          cluster.labels = { ...cluster.labels, ...postResult.tags };
+        }
+      }
+
+      // 7. Notify via ChatOps — with rule-based routing
+      // ────────────────────────────────────────────────────────────────────
       try {
-        await notifier.send(cluster, analysis);
+        const primaryChannel = preLlmRouteChannels[0]; // First route wins
+        const escalateChannels = [
+          ...preLlmEscalateChannels,
+          ...postLlmEscalateChannels,
+        ];
+
+        // Send primary notification (to route channel or default)
+        await notifier.send(cluster, analysis, primaryChannel);
+
+        // Send escalation notifications (in addition to primary)
+        for (const channel of escalateChannels) {
+          await notifier.send(cluster, analysis, channel);
+        }
+
         log2.info('Notification sent');
       } catch (err) {
         log2.error({ err }, 'Notification failed');

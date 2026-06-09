@@ -28,7 +28,7 @@ export class SlackNotifier implements INotifier {
     private readonly channel: string,
   ) {}
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
     const payload = analysis
       ? this.buildAnalysisMessage(cluster, analysis)
       : this.buildFallbackMessage(cluster);
@@ -167,7 +167,7 @@ export class ConsoleNotifier implements INotifier {
     analysis: LLMAnalysis | null;
   }> = [];
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
     try {
       this.sent.push({ cluster, analysis });
       logger.info(

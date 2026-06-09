@@ -95,7 +95,7 @@ export const RuleActionSchema = z.discriminatedUnion('type', [
 
 export interface Rule {
   id: string;
-  name: string;
+  name?: string;
   condition: RuleCondition;
   actions: RuleAction[];
   /** POST-LLM only (can only be used in post-llm section) */
