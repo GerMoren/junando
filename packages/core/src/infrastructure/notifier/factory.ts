@@ -54,6 +54,7 @@ export function createNotifier(config: Config): INotifier {
   const defaultNotifier = registry.resolve(config.notifierType);
 
   if (!config.rulesConfigPath) {
+    console.info('[createNotifier] RULES_CONFIG_PATH not set — rule engine disabled, using default notifier');
     return defaultNotifier;
   }
 
