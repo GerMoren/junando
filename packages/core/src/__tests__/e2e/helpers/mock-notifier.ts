@@ -21,6 +21,7 @@ export class MockNotifier implements INotifier {
     analysis: LLMAnalysis | null,
     channel?: string,
   ): Promise<void> {
-    this.calls.push({ cluster, analysis, channel });
+    const record = { cluster, analysis, ...(channel !== undefined && { channel }) };
+    this.calls.push(record);
   }
 }
