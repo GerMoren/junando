@@ -52,6 +52,7 @@ function clearEnv() {
   delete process.env.TEAMS_WEBHOOK_URL;
   delete process.env.LLM_FALLBACK_MODELS;
   delete process.env.LLM_FALLBACK_TIMEOUT_MS;
+  delete process.env.RULES_CONFIG_PATH;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -635,6 +636,37 @@ describe('Config — loadConfig', () => {
         expect(err.message).toContain('TEAMS_WEBHOOK_URL');
         expect(err.message).toContain('teams');
       }
+    });
+  });
+
+  // ── RULES_CONFIG_PATH (CFG-07) ──────────────────────────────────────────
+
+  describe('CFG-07: RULES_CONFIG_PATH (optional rules engine config)', () => {
+    it('reads RULES_CONFIG_PATH from env var', async () => {
+      setEnv({ ...validConfig });
+      process.env['RULES_CONFIG_PATH'] = '/etc/junando/rules.yaml';
+      const config = await loadConfig();
+      expect(config.rulesConfigPath).toBe('/etc/junando/rules.yaml');
+    });
+
+    it('defaults to undefined when RULES_CONFIG_PATH is not set', async () => {
+      setEnv({ ...validConfig });
+      const config = await loadConfig();
+      expect(config.rulesConfigPath).toBeUndefined();
+    });
+
+    it('accepts empty string as undefined', async () => {
+      setEnv({ ...validConfig });
+      process.env['RULES_CONFIG_PATH'] = '';
+      const config = await loadConfig();
+      expect(config.rulesConfigPath).toBeUndefined();
+    });
+
+    it('accepts relative paths', async () => {
+      setEnv({ ...validConfig });
+      process.env['RULES_CONFIG_PATH'] = './rules.yaml';
+      const config = await loadConfig();
+      expect(config.rulesConfigPath).toBe('./rules.yaml');
     });
   });
 });
