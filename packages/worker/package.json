@@ -1,6 +1,6 @@
 {
   "name": "@junando/worker",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "AWS Lambda SQS worker — processes alert events and dispatches notifications for Junando",
   "license": "Apache-2.0",
   "type": "module",
