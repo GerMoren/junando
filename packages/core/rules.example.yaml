@@ -1,0 +1,118 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Junando Business Rules Engine — Example Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# This file demonstrates the rule configuration syntax for the Junando
+# Business Rules Engine. Copy this file to rules.yaml and customize it
+# for your environment.
+#
+# Rules are evaluated at two pipeline hooks:
+#   pre-llm  — after deduplication, before LLM analysis.
+#              Use for: suppress noise, route to specific teams.
+#   post-llm — after LLM analysis completes.
+#              Use for: escalate based on urgency, tag for dashboards.
+#
+# Evaluation: first-match-wins — the first rule whose conditions ALL match
+# is executed. Subsequent rules are skipped.
+#
+# Valid condition fields:
+#   serviceName     — exact match on cluster service (case-insensitive)
+#   alertType       — AlertType enum: http_500 | latency_spike | recovery
+#   severity        — SeverityLevel: critical | high | medium | low
+#   endpointPath    — exact match on alert endpoint path
+#   alertCount      — range: { min?: number, max?: number }
+#   latencyP99Ms    — range: { min?: number, max?: number }
+#   labels          — key-value map (all must match)
+#   urgencyLevel    — POST-LLM only: low | medium | high | critical
+#   requiresRollback — POST-LLM only: true | false
+#   impactedServices — POST-LLM only: array of service names
+#
+# Valid action types:
+#   suppress         — PRE-LLM only. Skip LLM, traces, and notification.
+#   route            — PRE-LLM only. Override default notification channel.
+#   escalate         — PRE-LLM / POST-LLM. Additional notification to channel.
+#   tag              — POST-LLM only. Attach metadata to cluster for dashboards.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── PRE-LLM RULES — evaluated before LLM analysis ────────────────────────────
+pre-llm:
+  rules:
+    # ── SUPPRESS: Skip LLM cost for known false positives ──
+    - id: suppress-staging
+      name: Suppress staging alerts
+      condition:
+        serviceName: staging
+      actions:
+        - type: suppress
+
+    - id: suppress-transient-spikes
+      name: Suppress transient CDN spikes
+      condition:
+        serviceName: cdn-edge
+        alertType: latency_spike
+        severity: low
+      actions:
+        - type: suppress
+
+    # ── ROUTE: Override default notification channel ──
+    - id: route-payments-to-sre
+      name: Route payments-api incidents to SRE Slack
+      condition:
+        serviceName: payments-api
+        severity: critical
+      actions:
+        - type: route
+          channel: slack-sre
+
+    - id: route-dev-alerts
+      name: Route staging/dev alerts to dev team
+      condition:
+        labels:
+          environment: staging
+      actions:
+        - type: route
+          channel: slack-dev-team
+
+    # ── ESCALATE: Additional notification for high-volume incidents ──
+    - id: escalate-high-volume
+      name: Escalate high-volume incidents to on-call
+      condition:
+        alertCount:
+          min: 50
+      actions:
+        - type: escalate
+          channel: slack-oncall
+
+# ── POST-LLM RULES — evaluated after LLM analysis ────────────────────────────
+post-llm:
+  rules:
+    # ── ESCALATE + TAG: Critical incidents requiring rollback ──
+    - id: escalate-critical
+      name: Escalate critical incidents with rollback required
+      condition:
+        urgencyLevel: critical
+        requiresRollback: true
+      actions:
+        - type: escalate
+          channel: pagerduty-critical
+        - type: tag
+          key: incident-class
+          value: rollback-required
+
+    # ── TAG: Classify database incidents for dashboard filtering ──
+    - id: tag-db-incidents
+      name: Tag database-related incidents
+      condition:
+        serviceName: postgres-primary
+      actions:
+        - type: tag
+          key: team
+          value: dba
+
+    # ── ESCALATE: High urgency incidents ──
+    - id: escalate-high-urgency
+      name: Escalate high urgency incidents to on-call
+      condition:
+        urgencyLevel: high
+      actions:
+        - type: escalate
+          channel: slack-oncall
