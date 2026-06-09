@@ -3,7 +3,6 @@ import {
   isCsvBody,
   parseCsvBody,
   generateFingerprint,
-  DEFAULT_CSV_COLUMN_MAPPING,
   type CsvColumnMapping,
 } from '../csv-input.adapter';
 import { AlertType } from '@junando/core';
