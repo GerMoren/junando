@@ -1,6 +1,6 @@
 ---
-'@junando/core': minor
-'@junando/ingest': minor
+'@junando/core': patch
+'@junando/ingest': patch
 ---
 
 refactor: replace all switch/case with maps and FactoryRegistry.
