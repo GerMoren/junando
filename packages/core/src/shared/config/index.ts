@@ -80,6 +80,11 @@ const ConfigSchema = z
         return v.split(',').map((s) => s.trim()).filter(Boolean);
       }),
     llmFallbackTimeoutMs: z.coerce.number().int().positive().default(LLM_FALLBACK_DEFAULTS.TimeoutMs),
+    // Optional path to rules.yaml for business rules engine. When not set, rule engine is disabled.
+    rulesConfigPath: z
+      .string()
+      .optional()
+      .transform((v) => (v === '' ? undefined : v)),
   })
   .superRefine((data, ctx) => {
     if (data.notifierType === 'slack') {
@@ -160,6 +165,7 @@ export async function loadConfig(): Promise<Config> {
     nodeEnv: process.env['NODE_ENV'],
     llmFallbackModels: process.env['LLM_FALLBACK_MODELS'],
     llmFallbackTimeoutMs: process.env['LLM_FALLBACK_TIMEOUT_MS'],
+    rulesConfigPath: process.env['RULES_CONFIG_PATH'],
   });
 
   if (!result.success) {

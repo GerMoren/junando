@@ -2,6 +2,7 @@
 export * from './domain/entities/alert.js';
 export * from './domain/entities/cluster.js';
 export * from './domain/entities/incident.js';
+export * from './domain/entities/rule.js';
 export type { TraceabilityDocument } from './domain/entities/traceability.js';
 
 // Domain — Value Objects
@@ -14,7 +15,9 @@ export type {
   IIndexer,
   ILLMProvider,
   INotifier,
+  IRuleEngine,
   ITraceRepository,
+  RuleActionResult,
 } from './domain/ports/index.js';
 
 // Domain — Services
@@ -45,12 +48,22 @@ export {
 export { createNotifier } from './infrastructure/notifier/factory.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
 export { TeamsNotifier, TeamsNotifierError } from './infrastructure/notifier/teams.adapter.js';
+export { RoutingNotifier } from './infrastructure/notifier/routing-notifier.js';
 export { InMemoryAlertQueue, SQSAlertQueue } from './infrastructure/queue/sqs.adapter.js';
 export { startSqsLagPoller } from './infrastructure/queue/sqs-lag-poller.js';
 export {
   LokiTraceRepository,
   MockTraceRepository,
 } from './infrastructure/traces/loki-trace.adapter.js';
+
+// Infrastructure — Rules Engine
+export {
+  parseRuleConfig,
+  compileCondition,
+  dispatchActions,
+  ChannelRegistry,
+  RuleEngine,
+} from './infrastructure/rules/index.js';
 
 // Shared
 export { loadConfig } from './shared/config/index.js';
