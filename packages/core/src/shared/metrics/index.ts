@@ -98,3 +98,11 @@ export const sqsQueueLag = new Gauge({
   labelNames: ['queue_name'],
   registers: [registry],
 });
+
+/** Tracks clusters suppressed by the rule engine, segmented by rule ID. */
+export const suppressedClusters = new Gauge({
+  name: 'junando_suppressed_clusters',
+  help: 'Current number of clusters suppressed by the rule engine',
+  labelNames: ['rule_id'],
+  registers: [registry],
+});

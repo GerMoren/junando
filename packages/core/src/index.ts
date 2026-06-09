@@ -2,6 +2,7 @@
 export * from './domain/entities/alert.js';
 export * from './domain/entities/cluster.js';
 export * from './domain/entities/incident.js';
+export * from './domain/entities/rule.js';
 export type { TraceabilityDocument } from './domain/entities/traceability.js';
 
 // Domain — Value Objects
@@ -14,7 +15,9 @@ export type {
   IIndexer,
   ILLMProvider,
   INotifier,
+  IRuleEngine,
   ITraceRepository,
+  RuleActionResult,
 } from './domain/ports/index.js';
 
 // Domain — Services

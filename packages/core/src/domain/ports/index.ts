@@ -1,6 +1,7 @@
 import type { NormalizedAlert } from '../entities/alert.js';
 import type { AlertCluster } from '../entities/cluster.js';
 import type { LLMAnalysis } from '../entities/incident.js';
+import type { RuleAction } from '../entities/rule.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PORTS — interfaces defined by the domain.
@@ -66,4 +67,35 @@ export interface INotifier {
  */
 export interface IIndexer<TDocument> {
   index(doc: TDocument): Promise<void>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rule engine — evaluate rules at pipeline hooks
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Result of rule engine evaluation.
+ */
+export interface RuleActionResult {
+  suppressed: boolean; // true = don't proceed to next stage
+  actions: RuleAction[]; // actions to execute
+  matchedRuleId?: string; // which rule matched (for debugging)
+  tags: Record<string, string>; // tags to attach to cluster
+}
+
+/**
+ * Rule engine port — evaluates rules at pipeline hooks.
+ */
+export interface IRuleEngine {
+  /**
+   * PRE-LLM: evaluated after dedup, before LLM.
+   * Returns actions to apply, or suppressed=true if should not proceed.
+   */
+  evaluatePreLlm(cluster: AlertCluster): RuleActionResult;
+
+  /**
+   * POST-LLM: evaluated after LLM analysis.
+   * Returns additional actions based on analysis (escalate, tag, etc.).
+   */
+  evaluatePostLlm(cluster: AlertCluster, analysis: LLMAnalysis): RuleActionResult;
 }
