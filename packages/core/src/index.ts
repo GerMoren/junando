@@ -56,6 +56,7 @@ export {
 export { loadConfig } from './shared/config/index.js';
 export type { Config } from './shared/config/index.js';
 export * from './shared/constants.js';
+export { FactoryRegistry } from './shared/factory-registry.js';
 export { createLogger, reinitLogger } from './shared/logger/index.js';
 export type { Logger, LoggerOptions } from './shared/logger/index.js';
 export { flushLoki } from './shared/logger/loki-transport.js';
