@@ -86,7 +86,7 @@ describe("createIngestRuntime", () => {
     const createLokiClient = vi.fn().mockReturnValue({ queryRange: vi.fn() });
     const createLokiRunner = vi.fn().mockReturnValue(lokiRuntime);
     const createSqsSubscriber = vi.fn();
-    const createSqsTraceabilityProcessor = vi.fn();
+    const createTraceabilityIncidentProcessor = vi.fn();
 
     const runtime = createIngestRuntime({
       ingestConfig: makeLokiConfig(),
@@ -96,7 +96,7 @@ describe("createIngestRuntime", () => {
         createLokiClient,
         createLokiRunner,
         createSqsSubscriber,
-        createSqsTraceabilityProcessor,
+        createTraceabilityIncidentProcessor,
       },
     });
 
@@ -104,16 +104,17 @@ describe("createIngestRuntime", () => {
     expect(createLokiClient).toHaveBeenCalledTimes(1);
     expect(createLokiRunner).toHaveBeenCalledTimes(1);
     expect(createSqsSubscriber).not.toHaveBeenCalled();
-    expect(createSqsTraceabilityProcessor).not.toHaveBeenCalled();
+    expect(createTraceabilityIncidentProcessor).not.toHaveBeenCalled();
   });
 
-  it("selects the SQS runtime and wires the traceability processor when kind=sqs (no opensearch)", async () => {
+  it("selects the SQS runtime and wires IngestService when kind=sqs (no opensearch)", async () => {
     const logger = makeLogger();
     const useCase = { execute: vi.fn() } as unknown as Pick<ProcessIncidentUseCase, "execute">;
     const sqsRuntime = { start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined) };
     const createSqsSubscriber = vi.fn().mockReturnValue(sqsRuntime);
-    const processMessage = vi.fn().mockResolvedValue(undefined);
-    const createSqsTraceabilityProcessor = vi.fn().mockReturnValue(processMessage);
+    const createTraceabilityIncidentProcessor = vi.fn().mockReturnValue({
+      process: vi.fn().mockResolvedValue({ alert: {}, stages: {}, status: "success" }),
+    });
 
     const runtime = createIngestRuntime({
       ingestConfig: makeSqsConfig(),
@@ -123,15 +124,14 @@ describe("createIngestRuntime", () => {
         createLokiClient: vi.fn(),
         createLokiRunner: vi.fn(),
         createSqsSubscriber,
-        createSqsTraceabilityProcessor,
+        createTraceabilityIncidentProcessor,
       },
     });
 
     expect(runtime).toBe(sqsRuntime);
-    expect(createSqsTraceabilityProcessor).toHaveBeenCalledWith(
+    expect(createTraceabilityIncidentProcessor).toHaveBeenCalledWith(
       expect.objectContaining({
         processIncidentUseCase: useCase,
-        mapper: expect.objectContaining({ kind: "test-mapper-v1" }),
       }),
     );
     expect(createSqsSubscriber).toHaveBeenCalledTimes(1);
@@ -144,18 +144,14 @@ describe("createIngestRuntime", () => {
 
     expect(deps.config).toEqual(makeSqsConfig());
     expect(deps.logger).toBe(logger);
-    await deps.processMessage({ MessageId: "msg-1", Body: "{}" });
-    expect(processMessage).toHaveBeenCalledTimes(1);
   });
 
-  it("wires the indexer processor when sqs config has an opensearch block", async () => {
+  it("wires inline indexer when sqs config has an opensearch block", async () => {
     const logger = makeLogger();
     const useCase = { execute: vi.fn() } as unknown as Pick<ProcessIncidentUseCase, "execute">;
     const sqsRuntime = { start: vi.fn(), stop: vi.fn().mockResolvedValue(undefined) };
     const createSqsSubscriber = vi.fn().mockReturnValue(sqsRuntime);
-    const processMessage = vi.fn().mockResolvedValue(undefined);
-    const createSqsIndexerProcessor = vi.fn().mockReturnValue(processMessage);
-    const createSqsTraceabilityProcessor = vi.fn();
+    const createTraceabilityIncidentProcessor = vi.fn();
     const indexer = { index: vi.fn().mockResolvedValue(undefined) };
     const createOpenSearchIndexer = vi.fn().mockReturnValue(indexer);
 
@@ -178,8 +174,7 @@ describe("createIngestRuntime", () => {
         createLokiClient: vi.fn(),
         createLokiRunner: vi.fn(),
         createSqsSubscriber,
-        createSqsTraceabilityProcessor,
-        createSqsIndexerProcessor,
+        createTraceabilityIncidentProcessor,
         createOpenSearchIndexer,
       },
     });
@@ -190,13 +185,21 @@ describe("createIngestRuntime", () => {
       indexName: "traceability",
       region: "us-east-1",
     });
-    expect(createSqsIndexerProcessor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        indexer,
-        mapper: expect.objectContaining({ kind: "test-mapper-v1" }),
-      }),
-    );
-    expect(createSqsTraceabilityProcessor).not.toHaveBeenCalled();
+    expect(createTraceabilityIncidentProcessor).not.toHaveBeenCalled();
     expect(createSqsSubscriber).toHaveBeenCalledTimes(1);
+
+    // Verify the processMessage function indexes correctly.
+    const deps = createSqsSubscriber.mock.calls[0]?.[0] as {
+      config: IngestConfig;
+      processMessage: (message: Message) => Promise<void>;
+      logger: Logger;
+    };
+
+    const processMessage = deps.processMessage;
+    await processMessage({ MessageId: "msg-1", Body: "{}" });
+
+    // The stub mapper's toTraceabilityDocument was called.
+    expect(stubMapper.toTraceabilityDocument).toHaveBeenCalled();
+    expect(indexer.index).toHaveBeenCalled();
   });
 });
