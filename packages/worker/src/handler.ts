@@ -15,6 +15,8 @@ import {
 import type { SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
+import { isCsvBody, parseCsvBody } from './adapters/csv-input.adapter.js';
+import type { CsvColumnMapping } from './adapters/csv-input.adapter.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lambda B — SQS Worker
@@ -81,6 +83,14 @@ export const handler = async (event: SQSEvent): Promise<void> => {
   }
 };
 
+/** Parse an optional integer env var, returning undefined if unset or NaN */
+function parseIntEnv(key: string): number | undefined {
+  const val = process.env[key];
+  if (!val) return undefined;
+  const parsed = Number(val);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
 async function _handler(event: SQSEvent): Promise<void> {
   let useCaseInstance: ProcessIncidentUseCase;
   try {
@@ -94,17 +104,41 @@ async function _handler(event: SQSEvent): Promise<void> {
   }
 
   for (const record of event.Records) {
-    // Validate SQS message body with Zod before processing
+    // Auto-detect CSV vs JSON and parse accordingly
     let parsed: SQSMessage;
     try {
-      const raw = JSON.parse(record.body);
-      const result = SQSMessageSchema.safeParse(raw);
-      if (!result.success) {
-        logger.error({ err: result.error.issues }, 'Invalid SQS message body');
-        // Don't throw — let SQS retry and eventually DLQ
-        continue;
+      if (isCsvBody(record.body)) {
+        // CSV parsing with optional column mapping from env vars
+        const fpCol = parseIntEnv('CSV_FINGERPRINT_COL');
+        const epCol = parseIntEnv('CSV_ENDPOINT_COL');
+        const extraLabels = process.env['CSV_EXTRA_LABELS'];
+        const mapping: CsvColumnMapping = {
+          serviceCol: Number(process.env['CSV_SERVICE_COL'] ?? 0),
+          messageCol: Number(process.env['CSV_MESSAGE_COL'] ?? 1),
+          severityCol: Number(process.env['CSV_SEVERITY_COL'] ?? 2),
+          timestampCol: Number(process.env['CSV_TIMESTAMP_COL'] ?? 3),
+          ...(fpCol !== undefined && { fingerprintCol: fpCol }),
+          ...(epCol !== undefined && { endpointCol: epCol }),
+          ...(extraLabels !== undefined && { extraLabels }),
+        };
+        const csvResult = parseCsvBody(record.body, mapping);
+        if (!csvResult) {
+          logger.error({ record: record.messageId }, 'CSV parse returned no valid alerts');
+          continue;
+        }
+        parsed = csvResult;
+        logger.info({ alertCount: parsed.alerts.length }, 'Parsed CSV SQS message');
+      } else {
+        // JSON parsing — original behavior
+        const raw = JSON.parse(record.body);
+        const result = SQSMessageSchema.safeParse(raw);
+        if (!result.success) {
+          logger.error({ err: result.error.issues }, 'Invalid SQS message body');
+          // Don't throw — let SQS retry and eventually DLQ
+          continue;
+        }
+        parsed = result.data;
       }
-      parsed = result.data;
     } catch (err) {
       logger.error({ err }, 'Failed to parse SQS message body');
       continue;
