@@ -94,17 +94,15 @@ export function mapMetricResultToAlerts(
 
 type Comparator = '>' | '<' | '>=' | '<=';
 
+const COMPARATOR_FN = {
+  '>': (v: number, t: number) => v > t,
+  '<': (v: number, t: number) => v < t,
+  '>=': (v: number, t: number) => v >= t,
+  '<=': (v: number, t: number) => v <= t,
+} as const;
+
 function evaluate(value: number, comparator: Comparator, threshold: number): boolean {
-  switch (comparator) {
-    case '>':
-      return value > threshold;
-    case '<':
-      return value < threshold;
-    case '>=':
-      return value >= threshold;
-    case '<=':
-      return value <= threshold;
-  }
+  return COMPARATOR_FN[comparator]?.(value, threshold) ?? false;
 }
 
 function computeFingerprint(ruleName: string, service: string, windowBucketEnd: number): string {

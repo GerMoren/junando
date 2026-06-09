@@ -335,17 +335,14 @@ describe('SqsSubscriber', () => {
       }),
     };
 
+    const MESSAGE_PROMISE_MAP: Record<string, () => Promise<unknown>> = {
+      'm-1': () => firstDone.promise,
+      'm-2': () => secondDone.promise,
+      'm-3': () => thirdDone.promise,
+    };
+
     const processMessage = vi.fn((message: Message) => {
-      switch (message.MessageId) {
-        case 'm-1':
-          return firstDone.promise;
-        case 'm-2':
-          return secondDone.promise;
-        case 'm-3':
-          return thirdDone.promise;
-        default:
-          return Promise.resolve();
-      }
+      return MESSAGE_PROMISE_MAP[message.MessageId]?.() ?? Promise.resolve();
     });
 
     const subscriber = new SqsSubscriber({
