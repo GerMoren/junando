@@ -58,7 +58,7 @@ export const RuleConditionSchema = z.object({
   serviceName: z.string().optional(),
   alertType: z.nativeEnum(AlertType).optional(),
   severity: z.nativeEnum(SeverityLevel).optional(),
-  labels: z.record(z.string()).optional(),
+  labels: z.record(z.string(), z.string()).optional(),
   endpointPath: z.string().optional(),
   alertCount: AlertCountSchema.optional(),
   latencyP99Ms: LatencySchema.optional(),

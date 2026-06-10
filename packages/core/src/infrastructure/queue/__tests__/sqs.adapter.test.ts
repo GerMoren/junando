@@ -18,7 +18,7 @@ const registry = vi.hoisted((): MockRegistry => {
 });
 
 vi.mock('@aws-sdk/client-sqs', () => ({
-  SQSClient: vi.fn(() => {
+  SQSClient: vi.fn(function() {
     registry.constructorCalls++;
     return { send: registry.send };
   }),

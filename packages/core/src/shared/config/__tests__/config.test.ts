@@ -11,7 +11,7 @@ const mockSSMClient = {
 };
 
 vi.mock('@aws-sdk/client-ssm', () => ({
-  SSMClient: vi.fn(() => mockSSMClient),
+  SSMClient: vi.fn(function() { return mockSSMClient; }),
   GetParametersCommand: vi.fn(),
 }));
 

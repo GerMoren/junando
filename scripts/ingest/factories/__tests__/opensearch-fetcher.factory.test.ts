@@ -19,7 +19,7 @@ interface CapturedHttpRequest {
 const mockSign = vi.fn().mockImplementation((req: CapturedHttpRequest) => Promise.resolve(req));
 
 vi.mock('@smithy/signature-v4', () => ({
-  SignatureV4: vi.fn().mockImplementation(() => ({ sign: mockSign })),
+  SignatureV4: vi.fn(function() { return { sign: mockSign }; }),
 }));
 
 vi.mock('@aws-sdk/credential-provider-node', () => ({

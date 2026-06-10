@@ -14,7 +14,7 @@ export const LLMAnalysisSchema = z.object({
 
 export const IncidentSchema = z.object({
   cluster: AlertClusterSchema,
-  traces: z.array(z.record(z.unknown())).optional(),
+  traces: z.array(z.record(z.string(), z.unknown())).optional(),
   analysis: LLMAnalysisSchema.optional(), // absent if LLM failed gracefully
   processedAt: z.string().datetime(),
 });

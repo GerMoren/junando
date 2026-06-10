@@ -12,9 +12,11 @@ vi.mock('@junando/core', async () => {
   const actual = await vi.importActual('@junando/core');
   return {
     ...actual,
-    SQSAlertQueue: vi.fn().mockImplementation(() => ({
-      sendMessage: mockSendMessage,
-    })),
+    SQSAlertQueue: vi.fn(function() {
+      return {
+        sendMessage: mockSendMessage,
+      };
+    }),
     loadConfig: vi.fn().mockResolvedValue({
       slackSigningSecret: 'test-secret',
       logLevel: 'error',

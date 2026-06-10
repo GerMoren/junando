@@ -45,19 +45,19 @@ All packages are versioned in lockstep. Install the same version across packages
 
 | Dependency          | Version range | Used by                        |
 |---------------------|---------------|--------------------------------|
-| `@anthropic-ai/sdk` | `^0.32.0` | `@junando/core` |
-| `@aws-sdk/client-sqs` | `^3.1045.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
-| `@aws-sdk/client-ssm` | `^3.600.0` | `@junando/worker` |
-| `@google/generative-ai` | `^0.21.0` | `@junando/core` |
-| `ioredis` | `^5.10.1` | `@junando/core`, `@junando/worker` |
+| `@anthropic-ai/sdk` | `^0.102.0` | `@junando/core` |
+| `@aws-sdk/client-sqs` | `^3.1064.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
+| `@aws-sdk/client-ssm` | `^3.1064.0` | `@junando/worker` |
+| `@google/generative-ai` | `^0.24.1` | `@junando/core` |
+| `ioredis` | `^5.11.1` | `@junando/core`, `@junando/worker` |
 | `prom-client` | `^15.1.3` | `@junando/core` |
-| `zod` | `^3.23.0` | `@junando/core`, `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
+| `zod` | `^4.4.3` | `@junando/core`, `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
 
 ## pnpm
 
 | Version | Status     |
 |---------|------------|
-| `pnpm@11.2.2` | ✅ Pinned via `packageManager` |
+| `pnpm@11.5.2` | ✅ Pinned via `packageManager` |
 | >=9.0.0 | ✅ Supported (engines) |
 | < 9     | ❌ Unsupported |
 

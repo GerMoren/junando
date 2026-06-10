@@ -18,7 +18,7 @@ const mockLogger = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../shared/logger/index.js', () => ({
-  createLogger: vi.fn(() => mockLogger),
+  createLogger: vi.fn(function() { return mockLogger; }),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────

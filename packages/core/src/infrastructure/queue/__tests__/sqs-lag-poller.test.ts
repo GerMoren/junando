@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockSend = vi.fn();
 vi.mock('@aws-sdk/client-sqs', () => {
   return {
-    SQSClient: vi.fn().mockImplementation(() => ({ send: mockSend })),
-    GetQueueAttributesCommand: vi.fn().mockImplementation((input) => ({ input })),
+    SQSClient: vi.fn(function() { return { send: mockSend }; }),
+    GetQueueAttributesCommand: vi.fn(function(input) { return { input }; }),
   };
 });
 
