@@ -19,8 +19,8 @@ export const NormalizedAlertSchema = z.object({
   traceId: z.string().optional(),
   startsAt: z.string().datetime(),
   latencyMs: z.number().optional(),
-  labels: z.record(z.string()),
-  annotations: z.record(z.string()),
+  labels: z.record(z.string(), z.string()),
+  annotations: z.record(z.string(), z.string()),
 });
 
 // Raw Alertmanager webhook payload — validated at the boundary (Lambda A)
@@ -31,16 +31,16 @@ export const AlertmanagerPayloadSchema = z.object({
   truncatedAlerts: z.number().default(0),
   status: AlertStatusSchema,
   receiver: z.string(),
-  groupLabels: z.record(z.string()),
-  commonLabels: z.record(z.string()),
-  commonAnnotations: z.record(z.string()),
+  groupLabels: z.record(z.string(), z.string()),
+  commonLabels: z.record(z.string(), z.string()),
+  commonAnnotations: z.record(z.string(), z.string()),
   externalURL: z.string().url(),
   alerts: z
     .array(
       z.object({
         status: AlertStatusSchema,
-        labels: z.record(z.string()),
-        annotations: z.record(z.string()).default({}),
+        labels: z.record(z.string(), z.string()),
+        annotations: z.record(z.string(), z.string()).default({}),
         startsAt: z.string().datetime(),
         endsAt: z.string().datetime(),
         fingerprint: z.string().optional(),

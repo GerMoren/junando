@@ -20,7 +20,7 @@ export const AlertClusterSchema = z.object({
   /** Severity level — can be derived from ALERT_TYPE_LABELS[alertType].severity */
   severity: z.enum(SEVERITY_VALUES).optional(),
   /** Arbitrary key-value labels passed through from alerts */
-  labels: z.record(z.string()).optional(),
+  labels: z.record(z.string(), z.string()).optional(),
 });
 
 export type AlertCluster = z.infer<typeof AlertClusterSchema>;
