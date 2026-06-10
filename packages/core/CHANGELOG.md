@@ -1,5 +1,17 @@
 # @junando/core
 
+## 0.11.0
+
+### Minor Changes
+
+- a5a409c: feat(core): add business rules engine types and ports (Phase 1 of 3).
+
+  New domain entities: RuleCondition, RuleAction (discriminated union), Rule, RuleSection, RuleConfiguration. New IRuleEngine port with evaluatePreLlm/evaluatePostLlm methods. New RuleEvaluationPhase enum. New SeverityLevel enum. New suppressedClusters metric gauge. Closes #29.
+
+- a5a409c: feat(core): business rules engine infrastructure (Phase 2 of 3).
+
+  YamlRuleLoader for rules.yaml parsing and validation. ConditionEvaluator with pre-compiled predicates for 10 matchable fields. ActionDispatcher for multi-action execution. ChannelRegistry for multi-channel routing. RuleEngine implementation with first-match-wins semantics. Closes #29.
+
 ## 0.10.1
 
 ### Patch Changes
