@@ -13,7 +13,7 @@
     "clean": "rm -rf dist cdk.out"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.200.0",
+    "aws-cdk-lib": "^2.258.1",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.21"
   },
