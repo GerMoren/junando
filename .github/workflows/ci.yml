@@ -66,6 +66,8 @@ jobs:
     name: CDK
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Skip for dependabot PRs - they don't have GH_PAT secret
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - name: Checkout
