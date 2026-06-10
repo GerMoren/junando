@@ -7,7 +7,7 @@ import { AlertType } from '@junando/core';
 // Hoist mocks so they are available when vi.mock factory runs
 const mockExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockLoadConfig = vi.hoisted(() => vi.fn());
-const MockLokiTraceRepository = vi.hoisted(() => vi.fn().mockImplementation(() => ({})));
+const MockLokiTraceRepository = vi.hoisted(() => vi.fn(function() { return {}; }));
 
 // Mock dependencies from @junando/core
 vi.mock('@junando/core', async () => {
@@ -19,25 +19,26 @@ vi.mock('@junando/core', async () => {
       info: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
+      fatal: vi.fn(),
     }),
     reinitLogger: vi.fn(),
     flushLoki: vi.fn().mockResolvedValue(undefined),
-    RedisDeduplicationStore: vi.fn().mockImplementation(() => ({})),
+    RedisDeduplicationStore: vi.fn(function() { return {}; }),
     LokiTraceRepository: MockLokiTraceRepository,
-    SlackNotifier: vi.fn().mockImplementation(() => ({})),
-    createLLMProvider: vi.fn().mockImplementation(() => ({})),
-    ProcessIncidentUseCase: vi.fn().mockImplementation(() => ({
-      execute: mockExecute,
-    })),
+    SlackNotifier: vi.fn(function() { return {}; }),
+    createLLMProvider: vi.fn(function() { return {}; }),
+    ProcessIncidentUseCase: vi.fn(function() {
+      return { execute: mockExecute };
+    }),
   };
 });
 
 // Mock ioredis
 vi.mock('ioredis', () => {
   return {
-    Redis: vi.fn().mockImplementation(() => ({
-      on: vi.fn(),
-    })),
+    Redis: vi.fn(function() {
+      return { on: vi.fn() };
+    }),
   };
 });
 

@@ -26,7 +26,7 @@ vi.mock('@aws-sdk/client-sqs', async (importActual) => {
   const actual = await importActual<typeof import('@aws-sdk/client-sqs')>();
   return {
     ...actual,
-    SQSClient: vi.fn(() => {
+    SQSClient: vi.fn(function() {
       registry.constructorCalls++;
       return { send: registry.send };
     }),
@@ -409,7 +409,7 @@ describe('SqsSubscriber', () => {
 
     const subscriber = new SqsSubscriber({
       config: makeConfig({ batchSize: 1, maxInFlight: 2 }),
-      processMessage: vi.fn(() => firstDone.promise),
+      processMessage: vi.fn(function() { return firstDone.promise; }),
       logger: makeLogger(),
       sqsClient: sqsClient as Pick<SQSClient, 'send'>,
     });

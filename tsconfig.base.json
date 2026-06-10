@@ -13,6 +13,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@domain/*": ["packages/core/src/domain/*"],
       "@application/*": ["packages/core/src/application/*"],

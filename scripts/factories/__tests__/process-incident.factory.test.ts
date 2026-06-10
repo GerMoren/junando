@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock ioredis before any factory import
 vi.mock('ioredis', () => ({
-  Redis: vi.fn().mockImplementation(() => ({
-    status: 'ready',
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  })),
+  Redis: vi.fn(function() {
+    return {
+      status: 'ready',
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  }),
 }));
 
 // Partial mock of core — keep ProcessIncidentUseCase real so we can assert instanceof
@@ -14,8 +16,8 @@ vi.mock('../../../packages/core/src/index.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
-    RedisDeduplicationStore: vi.fn().mockImplementation(() => ({ isDuplicate: vi.fn() })),
-    LokiTraceRepository: vi.fn().mockImplementation(() => ({ findByFingerprint: vi.fn() })),
+    RedisDeduplicationStore: vi.fn(function() { return { isDuplicate: vi.fn() }; }),
+    LokiTraceRepository: vi.fn(function() { return { findByFingerprint: vi.fn() }; }),
     createLLMProvider: vi.fn().mockReturnValue({ chat: vi.fn() }),
     SlackNotifier: vi.fn().mockImplementation(() => ({ notify: vi.fn() })),
   };
