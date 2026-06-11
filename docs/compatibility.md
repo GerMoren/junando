@@ -47,7 +47,7 @@ All packages are versioned in lockstep. Install the same version across packages
 |---------------------|---------------|--------------------------------|
 | `@anthropic-ai/sdk` | `^0.102.0` | `@junando/core` |
 | `@aws-sdk/client-sqs` | `^3.1064.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
-| `@aws-sdk/client-ssm` | `^3.1064.0` | `@junando/worker` |
+| `@aws-sdk/client-ssm` | `^3.1065.0` | `@junando/worker` |
 | `@google/generative-ai` | `^0.24.1` | `@junando/core` |
 | `ioredis` | `^5.11.1` | `@junando/core`, `@junando/worker` |
 | `prom-client` | `^15.1.3` | `@junando/core` |
@@ -57,7 +57,7 @@ All packages are versioned in lockstep. Install the same version across packages
 
 | Version | Status     |
 |---------|------------|
-| `pnpm@11.5.2` | ✅ Pinned via `packageManager` |
+| `pnpm@11.5.3` | ✅ Pinned via `packageManager` |
 | >=9.0.0 | ✅ Supported (engines) |
 | < 9     | ❌ Unsupported |
 
