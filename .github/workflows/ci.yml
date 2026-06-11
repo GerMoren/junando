@@ -47,6 +47,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Update compatibility matrix
+        run: pnpm run docs:compat
+
       - name: Verify compatibility matrix
         run: pnpm run docs:compat:check
 
