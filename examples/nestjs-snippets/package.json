@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.26",
+    "@nestjs/common": "^11.1.27",
     "@nestjs/core": "^11.1.26",
     "nestjs-pino": "^4.1.0",
     "pino": "^10.3.1",
