@@ -23,8 +23,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@junando/core": "workspace:*",
     "@aws-sdk/client-sqs": "^3.1076.0",
+    "@junando/core": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -32,6 +32,6 @@
     "@types/node": "^26.0.1",
     "tsup": "^8.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
