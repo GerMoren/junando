@@ -12,16 +12,15 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
-      "@domain/*": ["packages/core/src/domain/*"],
-      "@application/*": ["packages/core/src/application/*"],
-      "@infrastructure/*": ["packages/core/src/infrastructure/*"],
-      "@shared/*": ["packages/core/src/shared/*"],
-      "@junando/core": ["packages/core/src/index.ts"],
-      "@junando/ingest": ["packages/ingest/src/index.ts"],
-      "@junando/ingest/loki-http-client": ["packages/ingest/src/adapters/loki/loki-http-client.ts"]
+      "@domain/*": ["./packages/core/src/domain/*"],
+      "@application/*": ["./packages/core/src/application/*"],
+      "@infrastructure/*": ["./packages/core/src/infrastructure/*"],
+      "@shared/*": ["./packages/core/src/shared/*"],
+      "@junando/core": ["./packages/core/src/index.ts"],
+      "@junando/ingest": ["./packages/ingest/src/index.ts"],
+      "@junando/ingest/loki-http-client": ["./packages/ingest/src/adapters/loki/loki-http-client.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

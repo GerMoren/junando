@@ -18,7 +18,7 @@
         "ignoreEnums": true
       }
     ],
-    "no-empty": ["error", "allowEmptyLoops"],
+    "no-empty": "error",
     "complexity": ["error", 15],
     "prefer-const": "error",
     "no-var": "error",
