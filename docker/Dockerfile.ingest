@@ -14,7 +14,7 @@ COPY packages/ingest/package.json ./packages/ingest/
 
 RUN pnpm install --frozen-lockfile
 
-COPY tsconfig.base.json tsconfig.json ./
+COPY tsconfig.base.json tsconfig.json tsconfig.scripts.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/ingest/ ./packages/ingest/
 
@@ -24,7 +24,7 @@ COPY scripts/factories/ ./scripts/factories/
 
 RUN pnpm --filter @junando/core build
 RUN pnpm --filter @junando/ingest build
-RUN npx tsup --config scripts/tsup.ingest.config.ts
+RUN npx tsdown --config scripts/tsdown.ingest.config.ts
 
 # ── Stage 2: runner ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner
@@ -33,7 +33,7 @@ RUN addgroup -S junando && adduser -S junando -G junando
 
 WORKDIR /app
 
-COPY --from=builder /app/dist/ingest-server.mjs ./
+COPY --from=builder /app/scripts/dist/ingest-server.mjs ./
 
 USER junando
 

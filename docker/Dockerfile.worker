@@ -14,16 +14,16 @@ COPY packages/worker/package.json ./packages/worker/
 
 RUN pnpm install --frozen-lockfile
 
-COPY tsconfig.base.json tsconfig.json ./
+COPY tsconfig.base.json tsconfig.json tsconfig.scripts.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/worker/ ./packages/worker/
-COPY scripts/tsup.worker.config.ts ./scripts/
+COPY scripts/tsdown.worker.config.ts ./scripts/
 COPY scripts/worker-server.ts ./scripts/
 COPY scripts/worker-batch.ts ./scripts/
 
 RUN pnpm --filter @junando/core build
 RUN pnpm --filter @junando/worker build
-RUN cd scripts && npx tsup --config tsup.worker.config.ts
+RUN cd scripts && npx tsdown --config tsdown.worker.config.ts
 
 # ── Stage 2: runner ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner

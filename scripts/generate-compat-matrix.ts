@@ -48,19 +48,20 @@ const nodeMajor = nodeEngine.match(/\d+/)?.[0] ?? "?";
 
 function moduleFormat(pkg: PkgJson): { esm: boolean; cjs: boolean; note: string } {
   const isEsm = pkg.type === "module";
-  const tsupConfig = join(
-    ROOT,
-    "packages",
-    pkg.name.replace("@junando/", ""),
-    "tsup.config.ts",
-  );
-  if (existsSync(tsupConfig)) {
-    const cfg = readFileSync(tsupConfig, "utf8");
-    const hasCjs = /["']cjs["']/.test(cfg);
-    const hasEsm = /["']esm["']/.test(cfg);
-    if (hasCjs && hasEsm) return { esm: true, cjs: true, note: "Dual build via tsup" };
-    if (hasEsm) return { esm: true, cjs: false, note: "ESM only (tsup)" };
-    if (hasCjs) return { esm: false, cjs: true, note: "CJS only (tsup)" };
+  const pkgDir = join(ROOT, "packages", pkg.name.replace("@junando/", ""));
+  // Check tsdown first, then tsup as fallback
+  for (const configName of ["tsdown.config.ts", "tsup.config.ts"]) {
+    const configPath = join(pkgDir, configName);
+    if (existsSync(configPath)) {
+      const cfg = readFileSync(configPath, "utf8");
+      const hasCjs = /["']cjs["']/.test(cfg);
+      const hasEsm = /["']esm["']/.test(cfg);
+      const tool = configName.startsWith("tsdown") ? "tsdown" : "tsup";
+      if (hasCjs && hasEsm) return { esm: true, cjs: true, note: `Dual build via ${tool}` };
+      if (hasEsm) return { esm: true, cjs: false, note: `ESM only (${tool})` };
+      if (hasCjs) return { esm: false, cjs: true, note: `CJS only (${tool})` };
+      break;
+    }
   }
   return {
     esm: isEsm,

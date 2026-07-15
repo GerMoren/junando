@@ -19,17 +19,17 @@ COPY packages/webhook/package.json ./packages/webhook/
 RUN pnpm install --frozen-lockfile
 
 # Copy source
-COPY tsconfig.base.json tsconfig.json ./
+COPY tsconfig.base.json tsconfig.json tsconfig.scripts.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/webhook/ ./packages/webhook/
-COPY scripts/tsup.webhook.config.ts ./scripts/
+COPY scripts/tsdown.webhook.config.ts ./scripts/
 COPY scripts/webhook-server.ts ./scripts/
 COPY scripts/http-utils.ts ./scripts/
 
 # Build packages and entrypoint
 RUN pnpm --filter @junando/core build
 RUN pnpm --filter @junando/webhook build
-RUN cd scripts && npx tsup --config tsup.webhook.config.ts
+RUN cd scripts && npx tsdown --config tsdown.webhook.config.ts
 
 # ── Stage 2: runner ───────────────────────────────────────────────────────────
 FROM node:24-alpine AS runner

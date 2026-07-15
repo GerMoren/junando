@@ -20,8 +20,8 @@
     "access": "public"
   },
   "scripts": {
-    "prepare": "[ -d src ] && tsup || true",
-    "build": "tsup",
+    "prepare": "[ -d src ] && tsdown || true",
+    "build": "tsdown && tsc --project tsconfig.dts.json",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -33,7 +33,7 @@
   "devDependencies": {
     "@junando/core": "workspace:*",
     "@types/node": "^26.0.1",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.22.8",
     "typescript": "^7.0.2"
   },
   "exports": {

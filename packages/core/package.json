@@ -19,7 +19,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --tsconfig tsconfig.build.json",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "tsup": "^8.0.0",
+    "tsdown": "^0.22.8",
     "typescript": "^7.0.2"
   },
   "exports": {

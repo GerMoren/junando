@@ -4,7 +4,7 @@
   "description": "AWS Lambda SQS worker — processes alert events and dispatches notifications for Junando",
   "license": "Apache-2.0",
   "type": "module",
-  "main": "./dist/handler.js",
+  "main": "./dist/handler.cjs",
   "files": [
     "dist",
     "README.md"
@@ -18,7 +18,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -32,7 +32,7 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.162",
     "@types/node": "^26.0.1",
-    "tsup": "^8.0.0",
+    "tsdown": "^0.22.8",
     "typescript": "^7.0.2"
   }
 }
