@@ -1,16 +1,18 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: { 'webhook-server': 'webhook-server.ts' },
+  entry: { 'ingest-server': 'ingest-server.ts' },
   format: 'esm',
   platform: 'node',
   target: 'node24',
   sourcemap: false,
   minify: false,
-  noExternal: [/./],
+  deps: { alwaysBundle: [/./] },
   outDir: 'dist',
-  splitting: false,
-  outExtension: () => ({ js: '.mjs' }),
+  outExtensions: () => ({ js: '.mjs' }),
+  dts: false,
+  tsconfig: 'tsconfig.scripts.json',
+  outputOptions: { codeSplitting: false },
   banner: {
     js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
   },

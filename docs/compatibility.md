@@ -15,10 +15,10 @@
 | Package           | ESM | CJS | Notes                                  |
 |-------------------|-----|-----|----------------------------------------|
 | `@junando/cdk` | ❌ | ✅ | CJS only |
-| `@junando/core` | ✅ | ❌ | ESM only |
-| `@junando/ingest` | ✅ | ✅ | Dual build via tsup |
-| `@junando/webhook` | ❌ | ✅ | CJS only (tsup) |
-| `@junando/worker` | ❌ | ✅ | CJS only (tsup) |
+| `@junando/core` | ✅ | ❌ | ESM only (tsdown) |
+| `@junando/ingest` | ✅ | ✅ | Dual build via tsdown |
+| `@junando/webhook` | ❌ | ✅ | CJS only (tsdown) |
+| `@junando/worker` | ❌ | ✅ | CJS only (tsdown) |
 
 > All packages target **ES2022** (`tsconfig` `target`). TypeScript declarations are emitted for both ESM and CJS where applicable.
 
@@ -46,8 +46,8 @@ All packages are versioned in lockstep. Install the same version across packages
 | Dependency          | Version range | Used by                        |
 |---------------------|---------------|--------------------------------|
 | `@anthropic-ai/sdk` | `^0.102.0` | `@junando/core` |
-| `@aws-sdk/client-sqs` | `^3.1064.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
-| `@aws-sdk/client-ssm` | `^3.1065.0` | `@junando/worker` |
+| `@aws-sdk/client-sqs` | `^3.1076.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
+| `@aws-sdk/client-ssm` | `^3.1080.0` | `@junando/worker` |
 | `@google/generative-ai` | `^0.24.1` | `@junando/core` |
 | `ioredis` | `^5.11.1` | `@junando/core`, `@junando/worker` |
 | `prom-client` | `^15.1.3` | `@junando/core` |

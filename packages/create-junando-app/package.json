@@ -24,15 +24,15 @@
   },
   "scripts": {
     "prebuild": "node scripts/sync-template.js",
-    "build": "tsup src/cli.ts --format esm --dts --tsconfig tsconfig.build.json",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist template",
     "prepublishOnly": "pnpm clean && pnpm build && node scripts/verify-tarball.js"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "tsup": "^8.0.0",
-    "typescript": "^6.0.3",
+    "tsdown": "^0.22.8",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }

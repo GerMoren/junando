@@ -4,5 +4,7 @@ packages:
 allowBuilds:
   '@nestjs/core': false
   esbuild: false
+minimumReleaseAgeExclude:
+  - tsdown@0.22.8
 overrides:
   ioredis: "^5.10.1"
