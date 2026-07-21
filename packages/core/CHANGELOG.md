@@ -1,5 +1,11 @@
 # @junando/core
 
+## 0.12.1
+
+### Patch Changes
+
+- fcc4ee4: Support `staging` as a valid runtime environment for pilot deployments.
+
 ## 0.12.0
 
 ### Minor Changes
