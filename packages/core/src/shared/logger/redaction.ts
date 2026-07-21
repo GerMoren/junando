@@ -18,6 +18,7 @@ const MESSAGE_KEY = 'message';
 const NAME_KEY = 'name';
 const STACK_KEY = 'stack';
 const DEVELOPMENT = 'development';
+const OUTCOME_KEY = 'outcome';
 
 /**
  * Top-level fields allowed to pass through. `cluster`, `dedup`, `rule`,
@@ -29,6 +30,7 @@ const SAFE_FIELDS: ReadonlySet<string> = new Set([
   'timestamp',
   'component',
   'version',
+  OUTCOME_KEY,
   'cluster',
   'dedup',
   'rule',

@@ -1,4 +1,4 @@
-import type { Component } from './enums.js';
+import type { Component, Outcome } from './enums.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WideEvent — one canonical structured log line per processing unit.
@@ -22,16 +22,22 @@ export interface ClusterSection {
   serviceName: string;
   alertCount: number;
   spanCount: number;
+  /** Number of representative traces that failed to fetch (fail-open). */
+  traceErrors?: number;
 }
 
 export interface DedupSection {
   isNew: boolean;
   ttlSeconds: number;
+  /** Fail-open error message when the store was unreachable (e.g. Redis down). */
+  error?: string;
 }
 
 export interface RuleSection {
   matched: boolean;
   suppressed: boolean;
+  /** ID of the rule that matched, when the engine reports one. */
+  matchedRuleId?: string;
 }
 
 export interface LlmSection {
@@ -60,6 +66,7 @@ export interface WideEvent {
   timestamp: string;
   component: Component;
   version?: string;
+  outcome?: Outcome;
   cluster?: ClusterSection;
   dedup?: DedupSection;
   rule?: RuleSection;

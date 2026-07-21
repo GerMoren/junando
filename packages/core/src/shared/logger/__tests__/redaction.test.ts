@@ -23,11 +23,23 @@ describe('redact', () => {
     expect(redact(input)).toEqual(input);
   });
 
+  it('keeps the outcome field (whitelisted) instead of redacting it', () => {
+    const input = {
+      requestId: 'req-1',
+      component: 'useCase',
+      outcome: 'degraded',
+    };
+
+    const result = redact(input);
+
+    expect(result['outcome']).toBe('degraded');
+  });
+
   it('passes whitelisted section objects through with values intact', () => {
     const input = {
-      cluster: { fingerprint: 'fp', serviceName: 'api', alertCount: 2, spanCount: 5 },
-      dedup: { isNew: true, ttlSeconds: 900 },
-      rule: { matched: true, suppressed: false },
+      cluster: { fingerprint: 'fp', serviceName: 'api', alertCount: 2, spanCount: 5, traceErrors: 1 },
+      dedup: { isNew: true, ttlSeconds: 900, error: 'Redis connection failed' },
+      rule: { matched: true, suppressed: false, matchedRuleId: 'rule-1' },
       llm: { provider: 'anthropic', model: 'claude', latencyMs: 10, urgency: 'high', tokens: 5 },
       notify: { channels: ['slack', 'teams'], outcome: 'sent', latencyMs: 30 },
     };
