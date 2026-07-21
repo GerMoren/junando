@@ -12,7 +12,7 @@ import {
   flushLoki,
   startSqsLagPoller,
 } from '@junando/core';
-import type { SQSEvent } from 'aws-lambda';
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { isCsvBody, parseCsvBody } from './adapters/csv-input.adapter.js';
@@ -73,8 +73,13 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   return useCase;
 }
 
-export const handler = async (event: SQSEvent): Promise<void> => {
+export const handler = async (
+  event: SQSEvent | APIGatewayProxyEventV2,
+): Promise<void | APIGatewayProxyResultV2> => {
   try {
+    if (isFunctionUrlEvent(event)) {
+      return await handleHttpRequest(event);
+    }
     return await _handler(event);
   } finally {
     // Flush buffered logs to Loki before Lambda exits.
@@ -82,6 +87,38 @@ export const handler = async (event: SQSEvent): Promise<void> => {
     await flushLoki();
   }
 };
+
+/** Lambda Function URL events carry rawPath; SQS events carry Records. */
+function isFunctionUrlEvent(
+  event: SQSEvent | APIGatewayProxyEventV2,
+): event is APIGatewayProxyEventV2 {
+  return 'rawPath' in event;
+}
+
+/**
+ * HTTP routes exposed via the worker Function URL (IAM-auth).
+ * Deliberately dependency-free: a metrics scrape must not initialize the pipeline.
+ */
+async function handleHttpRequest(
+  event: APIGatewayProxyEventV2,
+): Promise<APIGatewayProxyResultV2> {
+  if (event.rawPath === '/metrics') {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'text/plain' },
+      body: await metrics.registry.metrics(),
+    };
+  }
+
+  if (event.rawPath === '/health') {
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ status: 'ok', service: 'junando-worker' }),
+    };
+  }
+
+  return { statusCode: 404, body: JSON.stringify({ error: 'Not Found' }) };
+}
 
 /** Parse an optional integer env var, returning undefined if unset or NaN */
 function parseIntEnv(key: string): number | undefined {

@@ -102,7 +102,14 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
   const QUEUE_URL = process.env['SQS_QUEUE_URL'] ?? '';
   const start = Date.now();
 
-  const correlationId = randomUUID();
+  // Accept the upstream correlationId (Alertmanager x-correlation-id header) so
+  // the whole pipeline can be traced end-to-end. Spec requires UUID v4 everywhere,
+  // so an absent or malformed header falls back to a freshly generated UUID.
+  const correlationIdHeader = event.headers?.['x-correlation-id'];
+  const correlationId =
+    correlationIdHeader && z.string().uuid().safeParse(correlationIdHeader).success
+      ? correlationIdHeader
+      : randomUUID();
 
   // Health check
   if (event.rawPath === '/health') {
