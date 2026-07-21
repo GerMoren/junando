@@ -54,12 +54,27 @@ export interface ITraceRepository {
 }
 
 /**
+ * Structured result of an LLM analysis call.
+ * Carries the diagnosis plus the observability metadata that feeds the
+ * `llm` section of the wide event (urgency comes from analysis.urgency_level;
+ * total tokens = promptTokens + completionTokens).
+ */
+export interface LLMResult {
+  analysis: LLMAnalysis;
+  provider: string;
+  model: string;
+  latencyMs: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
  * LLM provider.
  * Analyzes an incident cluster and returns a structured diagnosis.
  * Implementations: GeminiProvider, ClaudeProvider, OpenAIProvider, MockLLMProvider (tests)
  */
 export interface ILLMProvider {
-  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis>;
+  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult>;
 }
 
 /**

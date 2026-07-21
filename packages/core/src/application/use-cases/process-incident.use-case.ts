@@ -100,7 +100,8 @@ export class ProcessIncidentUseCase {
       // 5. LLM inference — fail gracefully, notify anyway with null analysis
       let analysis = null;
       try {
-        analysis = await llm.analyze(cluster, allSpans);
+        const llmResult = await llm.analyze(cluster, allSpans);
+        analysis = llmResult.analysis;
         log2.info({ urgency: analysis.urgency_level }, 'LLM analysis complete');
       } catch (err) {
         log2.warn({ err }, 'LLM inference failed — notifying without diagnosis');

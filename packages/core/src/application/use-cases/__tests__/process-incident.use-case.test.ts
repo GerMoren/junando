@@ -69,11 +69,18 @@ describe('ProcessIncidentUseCase', () => {
     vi.mocked(mockDedup.isNew).mockResolvedValue({ isNew: true, ttlSeconds: 300 });
     vi.mocked(mockTraces.findByTraceId).mockResolvedValue([{ span: 'test' }]);
     vi.mocked(mockLlm.analyze).mockResolvedValue({
-      probable_cause: 'test',
+      analysis: {
+        probable_cause: 'test',
       impacted_services: ['test'],
       recommended_steps: [],
       urgency_level: 'high',
       requires_rollback: false,
+      },
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 1,
+      promptTokens: 0,
+      completionTokens: 0,
     });
 
     await useCase.execute([alert], 'corr-1');
@@ -145,11 +152,18 @@ describe('ProcessIncidentUseCase — onClustersBuilt callback', () => {
 
     vi.mocked(mockDedup.isNew).mockResolvedValue({ isNew: false, ttlSeconds: 300 }); // skip inner processing
     vi.mocked(mockLlm.analyze).mockResolvedValue({
-      probable_cause: 'x',
+      analysis: {
+        probable_cause: 'x',
       impacted_services: ['s'],
       recommended_steps: [],
       urgency_level: 'low',
       requires_rollback: false,
+      },
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 1,
+      promptTokens: 0,
+      completionTokens: 0,
     });
 
     const alerts = [
@@ -223,11 +237,18 @@ describe('ProcessIncidentUseCase — dedup counter emission', () => {
     dedupDuplicateSpy = vi.spyOn(metricsModule.dedupDuplicate, 'inc');
     vi.mocked(mockTraces.findByTraceId).mockResolvedValue([]);
     vi.mocked(mockLlm.analyze).mockResolvedValue({
-      probable_cause: 'test',
+      analysis: {
+        probable_cause: 'test',
       impacted_services: [],
       recommended_steps: [],
       urgency_level: 'low',
       requires_rollback: false,
+      },
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 1,
+      promptTokens: 0,
+      completionTokens: 0,
     });
     vi.mocked(mockNotifier.send).mockResolvedValue(undefined);
   });
@@ -307,11 +328,18 @@ describe('ProcessIncidentUseCase — IRuleEngine PRE-LLM hooks', () => {
     vi.mocked(mockDedup.isNew).mockResolvedValue({ isNew: true, ttlSeconds: 300 });
     vi.mocked(mockTraces.findByTraceId).mockResolvedValue([]);
     vi.mocked(mockLlm.analyze).mockResolvedValue({
-      probable_cause: 'test',
+      analysis: {
+        probable_cause: 'test',
       impacted_services: [],
       recommended_steps: [],
       urgency_level: 'low',
       requires_rollback: false,
+      },
+      provider: 'mock',
+      model: 'mock',
+      latencyMs: 1,
+      promptTokens: 0,
+      completionTokens: 0,
     });
     vi.mocked(mockNotifier.send).mockResolvedValue(undefined);
   });
@@ -457,7 +485,7 @@ describe('ProcessIncidentUseCase — IRuleEngine POST-LLM hooks', () => {
     vi.clearAllMocks();
     vi.mocked(mockDedup.isNew).mockResolvedValue({ isNew: true, ttlSeconds: 300 });
     vi.mocked(mockTraces.findByTraceId).mockResolvedValue([]);
-    vi.mocked(mockLlm.analyze).mockResolvedValue(analysis);
+    vi.mocked(mockLlm.analyze).mockResolvedValue({ analysis, provider: 'mock', model: 'mock', latencyMs: 1, promptTokens: 0, completionTokens: 0 });
     vi.mocked(mockNotifier.send).mockResolvedValue(undefined);
   });
 
@@ -543,7 +571,7 @@ describe('ProcessIncidentUseCase — Rule action routing', () => {
     vi.clearAllMocks();
     vi.mocked(mockDedup.isNew).mockResolvedValue({ isNew: true, ttlSeconds: 300 });
     vi.mocked(mockTraces.findByTraceId).mockResolvedValue([]);
-    vi.mocked(mockLlm.analyze).mockResolvedValue(analysis);
+    vi.mocked(mockLlm.analyze).mockResolvedValue({ analysis, provider: 'mock', model: 'mock', latencyMs: 1, promptTokens: 0, completionTokens: 0 });
     vi.mocked(mockNotifier.send).mockResolvedValue(undefined);
   });
 

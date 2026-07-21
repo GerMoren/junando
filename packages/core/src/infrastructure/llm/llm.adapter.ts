@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import { LLMAnalysisSchema } from '../../domain/entities/incident.js';
-import type { ILLMProvider } from '../../domain/ports/index.js';
+import type { ILLMProvider, LLMResult } from '../../domain/ports/index.js';
 import {
   CIRCUIT_BREAKER,
   LLM_FALLBACK_DEFAULTS,
@@ -15,6 +15,19 @@ import { createLogger } from '../../shared/logger/index.js';
 import { llmInferenceDuration, llmInferenceTotal } from '../../shared/metrics/index.js';
 
 const logger = createLogger();
+
+/** Provider name reported by MockLLMProvider results. */
+const MOCK_PROVIDER_NAME = 'mock';
+
+/**
+ * Internal carrier: what each provider's raw call produces before the
+ * shared metadata (provider, model, latencyMs) is attached.
+ */
+interface LlmRawResult {
+  analysis: LLMAnalysis;
+  promptTokens: number;
+  completionTokens: number;
+}
 
 /**
  * Schema for OpenRouter API response validation.
@@ -145,9 +158,23 @@ export class GeminiProvider implements ILLMProvider {
     this.breaker = new Breaker.default(this.analyzeRaw.bind(this), BREAKER_OPTIONS);
   }
 
-  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
+  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult> {
+    const startMs = Date.now();
+    const raw = await this.analyzeWithBreaker(cluster, traces);
+    return {
+      ...raw,
+      provider: LLMProviderType.Gemini,
+      model: this.model,
+      latencyMs: Date.now() - startMs,
+    };
+  }
+
+  private async analyzeWithBreaker(
+    cluster: AlertCluster,
+    traces: Record<string, unknown>[],
+  ): Promise<LlmRawResult> {
     try {
-      return (await this.breaker.fire(cluster, traces)) as LLMAnalysis;
+      return (await this.breaker.fire(cluster, traces)) as LlmRawResult;
     } catch {
       return this.analyzeRaw(cluster, traces);
     }
@@ -156,7 +183,7 @@ export class GeminiProvider implements ILLMProvider {
   private async analyzeRaw(
     cluster: AlertCluster,
     traces: Record<string, unknown>[],
-  ): Promise<LLMAnalysis> {
+  ): Promise<LlmRawResult> {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const gemini = genAI.getGenerativeModel({
@@ -165,7 +192,16 @@ export class GeminiProvider implements ILLMProvider {
     });
 
     const result = await gemini.generateContent(buildUserPrompt(cluster, traces));
-    return parseAnalysis(result.response.text());
+    const usage = (
+      result.response as {
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      }
+    ).usageMetadata;
+    return {
+      analysis: parseAnalysis(result.response.text()),
+      promptTokens: usage?.promptTokenCount ?? 0,
+      completionTokens: usage?.candidatesTokenCount ?? 0,
+    };
   }
 }
 
@@ -179,7 +215,8 @@ export class ClaudeProvider implements ILLMProvider {
     private readonly model: string = LLM_MODELS.Claude,
   ) {}
 
-  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
+  async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult> {
+    const startMs = Date.now();
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: this.apiKey });
 
@@ -191,7 +228,14 @@ export class ClaudeProvider implements ILLMProvider {
     });
 
     const text = message.content.find((b) => b.type === 'text')?.text ?? '';
-    return parseAnalysis(text);
+    return {
+      analysis: parseAnalysis(text),
+      provider: LLMProviderType.Claude,
+      model: this.model,
+      latencyMs: Date.now() - startMs,
+      promptTokens: message.usage?.input_tokens ?? 0,
+      completionTokens: message.usage?.output_tokens ?? 0,
+    };
   }
 }
 
@@ -202,14 +246,21 @@ export class ClaudeProvider implements ILLMProvider {
 export class MockLLMProvider implements ILLMProvider {
   readonly callLog: Array<{ cluster: AlertCluster }> = [];
 
-  async analyze(cluster: AlertCluster, _traces: Record<string, unknown>[]): Promise<LLMAnalysis> {
+  async analyze(cluster: AlertCluster, _traces: Record<string, unknown>[]): Promise<LLMResult> {
     this.callLog.push({ cluster });
     return {
-      probable_cause: `Mock: ${cluster.alertType} on ${cluster.serviceName}`,
-      impacted_services: [cluster.serviceName],
-      recommended_steps: ['Check the logs', 'Verify the deployment'],
-      urgency_level: 'high',
-      requires_rollback: false,
+      analysis: {
+        probable_cause: `Mock: ${cluster.alertType} on ${cluster.serviceName}`,
+        impacted_services: [cluster.serviceName],
+        recommended_steps: ['Check the logs', 'Verify the deployment'],
+        urgency_level: 'high',
+        requires_rollback: false,
+      },
+      provider: MOCK_PROVIDER_NAME,
+      model: MOCK_PROVIDER_NAME,
+      latencyMs: 0,
+      promptTokens: 0,
+      completionTokens: 0,
     };
   }
 }
@@ -231,23 +282,26 @@ interface FallbackOptions {
 export class OpenRouterProvider implements ILLMProvider {
   private readonly fallbackModels: string[];
   private readonly fallbackTimeoutMs: number;
+  private readonly providerName: string;
 
   constructor(
     private readonly apiKey: string,
     private readonly model: string = LLM_MODELS.OpenRouter,
     fallbackModels: string[] = [],
     fallbackTimeoutMs: number = LLM_FALLBACK_DEFAULTS.TimeoutMs,
+    providerName: string = LLMProviderType.OpenRouter,
   ) {
     // Deduplicate: remove primary model from fallback list at construction time
     this.fallbackModels = fallbackModels.filter((m) => m !== model);
     this.fallbackTimeoutMs = fallbackTimeoutMs;
+    this.providerName = providerName;
   }
 
   async analyze(
     cluster: AlertCluster,
     traces: Record<string, unknown>[],
     correlationId?: string,
-  ): Promise<LLMAnalysis> {
+  ): Promise<LLMResult> {
     const prompt = buildUserPrompt(cluster, traces);
     logger.debug({ model: this.model, promptLength: prompt.length, correlationId }, 'llm:request:start');
 
@@ -301,7 +355,7 @@ export class OpenRouterProvider implements ILLMProvider {
           if (this.fallbackModels.length > 0) {
             // Primary model exhausted — try fallback chain
             const deadlineMs = Date.now() + this.fallbackTimeoutMs;
-            return this.analyzeFallback(prompt, correlationId, deadlineMs, this.model);
+            return this.analyzeFallback(prompt, correlationId, deadlineMs, this.model, startMs);
           }
           llmInferenceTotal.inc({ status: 'rate_limited' });
           throw new Error(`OpenRouter API failed: ${res.status}`);
@@ -318,9 +372,10 @@ export class OpenRouterProvider implements ILLMProvider {
 
       const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
       const analysis = parseAnalysis(text, correlationId);
+      const usage = parsed.success ? parsed.data.usage : undefined;
 
-      if (parsed.success && parsed.data.usage) {
-        const { prompt_tokens, completion_tokens, total_tokens } = parsed.data.usage;
+      if (usage) {
+        const { prompt_tokens, completion_tokens, total_tokens } = usage;
         logger.info(
           {
             model: this.model,
@@ -335,7 +390,14 @@ export class OpenRouterProvider implements ILLMProvider {
       llmInferenceTotal.inc({ status: 'success' });
       llmInferenceDuration.observe({ model: this.model }, latencyMs / 1000);
 
-      return analysis;
+      return {
+        analysis,
+        provider: this.providerName,
+        model: this.model,
+        latencyMs,
+        promptTokens: usage?.prompt_tokens ?? 0,
+        completionTokens: usage?.completion_tokens ?? 0,
+      };
     }
 
     throw new Error('OpenRouter API failed after retry');
@@ -346,7 +408,8 @@ export class OpenRouterProvider implements ILLMProvider {
     correlationId: string | undefined,
     deadlineMs: number,
     fromModel: string,
-  ): Promise<LLMAnalysis> {
+    startMs: number,
+  ): Promise<LLMResult> {
     for (const toModel of this.fallbackModels) {
       if (Date.now() >= deadlineMs) {
         throw new Error('OpenRouter fallback chain timed out');
@@ -383,7 +446,15 @@ export class OpenRouterProvider implements ILLMProvider {
 
       const parsed = OpenRouterResponseSchema.safeParse(raw);
       const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
-      return parseAnalysis(text, correlationId);
+      const usage = parsed.success ? parsed.data.usage : undefined;
+      return {
+        analysis: parseAnalysis(text, correlationId),
+        provider: this.providerName,
+        model: toModel,
+        latencyMs: Date.now() - startMs,
+        promptTokens: usage?.prompt_tokens ?? 0,
+        completionTokens: usage?.completion_tokens ?? 0,
+      };
     }
 
     throw new Error('OpenRouter API exhausted all models');
@@ -403,8 +474,8 @@ type LLMFactory = (apiKey: string, model?: string, options?: FallbackOptions) =>
 const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, LLMFactory>([
   [LLMProviderType.Gemini, (apiKey, model) => new GeminiProvider(apiKey, model)],
   [LLMProviderType.Claude, (apiKey, model) => new ClaudeProvider(apiKey, model)],
-  [LLMProviderType.OpenRouter, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs)],
-  [LLMProviderType.Qwen, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs)],
+  [LLMProviderType.OpenRouter, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs, LLMProviderType.OpenRouter)],
+  [LLMProviderType.Qwen, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs, LLMProviderType.Qwen)],
 ]);
 
 export function createLLMProvider(provider: string, apiKey: string, model?: string, options?: FallbackOptions): ILLMProvider {

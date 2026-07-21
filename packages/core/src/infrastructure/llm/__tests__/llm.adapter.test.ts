@@ -81,11 +81,22 @@ describe('MockLLMProvider', () => {
     const cluster = makeCluster();
     const result = await provider.analyze(cluster, []);
 
-    expect(result.probable_cause).toBe('Mock: http_500 on checkout-service');
-    expect(result.impacted_services).toEqual(['checkout-service']);
-    expect(result.recommended_steps).toEqual(['Check the logs', 'Verify the deployment']);
-    expect(result.urgency_level).toBe('high');
-    expect(result.requires_rollback).toBe(false);
+    expect(result.analysis.probable_cause).toBe('Mock: http_500 on checkout-service');
+    expect(result.analysis.impacted_services).toEqual(['checkout-service']);
+    expect(result.analysis.recommended_steps).toEqual(['Check the logs', 'Verify the deployment']);
+    expect(result.analysis.urgency_level).toBe('high');
+    expect(result.analysis.requires_rollback).toBe(false);
+  });
+
+  it('returns a structured LLMResult with provider metadata', async () => {
+    const provider = new MockLLMProvider();
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.provider).toBe('mock');
+    expect(result.model).toBe('mock');
+    expect(result.latencyMs).toBe(0);
+    expect(result.promptTokens).toBe(0);
+    expect(result.completionTokens).toBe(0);
   });
 
   it('logs incoming cluster calls', async () => {
@@ -103,14 +114,14 @@ describe('MockLLMProvider', () => {
     const provider = new MockLLMProvider();
     const traces = [{ traceId: 't1' }, { traceId: 't2' }];
     const result = await provider.analyze(makeCluster(), traces);
-    expect(result.probable_cause).toBe('Mock: http_500 on checkout-service');
+    expect(result.analysis.probable_cause).toBe('Mock: http_500 on checkout-service');
   });
 
   it('returns analysis that validates against LLMAnalysisSchema', async () => {
     const { LLMAnalysisSchema } = await import('../../../domain/entities/incident.js');
     const provider = new MockLLMProvider();
     const result = await provider.analyze(makeCluster(), []);
-    expect(() => LLMAnalysisSchema.parse(result)).not.toThrow();
+    expect(() => LLMAnalysisSchema.parse(result.analysis)).not.toThrow();
   });
 });
 
@@ -185,11 +196,11 @@ describe('OpenRouterProvider', () => {
 
     const result = await provider.analyze(makeCluster(), []);
 
-    expect(result.probable_cause).toBe('memory leak');
-    expect(result.impacted_services).toEqual(['web']);
-    expect(result.recommended_steps).toEqual(['restart pod']);
-    expect(result.urgency_level).toBe('critical');
-    expect(result.requires_rollback).toBe(true);
+    expect(result.analysis.probable_cause).toBe('memory leak');
+    expect(result.analysis.impacted_services).toEqual(['web']);
+    expect(result.analysis.recommended_steps).toEqual(['restart pod']);
+    expect(result.analysis.urgency_level).toBe('critical');
+    expect(result.analysis.requires_rollback).toBe(true);
   });
 
   it('throws when fetch response is not ok (non-retryable status)', async () => {
@@ -232,8 +243,8 @@ describe('OpenRouterProvider', () => {
 
     const result = await provider.analyze(makeCluster(), []);
     // Falls back to heuristic analysis
-    expect(result.urgency_level).toBeDefined();
-    expect(result.probable_cause).toBe('Analysis in progress - check logs for details');
+    expect(result.analysis.urgency_level).toBeDefined();
+    expect(result.analysis.probable_cause).toBe('Analysis in progress - check logs for details');
   });
 
   it('returns fallback when choices array is empty', async () => {
@@ -244,7 +255,7 @@ describe('OpenRouterProvider', () => {
     });
 
     const result = await provider.analyze(makeCluster(), []);
-    expect(result.probable_cause).toBe('Analysis in progress - check logs for details');
+    expect(result.analysis.probable_cause).toBe('Analysis in progress - check logs for details');
   });
 
   it('handles cluster with missing optional fields', async () => {
@@ -266,7 +277,7 @@ describe('OpenRouterProvider', () => {
 
     const clusterNoLatency = makeCluster({ latencyP99Ms: undefined });
     const result = await provider.analyze(clusterNoLatency, []);
-    expect(result.urgency_level).toBe('medium');
+    expect(result.analysis.urgency_level).toBe('medium');
   });
 
   it('uses default model when model param is omitted', async () => {
@@ -396,7 +407,7 @@ describe('OpenRouterProvider — fallback chain', () => {
     await vi.runAllTimersAsync();
     const result = await promise;
 
-    expect(result.probable_cause).toBe('fixed');
+    expect(result.analysis.probable_cause).toBe('fixed');
     expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -442,7 +453,7 @@ describe('OpenRouterProvider — fallback chain', () => {
     const result = await promise;
 
     // model-b was tried (not model-a again), fetch called 3 times total (2 primary + 1 fallback)
-    expect(result.probable_cause).toBe('fixed');
+    expect(result.analysis.probable_cause).toBe('fixed');
     const calls = mockFetch.mock.calls as [string, RequestInit][];
     const fallbackBody = JSON.parse(calls[2][1].body as string);
     expect(fallbackBody.model).toBe('model-b');
@@ -511,14 +522,19 @@ describe('LLM provider interface contract', () => {
     expect(typeof openrouter.analyze).toBe('function');
   });
 
-  it('analyze returns a Promise<LLMAnalysis>', async () => {
+  it('analyze returns a Promise<LLMResult> carrying the analysis plus observability metadata', async () => {
     const mock = new MockLLMProvider();
     const result = await mock.analyze(makeCluster(), []);
-    expect(result).toHaveProperty('probable_cause');
-    expect(result).toHaveProperty('impacted_services');
-    expect(result).toHaveProperty('recommended_steps');
-    expect(result).toHaveProperty('urgency_level');
-    expect(result).toHaveProperty('requires_rollback');
+    expect(result.analysis).toHaveProperty('probable_cause');
+    expect(result.analysis).toHaveProperty('impacted_services');
+    expect(result.analysis).toHaveProperty('recommended_steps');
+    expect(result.analysis).toHaveProperty('urgency_level');
+    expect(result.analysis).toHaveProperty('requires_rollback');
+    expect(result).toHaveProperty('provider');
+    expect(result).toHaveProperty('model');
+    expect(result).toHaveProperty('latencyMs');
+    expect(result).toHaveProperty('promptTokens');
+    expect(result).toHaveProperty('completionTokens');
   });
 });
 
@@ -544,7 +560,8 @@ describe('parseAnalysis edge cases', () => {
       }),
     });
     const provider = new OpenRouterProvider('key');
-    return provider.analyze(makeCluster(), []);
+    const result = await provider.analyze(makeCluster(), []);
+    return result.analysis;
   }
 
   it('parses analysis with extra whitespace around JSON', async () => {
@@ -579,8 +596,8 @@ describe('parseAnalysis edge cases', () => {
     });
     const provider = new OpenRouterProvider('key');
     const result = await provider.analyze(makeCluster(), []);
-    expect(result.urgency_level).toBe('critical');
-    expect(result.requires_rollback).toBe(true);
+    expect(result.analysis.urgency_level).toBe('critical');
+    expect(result.analysis.requires_rollback).toBe(true);
   });
 
   it('detects low urgency via heuristics', async () => {
@@ -593,7 +610,7 @@ describe('parseAnalysis edge cases', () => {
     });
     const provider = new OpenRouterProvider('key');
     const result = await provider.analyze(makeCluster(), []);
-    expect(result.urgency_level).toBe('low');
+    expect(result.analysis.urgency_level).toBe('low');
   });
 
   it('detects high urgency via severity-2 keyword', async () => {
@@ -606,7 +623,7 @@ describe('parseAnalysis edge cases', () => {
     });
     const provider = new OpenRouterProvider('key');
     const result = await provider.analyze(makeCluster(), []);
-    expect(result.urgency_level).toBe('high');
+    expect(result.analysis.urgency_level).toBe('high');
   });
 
   it('uses unknown-service default when impacted_services cannot be parsed', async () => {
@@ -816,6 +833,188 @@ describe('OpenRouterProvider — metric instrumentation', () => {
     await assertion;
     expect(mockMetrics.inc).toHaveBeenCalledWith({ status: 'rate_limited' });
     vi.useRealTimers();
+  });
+});
+
+// ── Structured LLMResult — OpenRouter ─────────────────────────────────────
+
+describe('OpenRouterProvider — structured LLMResult', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const successContent =
+    '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}';
+
+  it('returns provider, model, latencyMs and token counts from the API usage', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: successContent } }],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.provider).toBe('openrouter');
+    expect(result.model).toBe('qwen/model');
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.promptTokens).toBe(20);
+    expect(result.completionTokens).toBe(10);
+    expect(result.analysis.urgency_level).toBe('low');
+  });
+
+  it('reports zero tokens when the API omits usage', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: successContent } }],
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.promptTokens).toBe(0);
+    expect(result.completionTokens).toBe(0);
+  });
+
+  it('reports the provider name given to the factory (qwen stays distinguishable)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: successContent } }],
+      }),
+    });
+
+    const qwenProvider = createLLMProvider('qwen', 'key');
+    const qwenResult = await qwenProvider.analyze(makeCluster(), []);
+    expect(qwenResult.provider).toBe('qwen');
+
+    const openrouterProvider = createLLMProvider('openrouter', 'key');
+    const openrouterResult = await openrouterProvider.analyze(makeCluster(), []);
+    expect(openrouterResult.provider).toBe('openrouter');
+  });
+
+  it('reports the fallback model that actually succeeded', async () => {
+    vi.useFakeTimers();
+    const provider = new OpenRouterProvider('key', 'model-a', ['model-b'], 60_000);
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({ error: { metadata: { retry_after_seconds: 1 } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({ error: { metadata: { retry_after_seconds: 1 } } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ index: 0, message: { role: 'assistant', content: successContent } }],
+          usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 },
+        }),
+      });
+
+    const promise = provider.analyze(makeCluster(), [], 'corr-fb');
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(result.model).toBe('model-b');
+    expect(result.promptTokens).toBe(7);
+    expect(result.completionTokens).toBe(3);
+    vi.useRealTimers();
+  });
+});
+
+// ── Structured LLMResult — Gemini / Claude (SDK mocked) ───────────────────
+
+vi.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: class {
+    getGenerativeModel() {
+      return {
+        generateContent: async () => ({
+          response: {
+            text: () =>
+              '{"probable_cause":"gemini cause","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"medium","requires_rollback":false}',
+            usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 8 },
+          },
+        }),
+      };
+    }
+  },
+}));
+
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = {
+      create: async () => ({
+        content: [
+          {
+            type: 'text',
+            text: '{"probable_cause":"claude cause","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"high","requires_rollback":true}',
+          },
+        ],
+        usage: { input_tokens: 15, output_tokens: 7 },
+      }),
+    };
+  },
+}));
+
+describe('GeminiProvider — structured LLMResult', () => {
+  it('returns provider, model, latencyMs and tokens from usageMetadata', async () => {
+    const { GeminiProvider } = await import('../llm.adapter.js');
+    const provider = new GeminiProvider('test-key');
+
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.provider).toBe('gemini');
+    expect(result.model).toBe('gemini-2.0-flash');
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.promptTokens).toBe(12);
+    expect(result.completionTokens).toBe(8);
+    expect(result.analysis.probable_cause).toBe('gemini cause');
+  });
+
+  it('honors a custom model override', async () => {
+    const { GeminiProvider } = await import('../llm.adapter.js');
+    const provider = new GeminiProvider('test-key', 'gemini-2.5-pro');
+
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.model).toBe('gemini-2.5-pro');
+  });
+});
+
+describe('ClaudeProvider — structured LLMResult', () => {
+  it('returns provider, model, latencyMs and tokens from message usage', async () => {
+    const { ClaudeProvider } = await import('../llm.adapter.js');
+    const provider = new ClaudeProvider('test-key');
+
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.provider).toBe('claude');
+    expect(result.model).toBe('claude-haiku-4-5');
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.promptTokens).toBe(15);
+    expect(result.completionTokens).toBe(7);
+    expect(result.analysis.urgency_level).toBe('high');
+    expect(result.analysis.requires_rollback).toBe(true);
   });
 });
 
