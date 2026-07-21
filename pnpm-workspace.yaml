@@ -6,5 +6,9 @@ allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
   - tsdown@0.22.8
+  - '@aws-sdk/client-sqs@3.1091.0'
+  - '@aws-sdk/client-ssm@3.1091.0'
+  - '@smithy/core@3.29.6'
+  - '@smithy/signature-v4@5.6.7'
 overrides:
   ioredis: "^5.10.1"

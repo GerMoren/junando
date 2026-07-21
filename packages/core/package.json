@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.102.0",
+    "@anthropic-ai/sdk": "^0.112.3",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
     "ioredis": "^5.11.1",
@@ -35,8 +35,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.0.1",
-    "tsdown": "^0.22.8",
+    "@types/node": "^26.1.1",
+    "tsdown": "^0.22.12",
     "typescript": "^7.0.2"
   },
   "exports": {
