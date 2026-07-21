@@ -30,6 +30,7 @@
     "simulate:db-outage:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --scenario=db_outage --target=webhook",
     "simulate:bad-deploy:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --scenario=bad_deploy --target=webhook",
     "simulate:latency:prod": "tsx --env-file=.env.production scripts/simulate-incident.ts -- --scenario=latency_spike --target=webhook",
+    "test:wide-events": "bash scripts/test-wide-events.sh",
     "logs:webhook": "aws logs tail /aws/lambda/junando-webhook --follow --format short",
     "logs:worker": "aws logs tail /aws/lambda/junando-worker --follow --format short",
     "ingest:build": "tsdown --config scripts/tsdown.ingest.config.ts",
