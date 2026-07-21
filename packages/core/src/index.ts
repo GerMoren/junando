@@ -10,6 +10,7 @@ export { Fingerprint } from './domain/value-objects/fingerprint.js';
 
 // Domain — Ports (interfaces)
 export type {
+  DedupResult,
   IAlertQueue,
   IDeduplicationStore,
   IIndexer,
@@ -17,8 +18,11 @@ export type {
   INotifier,
   IRuleEngine,
   ITraceRepository,
+  LLMResult,
+  NotifyResult,
   RuleActionResult,
 } from './domain/ports/index.js';
+export { NotifyOutcome } from './domain/ports/index.js';
 
 // Domain — Services
 export { ClusteringService } from './domain/services/clustering.service.js';
