@@ -26,6 +26,30 @@ describe('resolveDeployConfig', () => {
       });
       expect(result.nodeEnv).toBe('production');
     });
+
+    it('uses staging for pilot when NODE_ENV and production context default are absent', () => {
+      const result = resolveDeployConfig({ awsEnv: 'pilot', contextNodeEnv: 'production' });
+      expect(result.nodeEnv).toBe('staging');
+    });
+
+    it('preserves an explicit pilot NODE_ENV override', () => {
+      const result = resolveDeployConfig({ awsEnv: 'pilot', envNodeEnv: 'production' });
+      expect(result.nodeEnv).toBe('production');
+    });
+  });
+
+  describe('physical resource name resolution', () => {
+    it('keeps the default resource names unchanged', () => {
+      expect(resolveDeployConfig({}).resourceNamePrefix).toBe('junando');
+    });
+
+    it('uses the pilot resource name prefix only for AWS_ENV=pilot', () => {
+      expect(resolveDeployConfig({ awsEnv: 'pilot' }).resourceNamePrefix).toBe('junando-pilot');
+    });
+
+    it('keeps the default resource names for other AWS environments', () => {
+      expect(resolveDeployConfig({ awsEnv: 'dev' }).resourceNamePrefix).toBe('junando');
+    });
   });
 
   describe('ssmPrefix resolution', () => {
@@ -51,6 +75,16 @@ describe('resolveDeployConfig', () => {
         contextSsmPrefix: undefined,
       });
       expect(result.ssmPrefix).toBe('/junando');
+    });
+
+    it('uses a safe pilot prefix when SSM_PREFIX is omitted', () => {
+      const result = resolveDeployConfig({ awsEnv: 'pilot', contextSsmPrefix: '/junando' });
+      expect(result.ssmPrefix).toBe('/junando-pilot');
+    });
+
+    it('preserves an explicit pilot SSM_PREFIX override', () => {
+      const result = resolveDeployConfig({ awsEnv: 'pilot', envSsmPrefix: '/custom-pilot' });
+      expect(result.ssmPrefix).toBe('/custom-pilot');
     });
   });
 

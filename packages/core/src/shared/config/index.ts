@@ -9,6 +9,13 @@ import { createLogger } from '../logger/index.js';
 // No silent failures, no undefined values in the codebase.
 // ─────────────────────────────────────────────────────────────────────────────
 
+export enum NodeEnvironment {
+  Development = 'development',
+  Test = 'test',
+  Staging = 'staging',
+  Production = 'production',
+}
+
 // Load secrets from SSM using SSM_PREFIX (AWS Lambda deployment)
 async function loadSecretsFromSSM(): Promise<void> {
   const prefix = process.env.SSM_PREFIX;
@@ -70,7 +77,7 @@ const ConfigSchema = z
     dedupTtlSeconds: z.coerce.number().int().positive().default(300),
     clusterWindowMs: z.coerce.number().int().positive().default(120_000),
     logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
-    nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
+    nodeEnv: z.nativeEnum(NodeEnvironment).default(NodeEnvironment.Development),
     llmFallbackModels: z
       .string()
       .optional()

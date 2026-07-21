@@ -18,22 +18,32 @@ export interface JunandoStackProps extends cdk.StackProps {
   nodeEnv: string;
   /** SSM Parameter Store prefix for all secrets — resolved by bin/app.ts. */
   ssmPrefix: string;
+  /** Prefix for physical resource names — resolved by bin/app.ts. */
+  resourceNamePrefix?: string;
+}
+
+const DEFAULT_RESOURCE_NAME_PREFIX = 'junando';
+
+function resourceName(prefix: string, suffix: string): string {
+  return `${prefix}-${suffix}`;
 }
 
 export class JunandoStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: JunandoStackProps) {
     super(scope, id, props);
 
+    const resourceNamePrefix = props.resourceNamePrefix ?? DEFAULT_RESOURCE_NAME_PREFIX;
+
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
     const coreLayer = new lambda.LayerVersion(this, 'JunandoCoreLayer', {
       code: lambda.Code.fromAsset(path.join(process.cwd(), '..', 'core', 'dist')),
       compatibleRuntimes: [lambda.Runtime.NODEJS_24_X],
-      layerVersionName: 'junando-core-layer',
+      layerVersionName: resourceName(resourceNamePrefix, 'core-layer'),
     });
 
     // ── Dead Letter Queue ────────────────────────────────────────────────────
     const dlq = new sqs.Queue(this, 'AlertDLQ', {
-      queueName: 'junando-alerts-dlq.fifo',
+      queueName: `${resourceName(resourceNamePrefix, 'alerts-dlq')}.fifo`,
       retentionPeriod: cdk.Duration.days(14),
       fifo: true,
       encryption: sqs.QueueEncryption.KMS_MANAGED,
@@ -41,7 +51,7 @@ export class JunandoStack extends cdk.Stack {
 
     // ── Main Queue ───────────────────────────────────────────────────────────
     const queue = new sqs.Queue(this, 'AlertQueue', {
-      queueName: 'junando-alerts.fifo',
+      queueName: `${resourceName(resourceNamePrefix, 'alerts')}.fifo`,
       visibilityTimeout: cdk.Duration.minutes(3), // must match Lambda B timeout
       retentionPeriod: cdk.Duration.days(4),
       deadLetterQueue: { queue: dlq, maxReceiveCount: 3 },
@@ -52,7 +62,7 @@ export class JunandoStack extends cdk.Stack {
 
     // ── Lambda A — Webhook Receiver ──────────────────────────────────────────
     const webhookFn = new lambda.Function(this, 'WebhookLambda', {
-      functionName: 'junando-webhook',
+      functionName: resourceName(resourceNamePrefix, 'webhook'),
       runtime: lambda.Runtime.NODEJS_24_X,
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('webhook')),
@@ -75,8 +85,8 @@ export class JunandoStack extends cdk.Stack {
       new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter*', 'ssm:DescribeParameters', 'kms:Decrypt'],
         resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/junando/*`,
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/junando`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.ssmPrefix}/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.ssmPrefix}`,
         ],
       }),
     );
@@ -93,7 +103,7 @@ export class JunandoStack extends cdk.Stack {
 
     // ── Lambda B — SQS Worker ────────────────────────────────────────────────
     const workerFn = new lambda.Function(this, 'WorkerLambda', {
-      functionName: 'junando-worker',
+      functionName: resourceName(resourceNamePrefix, 'worker'),
       runtime: lambda.Runtime.NODEJS_24_X,
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('worker')),
@@ -114,9 +124,9 @@ export class JunandoStack extends cdk.Stack {
       new cdk.aws_iam.PolicyStatement({
         actions: ['ssm:GetParameter*', 'ssm:DescribeParameters', 'kms:Decrypt'],
         resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/junando/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.ssmPrefix}/*`,
           // Some SDK calls might need access to the root or alias
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/junando`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.ssmPrefix}`,
         ],
       }),
     );
