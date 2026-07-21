@@ -291,7 +291,7 @@ describe('Config — loadConfig', () => {
       expect(config.nodeEnv).toBe('development');
     });
 
-    for (const env of ['development', 'test', 'production']) {
+    for (const env of ['development', 'test', 'staging', 'production']) {
       it(`accepts nodeEnv "${env}"`, async () => {
         setEnv({ ...validConfig, NODE_ENV: env });
         const config = await loadConfig();
