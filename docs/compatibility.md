@@ -34,10 +34,10 @@
 | Package             | Current | Minimum peer |
 |---------------------|---------|--------------|
 | `@junando/cdk` | 0.1.0 | — |
-| `@junando/core` | 0.11.1 | — |
-| `@junando/ingest` | 0.11.1 | — |
-| `@junando/webhook` | 0.11.1 | — |
-| `@junando/worker` | 0.11.1 | — |
+| `@junando/core` | 0.12.0 | — |
+| `@junando/ingest` | 0.12.0 | — |
+| `@junando/webhook` | 0.12.0 | — |
+| `@junando/worker` | 0.12.0 | — |
 
 All packages are versioned in lockstep. Install the same version across packages to avoid type mismatches.
 
@@ -45,9 +45,9 @@ All packages are versioned in lockstep. Install the same version across packages
 
 | Dependency          | Version range | Used by                        |
 |---------------------|---------------|--------------------------------|
-| `@anthropic-ai/sdk` | `^0.102.0` | `@junando/core` |
-| `@aws-sdk/client-sqs` | `^3.1076.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
-| `@aws-sdk/client-ssm` | `^3.1080.0` | `@junando/worker` |
+| `@anthropic-ai/sdk` | `^0.112.3` | `@junando/core` |
+| `@aws-sdk/client-sqs` | `^3.1091.0` | `@junando/ingest`, `@junando/webhook`, `@junando/worker` |
+| `@aws-sdk/client-ssm` | `^3.1091.0` | `@junando/worker` |
 | `@google/generative-ai` | `^0.24.1` | `@junando/core` |
 | `ioredis` | `^5.11.1` | `@junando/core`, `@junando/worker` |
 | `prom-client` | `^15.1.3` | `@junando/core` |
@@ -57,7 +57,7 @@ All packages are versioned in lockstep. Install the same version across packages
 
 | Version | Status     |
 |---------|------------|
-| `pnpm@11.5.3` | ✅ Pinned via `packageManager` |
+| `pnpm@11.15.1` | ✅ Pinned via `packageManager` |
 | >=9.0.0 | ✅ Supported (engines) |
 | < 9     | ❌ Unsupported |
 
