@@ -75,9 +75,11 @@ function resolveOutcome({ llmError, notifyError }: OutcomeSignals): Outcome {
 
 export class ProcessIncidentUseCase {
   private readonly clustering: ClusteringService;
+  private readonly wideEventsEnabled: boolean;
 
   constructor(private readonly deps: Dependencies) {
     this.clustering = deps.clustering ?? new ClusteringService();
+    this.wideEventsEnabled = process.env['WIDE_EVENTS_ENABLED'] !== 'false';
   }
 
   async execute(alerts: NormalizedAlert[], correlationId: string): Promise<void> {
@@ -249,6 +251,8 @@ export class ProcessIncidentUseCase {
    * PII, and emits the single canonical log line for the cluster.
    */
   private emit(builder: WideEventBuilder, outcome: Outcome, startMs: number): void {
+    if (!this.wideEventsEnabled) return;
+
     const event: WideEvent = builder
       .set('outcome', outcome)
       .set('durationMs', Date.now() - startMs)
