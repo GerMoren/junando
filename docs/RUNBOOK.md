@@ -23,7 +23,7 @@ Follow a single alert from webhook ingestion through to Slack delivery:
 Surface provider errors, rate-limit events, and fallback hops:
 
 ```logql
-{service_name="junando"} | json | useCase = "llm:request" | level = "error"
+{service_name="junando"} | json | component = "llm" | level = "error"
 ```
 
 Or filter on the HTTP status logged by the OpenRouter adapter:
@@ -37,7 +37,7 @@ Or filter on the HTTP status logged by the OpenRouter adapter:
 Isolate Lambda A handler failures that returned an error status to Alertmanager:
 
 ```logql
-{service_name="junando"} | json | service = "webhook" | level = "error"
+{service_name="junando"} | json | component = "webhook" | level = "error"
 ```
 
 ### 4. Find slow pipelines (latency outliers)
@@ -45,13 +45,13 @@ Isolate Lambda A handler failures that returned an error status to Alertmanager:
 Identify worker invocations where end-to-end processing exceeded 10 seconds:
 
 ```logql
-{service_name="junando"} | json | service = "worker" | durationMs > 10000
+{service_name="junando"} | json | component = "worker" | durationMs > 10000
 ```
 
 Or find individual LLM calls with high latency:
 
 ```logql
-{service_name="junando"} | json | useCase =~ "llm:.*" | latencyMs > 5000
+{service_name="junando"} | json | component = "llm" | latencyMs > 5000
 ```
 
 ### 5. Trace a specific alert fingerprint end-to-end
@@ -67,7 +67,7 @@ Useful when an alert was processed but no Slack message arrived:
 Surface notifier errors and retry exhaustion events:
 
 ```logql
-{service_name="junando"} | json | service = "notifier" | level = "error"
+{service_name="junando"} | json | component = "notifier" | level = "error"
 ```
 
 ### 7. Find worker Lambda timeouts or hard crashes
@@ -75,7 +75,7 @@ Surface notifier errors and retry exhaustion events:
 Look for abrupt terminations (no graceful error log):
 
 ```logql
-{service_name="junando"} | json | service = "worker" | msg =~ "timeout|Task timed out|SIGTERM"
+{service_name="junando"} | json | component = "worker" | msg =~ "timeout|Task timed out|SIGTERM"
 ```
 
 ---
@@ -131,7 +131,7 @@ Look for abrupt terminations (no graceful error log):
 - Slack notifications arrive but contain no AI diagnosis (cluster summary only).
 - Loki query for LLM errors returns results:
   ```logql
-  {service_name="junando"} | json | useCase = "llm:request" | level = "error"
+  {service_name="junando"} | json | component = "llm" | level = "error"
   ```
 - Loki query for 429 / fallback events:
   ```logql
@@ -143,7 +143,7 @@ Look for abrupt terminations (no graceful error log):
 
 1. Check the `model` field in error logs to identify which provider is failing:
    ```logql
-   {service_name="junando"} | json | useCase = "llm:request" | level = "error" | line_format "model={{.model}} msg={{.msg}}"
+   {service_name="junando"} | json | component = "llm" | level = "error" | line_format "model={{.model}} msg={{.msg}}"
    ```
 2. Verify the fallback chain is configured — inspect the SSM parameter:
    ```bash
@@ -197,7 +197,7 @@ Look for abrupt terminations (no graceful error log):
    ```
    Or in Loki:
    ```logql
-   {service_name="junando"} | json | service = "worker" | level = "error"
+   {service_name="junando"} | json | component = "worker" | level = "error"
    ```
 3. Identify the failing `correlationId` or `fingerprint` from the error logs to determine if it is a single bad message or a systemic failure.
 4. Check if the worker Lambda itself is in an error state (memory, timeout, missing env vars):
@@ -235,7 +235,7 @@ Look for abrupt terminations (no graceful error log):
 - CloudWatch Logs for `junando-webhook` contain error-level entries.
 - Loki query surfaces errors:
   ```logql
-  {service_name="junando"} | json | service = "webhook" | level = "error"
+  {service_name="junando"} | json | component = "webhook" | level = "error"
   ```
 - HTTP client (Alertmanager, curl test) receives `500` or `502` responses.
 
@@ -255,7 +255,7 @@ Look for abrupt terminations (no graceful error log):
 3. Check for Zod validation errors — the Lambda returns `400` for invalid payloads (not `500`). A `500` means an unhandled exception.
 4. Check if the SQS `SendMessage` call is failing (IAM permission error, queue URL wrong):
    ```logql
-   {service_name="junando"} | json | service = "webhook" | msg =~ "sqs|queue|enqueue"
+   {service_name="junando"} | json | component = "webhook" | msg =~ "sqs|queue|enqueue"
    ```
 5. Verify the Lambda execution role has `sqs:SendMessage` on `junando-alerts`:
    ```bash
@@ -291,7 +291,7 @@ Look for abrupt terminations (no graceful error log):
 - Incidents are processed (LLM analysis completes) but no Slack message appears in the target channel.
 - Loki query surfaces notifier errors:
   ```logql
-  {service_name="junando"} | json | service = "notifier" | level = "error"
+  {service_name="junando"} | json | component = "notifier" | level = "error"
   ```
 - Worker Lambda logs show `slack:delivery:error` with HTTP status codes.
 - DLQ depth may increase if Slack errors cause the worker to throw after exhausting retries.
@@ -300,7 +300,7 @@ Look for abrupt terminations (no graceful error log):
 
 1. Check notifier error details — look for HTTP status, error message, and retry count:
    ```logql
-   {service_name="junando"} | json | service = "notifier" | level = "error" | line_format "msg={{.msg}} correlationId={{.correlationId}}"
+   {service_name="junando"} | json | component = "notifier" | level = "error" | line_format "msg={{.msg}} correlationId={{.correlationId}}"
    ```
 2. Common Slack error codes:
    - `invalid_auth` — Bot token is wrong or revoked
@@ -339,7 +339,7 @@ Look for abrupt terminations (no graceful error log):
 - SQS message visibility timeout expires and messages re-appear in the queue, eventually hitting DLQ.
 - Loki query:
   ```logql
-  {service_name="junando"} | json | service = "worker" | msg =~ "timeout|timed out|SIGTERM"
+  {service_name="junando"} | json | component = "worker" | msg =~ "timeout|timed out|SIGTERM"
   ```
 - DLQ depth increasing (see Scenario 3 detection).
 - The **SQS Health** dashboard shows messages not being consumed.
@@ -348,7 +348,7 @@ Look for abrupt terminations (no graceful error log):
 
 1. Identify the stage where the timeout occurs by checking the last log line before the timeout in CloudWatch Logs:
    ```logql
-   {service_name="junando"} | json | service = "worker" | correlationId = "<ID>"
+   {service_name="junando"} | json | component = "worker" | correlationId = "<ID>"
    ```
    The pipeline stages in order: dedup → cluster → trace extraction (Loki) → LLM inference → Slack notification.
 2. Check current Lambda timeout setting:
@@ -359,15 +359,15 @@ Look for abrupt terminations (no graceful error log):
    Default is 180 seconds (3 minutes).
 3. Check for high `durationMs` or `latencyMs` in recent successful invocations to identify which stage is slow:
    ```logql
-   {service_name="junando"} | json | service = "worker" | durationMs > 0 | line_format "durationMs={{.durationMs}} useCase={{.useCase}}"
+   {service_name="junando"} | json | component = "worker" | durationMs > 0 | line_format "durationMs={{.durationMs}} component={{.component}}"
    ```
 4. Check if Loki trace extraction is hanging (unreachable Loki endpoint adds latency before graceful fallback):
    ```logql
-   {service_name="junando"} | json | useCase = "trace:fetch" | latencyMs > 5000
+   {service_name="junando"} | json | component = "traces" | latencyMs > 5000
    ```
 5. Check if LLM calls are consuming most of the budget:
    ```logql
-   {service_name="junando"} | json | useCase =~ "llm:.*" | latencyMs > 30000
+   {service_name="junando"} | json | component = "llm" | latencyMs > 30000
    ```
 
 #### Remediation

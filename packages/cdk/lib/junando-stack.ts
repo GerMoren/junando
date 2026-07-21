@@ -63,6 +63,9 @@ export class JunandoStack extends cdk.Stack {
         SQS_QUEUE_URL: queue.queueUrl,
         NODE_ENV: props.nodeEnv,
         SSM_PREFIX: props.ssmPrefix,
+        // Wide events rollout flag (default: enabled). Set to 'false' to revert
+        // to legacy scattered logs without redeploying code.
+        WIDE_EVENTS_ENABLED: 'true',
       },
     });
     queue.grantSendMessages(webhookFn);
@@ -100,6 +103,9 @@ export class JunandoStack extends cdk.Stack {
       environment: {
         NODE_ENV: props.nodeEnv,
         SSM_PREFIX: props.ssmPrefix,
+        // Wide events rollout flag (default: enabled). Set to 'false' to revert
+        // to legacy scattered logs without redeploying code.
+        WIDE_EVENTS_ENABLED: 'true',
       },
     });
 
@@ -124,6 +130,20 @@ export class JunandoStack extends cdk.Stack {
     );
     queue.grantConsumeMessages(workerFn);
 
+    // ── Worker Function URL — /metrics scrape endpoint ──────────────────────
+    // IAM auth only: never exposed to anonymous internet traffic. Callers must
+    // sign requests with SigV4 (e.g. Grafana sigv4 middleware or aws-sigv4-fetch).
+    const workerFnUrl = workerFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+    });
+
+    // Resource policy: restrict lambda:InvokeFunctionUrl to the monitoring account.
+    // Defaults to this account (same-account IAM principals with the identity
+    // permission can scrape). Set MONITORING_ACCOUNT_ID at synth time to allow
+    // a cross-account monitoring principal — see design.md open questions.
+    const monitoringAccountId = process.env['MONITORING_ACCOUNT_ID'] ?? this.account;
+    workerFnUrl.grantInvokeUrl(new cdk.aws_iam.AccountPrincipal(monitoringAccountId));
+
     // ── CloudWatch Alarms ────────────────────────────────────────────────────
     new cloudwatch.Alarm(this, 'DLQAlarm', {
       metric: dlq.metricApproximateNumberOfMessagesVisible(),
@@ -141,6 +161,11 @@ export class JunandoStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'QueueURL', {
       value: queue.queueUrl,
       description: 'SQS queue URL',
+    });
+
+    new cdk.CfnOutput(this, 'WorkerMetricsURL', {
+      value: `${workerFnUrl.url}metrics`,
+      description: 'Worker /metrics endpoint — requires IAM SigV4-signed requests',
     });
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handler } from '../handler.js';
-import type { SQSEvent } from 'aws-lambda';
+import type { APIGatewayProxyEventV2, SQSEvent } from 'aws-lambda';
 import * as core from '@junando/core';
 import { AlertType } from '@junando/core';
 
@@ -168,6 +168,58 @@ describe('Worker Handler', () => {
       { err: expect.any(Error) },
       'getUseCase() failed — Lambda will retry via SQS',
     );
+  });
+});
+
+describe('Worker Handler — Function URL routes', () => {
+  const baseConfig = {
+    redisUrl: 'redis://localhost:6379',
+    lokiUrl: 'http://localhost:3100',
+    slackBotToken: 'xoxb-test',
+    slackChannel: '#test',
+    llmProvider: 'gemini' as const,
+    llmApiKey: 'test-key',
+    logLevel: 'error' as const,
+    dedupTtlSeconds: 300,
+  };
+
+  const httpEvent = (rawPath: string): APIGatewayProxyEventV2 =>
+    ({
+      rawPath,
+      headers: {},
+      requestContext: { http: { method: 'GET', path: rawPath } },
+    }) as unknown as APIGatewayProxyEventV2;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLoadConfig.mockResolvedValue(baseConfig);
+  });
+
+  it('GET /metrics returns the prom-client registry as text/plain', async () => {
+    const result = await handler(httpEvent('/metrics'));
+
+    expect(result).toMatchObject({ statusCode: 200 });
+    expect((result as any).headers['Content-Type']).toBe('text/plain');
+    // Real registry output — proves we serve the actual prom-client registry
+    expect((result as any).body).toContain('junando_alerts_processed_total');
+    // Pipeline must NOT be initialized for a cheap metrics scrape
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('GET /health returns 200 ok', async () => {
+    const result = await handler(httpEvent('/health'));
+
+    expect(result).toMatchObject({ statusCode: 200 });
+    expect(JSON.parse((result as any).body)).toEqual({
+      status: 'ok',
+      service: 'junando-worker',
+    });
+  });
+
+  it('returns 404 for unknown paths', async () => {
+    const result = await handler(httpEvent('/nope'));
+
+    expect(result).toMatchObject({ statusCode: 404 });
   });
 });
 

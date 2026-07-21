@@ -215,5 +215,40 @@ describe('Webhook Lambda Handler', () => {
       expect(body.accepted).toBe(1);
       expect(body.correlationId).toBeDefined();
     });
+
+    it('propagates a valid x-correlation-id header to the inline response', async () => {
+      // SQS_QUEUE_URL is already deleted in beforeEach → local dev inline path
+      const upstreamCorrelationId = '7a1c2d3e-4f5a-4b6c-8d9e-0f1a2b3c4d5e';
+      const payload = {
+        version: '4',
+        groupKey: 'test-group',
+        status: 'firing',
+        receiver: 'test-receiver',
+        groupLabels: { alertname: 'TestAlert' },
+        commonLabels: {},
+        commonAnnotations: {},
+        externalURL: 'http://localhost:9093',
+        alerts: [
+          {
+            status: 'firing',
+            labels: { alertname: 'TestAlert', service: 'test-service' },
+            annotations: { summary: 'Test alert inline' },
+            startsAt: '2026-05-12T10:00:00Z',
+            endsAt: '0001-01-01T00:00:00Z',
+            fingerprint: 'fp-inline-corr',
+          },
+        ],
+      };
+
+      const event = createEvent('/webhook/alert', JSON.stringify(payload), {
+        headers: { 'x-correlation-id': upstreamCorrelationId },
+      });
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body!);
+      expect(body.accepted).toBe(1);
+      expect(body.correlationId).toBe(upstreamCorrelationId);
+    });
   });
 });

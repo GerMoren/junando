@@ -138,7 +138,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "sum(rate({job=\"junando-webhook\", environment=\"$environment\"} |= \"webhook\" [5m]))",
+          "expr": "sum(rate({job=\"junando-webhook\", environment=\"$environment\"} | json | component = \"webhook\" [5m]))",
           "legendFormat": "requests/s",
           "refId": "A"
         }
