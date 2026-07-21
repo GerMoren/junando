@@ -187,6 +187,7 @@ Feedback welcome — open an issue or start a discussion.
 
 - [Architecture deep dive](docs/architecture/system-deep-dive.md)
 - [NestJS integration](docs/integrations/nestjs.md)
+- [Wide events — canonical log lines](docs/WIDE-EVENTS.md)
 - [Ops runbook](docs/RUNBOOK.md)
 - [Grafana setup](docs/runbooks/grafana-setup.md)
 - [Compatibility matrix](docs/compatibility.md)
