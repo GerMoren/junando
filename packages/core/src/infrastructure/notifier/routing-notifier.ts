@@ -1,6 +1,6 @@
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
-import type { INotifier } from '../../domain/ports/index.js';
+import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
 import type { RuleAction } from '../../domain/entities/rule.js';
 import { RuleActionType } from '../../domain/entities/rule.js';
 import type { ChannelRegistry } from '../rules/channel-registry.js';
@@ -70,8 +70,8 @@ export class RoutingNotifier implements INotifier {
    * Implements INotifier.send — sends via default notifier.
    * Backward-compatible with existing call sites that don't use rule actions.
    */
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<void> {
-    await this.defaultNotifier.send(cluster, analysis);
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<NotifyResult> {
+    return this.defaultNotifier.send(cluster, analysis);
   }
 
   /**
@@ -113,7 +113,7 @@ export class RoutingNotifier implements INotifier {
     }
 
     // Resolve notifications to send
-    const notifications: Promise<void>[] = [];
+    const notifications: Promise<unknown>[] = [];
 
     const hasRoute = ctx.routeChannels.size > 0;
 

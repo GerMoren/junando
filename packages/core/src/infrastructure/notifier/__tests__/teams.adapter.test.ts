@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TeamsNotifier, TeamsNotifierError } from '../teams.adapter.js';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
+import { NotifyOutcome } from '../../../domain/ports/index.js';
 import { AlertType } from '../../../shared/constants.js';
 import * as metricsModule from '../../../shared/metrics/index.js';
 
@@ -141,14 +142,20 @@ describe('TeamsNotifier', () => {
 
   // ── TNT-04: accept 200 and 202 ────────────────────────────────────────────
 
-  it('resolves without error on HTTP 202 (TNT-04)', async () => {
+  it('resolves with a structured result on HTTP 202 (TNT-04)', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 202, text: async () => '' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).resolves.toBeUndefined();
+    const result = await notifier.send(makeCluster(), makeAnalysis());
+    expect(result.outcome).toBe(NotifyOutcome.Success);
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.channels).toEqual(['teams']);
   });
 
-  it('resolves without error on HTTP 200 (TNT-04)', async () => {
+  it('resolves with a structured result on HTTP 200 (TNT-04)', async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, text: async () => '' });
-    await expect(notifier.send(makeCluster(), makeAnalysis())).resolves.toBeUndefined();
+    const result = await notifier.send(makeCluster(), makeAnalysis());
+    expect(result.outcome).toBe(NotifyOutcome.Success);
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.channels).toEqual(['teams']);
   });
 
   // ── TNT-05: throw on non-2xx with status + host only (no body) ────────────

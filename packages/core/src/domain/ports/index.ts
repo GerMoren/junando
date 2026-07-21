@@ -63,6 +63,29 @@ export interface ILLMProvider {
 }
 
 /**
+ * Terminal outcome of a single notification send.
+ * Feeds the `notify` section of the wide event.
+ */
+export const NotifyOutcome = {
+  Success: 'success',
+  Failure: 'failure',
+} as const;
+export type NotifyOutcome = (typeof NotifyOutcome)[keyof typeof NotifyOutcome];
+
+/**
+ * Structured result of a notification send.
+ * Adapters throw on failure (the caller records NotifyOutcome.Failure and
+ * rethrows for the queue retry), so a resolved promise always carries
+ * outcome=success.
+ */
+export interface NotifyResult {
+  outcome: NotifyOutcome;
+  latencyMs: number;
+  /** Concrete channels the notification was delivered to. */
+  channels: string[];
+}
+
+/**
  * Notifier.
  * Delivers incident diagnoses to a ChatOps channel.
  * Implementations: SlackNotifier, TeamsNotifier, ConsoleNotifier (local dev/tests)
@@ -75,7 +98,7 @@ export interface INotifier {
    *   instead of their default. Backward-compatible — existing call sites
    *   work unchanged.
    */
-  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<void>;
+  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<NotifyResult>;
 }
 
 /**

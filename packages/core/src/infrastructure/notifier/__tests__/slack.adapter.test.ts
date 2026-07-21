@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SlackNotifier } from '../slack.adapter.js';
+import { ConsoleNotifier, SlackNotifier } from '../slack.adapter.js';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
+import { NotifyOutcome } from '../../../domain/ports/index.js';
 import { AlertType } from '../../../shared/constants.js';
 import * as metricsModule from '../../../shared/metrics/index.js';
 
@@ -236,5 +237,80 @@ describe('SlackNotifier — notificationsTotal emission', () => {
     await notifier.send(makeCluster(), makeAnalysis());
 
     expect(incSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SlackNotifier — structured NotifyResult', () => {
+  const mockFetch = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    vi.clearAllMocks();
+  });
+
+  it('returns outcome=success, latencyMs, and the concrete channel on success', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+    const notifier = new SlackNotifier('test-token', 'alerts-prod');
+
+    const result = await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(result.outcome).toBe(NotifyOutcome.Success);
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.channels).toEqual(['alerts-prod']);
+  });
+
+  it('reports the channel it actually posts to, not the unused override param', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+    const notifier = new SlackNotifier('test-token', 'alerts-prod');
+
+    // SlackNotifier posts to its configured channel; the override is handled
+    // one level up by RoutingNotifier. The result must reflect reality.
+    const result = await notifier.send(makeCluster(), makeAnalysis(), 'ignored-override');
+
+    expect(result.channels).toEqual(['alerts-prod']);
+  });
+
+  it('still throws on Slack API failure (failure outcome is recorded by the caller)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+    const notifier = new SlackNotifier('test-token', 'alerts-prod');
+
+    await expect(notifier.send(makeCluster(), makeAnalysis())).rejects.toThrow(
+      'Slack API error: 500',
+    );
+  });
+});
+
+describe('ConsoleNotifier — structured NotifyResult', () => {
+  it('returns a successful result addressed at the console channel', async () => {
+    const notifier = new ConsoleNotifier();
+
+    const result = await notifier.send(makeCluster(), makeAnalysis());
+
+    expect(result.outcome).toBe(NotifyOutcome.Success);
+    expect(result.channels).toEqual(['console']);
+    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('still records the sent payload for local dev inspection', async () => {
+    const notifier = new ConsoleNotifier();
+    const cluster = makeCluster();
+
+    await notifier.send(cluster, null);
+
+    expect(notifier.sent).toHaveLength(1);
+    expect(notifier.sent[0].cluster).toBe(cluster);
+    expect(notifier.sent[0].analysis).toBeNull();
   });
 });

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
-import type { INotifier } from '../../../domain/ports/index.js';
+import type { INotifier, NotifyResult } from '../../../domain/ports/index.js';
+import { NotifyOutcome } from '../../../domain/ports/index.js';
 import type { RuleAction } from '../../../domain/entities/rule.js';
 import { RuleActionType } from '../../../domain/entities/rule.js';
 import { ChannelRegistry } from '../../rules/channel-registry.js';
@@ -29,8 +30,12 @@ const baseAnalysis: LLMAnalysis = {
   requires_rollback: false,
 };
 
+function makeNotifyResult(channels: string[]): NotifyResult {
+  return { outcome: NotifyOutcome.Success, latencyMs: 1, channels };
+}
+
 function makeNotifier(_name: string): INotifier {
-  return { send: vi.fn().mockResolvedValue(undefined) };
+  return { send: vi.fn().mockResolvedValue(makeNotifyResult([_name])) };
 }
 
 describe('RoutingNotifier', () => {
@@ -54,6 +59,17 @@ describe('RoutingNotifier', () => {
     await router.send(baseCluster, null);
 
     expect(defaultNotifier.send).toHaveBeenCalledWith(baseCluster, null);
+  });
+
+  it('returns the default notifier result from send()', async () => {
+    const defaultNotifier = makeNotifier('default');
+    const registry = new ChannelRegistry();
+    const router = new RoutingNotifier(registry, defaultNotifier);
+
+    const result = await router.send(baseCluster, baseAnalysis);
+
+    expect(result.outcome).toBe(NotifyOutcome.Success);
+    expect(result.channels).toEqual(['default']);
   });
 
   // ── sendWithActions: Route ────────────────────────────────────────────────

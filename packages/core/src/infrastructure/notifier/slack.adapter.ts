@@ -1,6 +1,7 @@
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
-import type { INotifier } from '../../domain/ports/index.js';
+import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
+import { NotifyOutcome } from '../../domain/ports/index.js';
 import { HTTP_TIMEOUT_MS, SLACK_API_URL, URGENCY_EMOJI } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
 import { notificationsTotal } from '../../shared/metrics/index.js';
@@ -28,10 +29,12 @@ export class SlackNotifier implements INotifier {
     private readonly channel: string,
   ) {}
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<NotifyResult> {
     const payload = analysis
       ? this.buildAnalysisMessage(cluster, analysis)
       : this.buildFallbackMessage(cluster);
+
+    const startMs = Date.now();
 
     try {
       const res = await fetch(SLACK_API_URL, {
@@ -49,6 +52,13 @@ export class SlackNotifier implements INotifier {
       if (!body.ok) throw new Error(`Slack error: ${body.error}`);
 
       notificationsTotal.inc({ channel: 'slack', outcome: 'success' });
+      // Report the channel actually posted to — the override is handled one
+      // level up by RoutingNotifier, so this adapter always targets this.channel.
+      return {
+        outcome: NotifyOutcome.Success,
+        latencyMs: Date.now() - startMs,
+        channels: [this.channel],
+      };
     } catch (err) {
       notificationsTotal.inc({ channel: 'slack', outcome: 'failure' });
       throw err;
@@ -167,7 +177,8 @@ export class ConsoleNotifier implements INotifier {
     analysis: LLMAnalysis | null;
   }> = [];
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<NotifyResult> {
+    const startMs = Date.now();
     try {
       this.sent.push({ cluster, analysis });
       logger.info(
@@ -181,6 +192,11 @@ export class ConsoleNotifier implements INotifier {
         '--- Junando Notification ---',
       );
       notificationsTotal.inc({ channel: 'unknown', outcome: 'success' });
+      return {
+        outcome: NotifyOutcome.Success,
+        latencyMs: Date.now() - startMs,
+        channels: ['console'],
+      };
     } catch (err) {
       notificationsTotal.inc({ channel: 'unknown', outcome: 'failure' });
       throw err;
