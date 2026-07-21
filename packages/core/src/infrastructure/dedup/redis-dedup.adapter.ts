@@ -1,5 +1,5 @@
 import type { Redis } from 'ioredis';
-import type { IDeduplicationStore } from '../../domain/ports/index.js';
+import type { DedupResult, IDeduplicationStore } from '../../domain/ports/index.js';
 import { dedupRedisFailoverTotal } from '../../shared/metrics/index.js';
 import { createLogger } from '../../shared/logger/index.js';
 
@@ -17,7 +17,7 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
 
   constructor(private readonly redis: Redis) {}
 
-  async isNew(fingerprint: string, ttlSeconds: number): Promise<boolean> {
+  async isNew(fingerprint: string, ttlSeconds: number): Promise<DedupResult> {
     try {
       const result = await this.redis.set(
         `${this.keyPrefix}${fingerprint}`,
@@ -26,12 +26,14 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
         ttlSeconds,
         'NX',
       );
-      return result === 'OK';
+      return { isNew: result === 'OK', ttlSeconds };
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       logger.warn({ err, fingerprint }, 'Redis dedup check failed, failing open');
       dedupRedisFailoverTotal.inc();
-      // Fail open: Redis down → treat every alert as new (noisy but safe)
-      return true;
+      // Fail open: Redis down → treat every alert as new (noisy but safe).
+      // The error rides the result so the wide event can record the failover.
+      return { isNew: true, ttlSeconds, error: message };
     }
   }
 
@@ -48,14 +50,16 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
 export class InMemoryDeduplicationStore implements IDeduplicationStore {
   private readonly store = new Map<string, number>(); // fingerprint → expiry timestamp
 
-  async isNew(fingerprint: string, ttlSeconds: number): Promise<boolean> {
+  async isNew(fingerprint: string, ttlSeconds: number): Promise<DedupResult> {
     const expiry = this.store.get(fingerprint);
     const now = Date.now();
 
-    if (expiry !== undefined && expiry > now) return false;
+    if (expiry !== undefined && expiry > now) {
+      return { isNew: false, ttlSeconds };
+    }
 
     this.store.set(fingerprint, now + ttlSeconds * 1000);
-    return true;
+    return { isNew: true, ttlSeconds };
   }
 
   async reset(fingerprint: string): Promise<void> {

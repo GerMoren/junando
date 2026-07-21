@@ -1,6 +1,7 @@
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
-import type { INotifier } from '../../domain/ports/index.js';
+import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
+import { NotifyOutcome } from '../../domain/ports/index.js';
 import { TEAMS_WEBHOOK_TIMEOUT_MS, URGENCY_EMOJI } from '../../shared/constants.js';
 import { notificationsTotal } from '../../shared/metrics/index.js';
 
@@ -181,12 +182,13 @@ export class TeamsNotifier implements INotifier {
     this.hostForErrors = host;
   }
 
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<void> {
+  async send(cluster: AlertCluster, analysis: LLMAnalysis | null, _channel?: string): Promise<NotifyResult> {
     const card = analysis ? buildAnalysisCard(cluster, analysis) : buildFallbackCard(cluster);
     const payload = buildAdaptiveCardPayload(card);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const startMs = Date.now();
 
     try {
       const res = await fetch(this.webhookUrl, {
@@ -208,6 +210,11 @@ export class TeamsNotifier implements INotifier {
       }
 
       notificationsTotal.inc({ channel: 'teams', outcome: 'success' });
+      return {
+        outcome: NotifyOutcome.Success,
+        latencyMs: Date.now() - startMs,
+        channels: ['teams'],
+      };
     } catch (err) {
       if (err instanceof TeamsNotifierError) {
         notificationsTotal.inc({ channel: 'teams', outcome: 'failure' });

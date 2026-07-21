@@ -3,6 +3,21 @@ import { createLokiDestination, initLokiBuffer } from './loki-transport.js';
 
 export type Logger = pino.Logger;
 
+// Wide events: canonical one-line-per-processing-unit logging.
+export { WideEventBuilder } from './wide-event-builder.js';
+export type {
+  WideEvent,
+  ClusterSection,
+  DedupSection,
+  RuleSection,
+  LlmSection,
+  NotifySection,
+  ErrorSection,
+} from './wide-event-builder.js';
+export { shouldSample, SLOW_EVENT_THRESHOLD_MS, NORMAL_SAMPLE_RATE } from './sampling.js';
+export { redact, REDACTED, MAX_STRING_CHARS, TRUNCATION_SUFFIX } from './redaction.js';
+export { Component, Stage, Outcome, SamplingDecision } from './enums.js';
+
 export interface LoggerOptions {
   level?: string;
   name?: string;

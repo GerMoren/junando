@@ -98,7 +98,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "quantile_over_time(0.5, {job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap latencyMs [5m])",
+          "expr": "quantile_over_time(0.5, {job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" | unwrap latencyMs [5m])",
           "legendFormat": "p50 latency ms",
           "refId": "A"
         }
@@ -118,7 +118,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "quantile_over_time(0.99, {job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap latencyMs [5m])",
+          "expr": "quantile_over_time(0.99, {job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" | unwrap latencyMs [5m])",
           "legendFormat": "p99 latency ms",
           "refId": "A"
         }
@@ -138,7 +138,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:failed\" | json | status=`429` [5m]))",
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" | status=`429` [5m]))",
           "legendFormat": "429 errors/s",
           "refId": "A"
         }
@@ -165,7 +165,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:fallback:hop\" [5m]))",
+          "expr": "sum(rate({job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" [5m]))",
           "legendFormat": "fallback hops/s",
           "refId": "A"
         }
@@ -185,7 +185,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap usage_promptTokens [5m]))",
+          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" | unwrap usage_promptTokens [5m]))",
           "legendFormat": "{{model}} prompt tokens",
           "refId": "A"
         }
@@ -205,7 +205,7 @@
       "datasource": { "type": "loki", "uid": "${loki_ds}" },
       "targets": [
         {
-          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} |= \"llm:request:success\" | json | unwrap usage_completionTokens [5m]))",
+          "expr": "sum by (model) (sum_over_time({job=~\"junando.*\", environment=\"$environment\"} | json | component = \"llm\" | unwrap usage_completionTokens [5m]))",
           "legendFormat": "{{model}} completion tokens",
           "refId": "A"
         }

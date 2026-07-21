@@ -15,12 +15,23 @@ import type { RuleAction } from '../entities/rule.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Structured result of a deduplication check.
+ * Feeds the `dedup` section of the wide event.
+ */
+export interface DedupResult {
+  isNew: boolean;
+  ttlSeconds: number;
+  /** Fail-open error message when the store was unreachable (e.g. Redis down). */
+  error?: string;
+}
+
+/**
  * Deduplication store.
  * Determines whether an alert fingerprint is new within a rolling TTL window.
  * Implementations: RedisDeduplicationStore, InMemoryDeduplicationStore (tests)
  */
 export interface IDeduplicationStore {
-  isNew(fingerprint: string, ttlSeconds: number): Promise<boolean>;
+  isNew(fingerprint: string, ttlSeconds: number): Promise<DedupResult>;
   reset(fingerprint: string): Promise<void>;
 }
 
@@ -43,12 +54,50 @@ export interface ITraceRepository {
 }
 
 /**
+ * Structured result of an LLM analysis call.
+ * Carries the diagnosis plus the observability metadata that feeds the
+ * `llm` section of the wide event (urgency comes from analysis.urgency_level;
+ * total tokens = promptTokens + completionTokens).
+ */
+export interface LLMResult {
+  analysis: LLMAnalysis;
+  provider: string;
+  model: string;
+  latencyMs: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
  * LLM provider.
  * Analyzes an incident cluster and returns a structured diagnosis.
  * Implementations: GeminiProvider, ClaudeProvider, OpenAIProvider, MockLLMProvider (tests)
  */
 export interface ILLMProvider {
-  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMAnalysis>;
+  analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult>;
+}
+
+/**
+ * Terminal outcome of a single notification send.
+ * Feeds the `notify` section of the wide event.
+ */
+export const NotifyOutcome = {
+  Success: 'success',
+  Failure: 'failure',
+} as const;
+export type NotifyOutcome = (typeof NotifyOutcome)[keyof typeof NotifyOutcome];
+
+/**
+ * Structured result of a notification send.
+ * Adapters throw on failure (the caller records NotifyOutcome.Failure and
+ * rethrows for the queue retry), so a resolved promise always carries
+ * outcome=success.
+ */
+export interface NotifyResult {
+  outcome: NotifyOutcome;
+  latencyMs: number;
+  /** Concrete channels the notification was delivered to. */
+  channels: string[];
 }
 
 /**
@@ -64,7 +113,7 @@ export interface INotifier {
    *   instead of their default. Backward-compatible — existing call sites
    *   work unchanged.
    */
-  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<void>;
+  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<NotifyResult>;
 }
 
 /**
