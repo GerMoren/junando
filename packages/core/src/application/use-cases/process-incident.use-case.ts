@@ -50,8 +50,8 @@ export class ProcessIncidentUseCase {
       const log2 = log.child({ fingerprint: cluster.fingerprint, service: cluster.serviceName });
 
       // 2. Deduplicate — skip if seen recently
-      const isNew = await dedup.isNew(cluster.fingerprint, dedupTtlSeconds);
-      if (!isNew) {
+      const dedupResult = await dedup.isNew(cluster.fingerprint, dedupTtlSeconds);
+      if (!dedupResult.isNew) {
         log2.debug('Duplicate cluster — skipping');
         dedupDuplicate.inc({ source: 'alertmanager' });
         continue;

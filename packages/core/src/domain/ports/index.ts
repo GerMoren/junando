@@ -15,12 +15,23 @@ import type { RuleAction } from '../entities/rule.js';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Structured result of a deduplication check.
+ * Feeds the `dedup` section of the wide event.
+ */
+export interface DedupResult {
+  isNew: boolean;
+  ttlSeconds: number;
+  /** Fail-open error message when the store was unreachable (e.g. Redis down). */
+  error?: string;
+}
+
+/**
  * Deduplication store.
  * Determines whether an alert fingerprint is new within a rolling TTL window.
  * Implementations: RedisDeduplicationStore, InMemoryDeduplicationStore (tests)
  */
 export interface IDeduplicationStore {
-  isNew(fingerprint: string, ttlSeconds: number): Promise<boolean>;
+  isNew(fingerprint: string, ttlSeconds: number): Promise<DedupResult>;
   reset(fingerprint: string): Promise<void>;
 }
 
