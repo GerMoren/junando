@@ -16,10 +16,13 @@ export type {
   IIndexer,
   ILLMProvider,
   INotifier,
+  IRollbackActionHandler,
   IRuleEngine,
   ITraceRepository,
   LLMResult,
   NotifyResult,
+  RollbackActionRequest,
+  RollbackActionResult,
   RuleActionResult,
 } from './domain/ports/index.js';
 export { NotifyOutcome } from './domain/ports/index.js';
@@ -50,6 +53,8 @@ export {
   MockLLMProvider,
 } from './infrastructure/llm/llm.adapter.js';
 export { createNotifier } from './infrastructure/notifier/factory.js';
+export { createRollbackActionHandler } from './infrastructure/rollback/factory.js';
+export { NoopRollbackActionHandler } from './infrastructure/rollback/noop-rollback-action.handler.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
 export { TeamsNotifier, TeamsNotifierError } from './infrastructure/notifier/teams.adapter.js';
 export { RoutingNotifier } from './infrastructure/notifier/routing-notifier.js';
@@ -76,5 +81,7 @@ export * from './shared/constants.js';
 export { FactoryRegistry } from './shared/factory-registry.js';
 export { createLogger, reinitLogger } from './shared/logger/index.js';
 export type { Logger, LoggerOptions } from './shared/logger/index.js';
+export { WideEventBuilder } from './shared/logger/index.js';
+export { Component, Outcome, SamplingDecision, Stage } from './shared/logger/index.js';
 export { flushLoki } from './shared/logger/loki-transport.js';
 export * as metrics from './shared/metrics/index.js';

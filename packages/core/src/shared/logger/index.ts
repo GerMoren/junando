@@ -12,6 +12,7 @@ export type {
   RuleSection,
   LlmSection,
   NotifySection,
+  RollbackSection,
   ErrorSection,
 } from './wide-event-builder.js';
 export { shouldSample, SLOW_EVENT_THRESHOLD_MS, NORMAL_SAMPLE_RATE } from './sampling.js';

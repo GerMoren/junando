@@ -1,6 +1,11 @@
 import {
   AlertmanagerPayloadSchema,
+  Component,
+  Outcome,
+  ROLLBACK_ACTION_ID,
+  WideEventBuilder,
   createLogger,
+  createRollbackActionHandler,
   reinitLogger,
   loadConfig,
   metrics,
@@ -8,7 +13,16 @@ import {
   SQSAlertQueue,
   flushLoki,
 } from '@junando/core';
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyResultV2,
+} from 'aws-lambda';
+import type {
+  Config,
+  IRollbackActionHandler,
+  RollbackActionRequest,
+  RollbackActionResult,
+} from '@junando/core';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
@@ -43,6 +57,12 @@ const SlackInteractivityPayloadSchema = z.object({
   message: z
     .object({
       ts: z.string().optional(),
+    })
+    .optional(),
+  response_url: z.string().url().optional(),
+  channel: z
+    .object({
+      id: z.string().optional(),
     })
     .optional(),
 });
@@ -82,6 +102,137 @@ function verifySlackSignature(
   }
 
   return timingSafeEqual(sigBuffer, computedBuffer);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Slack rollback action helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Parses the pipe-delimited value encoded in the Slack rollback button.
+ * Format: fingerprint|serviceName|endpointPath|alertType|urgencyLevel
+ */
+function parseRollbackValue(value: string | undefined): {
+  fingerprint: string;
+  serviceName: string;
+  endpointPath: string;
+  alertType: string;
+  urgencyLevel: string;
+} | null {
+  if (!value) return null;
+  const parts = value.split('|');
+  if (parts.length < 5) return null;
+  const [fingerprint, serviceName, endpointPath, alertType, urgencyLevel] = parts;
+  if (!fingerprint || !serviceName || !endpointPath || !alertType || !urgencyLevel) {
+    return null;
+  }
+  return { fingerprint, serviceName, endpointPath, alertType, urgencyLevel };
+}
+
+function buildRollbackActionRequest(
+  parsed: ReturnType<typeof parseRollbackValue>,
+  payload: z.infer<typeof SlackInteractivityPayloadSchema>,
+  correlationId: string,
+): RollbackActionRequest {
+  // Defensive: parseRollbackValue already validated non-null, but TS needs the guard.
+  if (!parsed) {
+    throw new Error('Invalid rollback action value');
+  }
+
+  return {
+    fingerprint: parsed.fingerprint,
+    serviceName: parsed.serviceName,
+    endpointPath: parsed.endpointPath,
+    alertType: parsed.alertType as RollbackActionRequest['alertType'],
+    urgencyLevel: parsed.urgencyLevel as NonNullable<RollbackActionRequest['urgencyLevel']>,
+    triggeredBy: {
+      ...(payload.user?.id !== undefined && { id: payload.user.id }),
+      ...(payload.user?.username !== undefined && { username: payload.user.username }),
+      channel: 'slack',
+    },
+    correlationId,
+    ...(payload.container?.message_ts !== undefined && {
+      messageTs: payload.container.message_ts,
+    }),
+  };
+}
+
+async function sendSlackResponse(
+  responseUrl: string | undefined,
+  result: RollbackActionResult,
+): Promise<void> {
+  if (!responseUrl) {
+    logger.warn('No Slack response_url available; skipping rollback result message');
+    return;
+  }
+
+  const text = result.ok
+    ? `✅ Rollback action completed: ${result.message}`
+    : `❌ Rollback action failed: ${result.message}`;
+
+  try {
+    await fetch(responseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        response_type: 'ephemeral',
+        replace_original: false,
+      }),
+    });
+  } catch (err) {
+    logger.warn({ err, responseUrl }, 'Failed to send Slack rollback response');
+  }
+}
+
+async function handleRollbackAction(
+  action: {
+    action_id?: string | undefined;
+    value?: string | undefined;
+    type?: string | undefined;
+  },
+  payload: z.infer<typeof SlackInteractivityPayloadSchema>,
+  correlationId: string,
+  config: Config,
+): Promise<void> {
+  const handler: IRollbackActionHandler = createRollbackActionHandler(config);
+  const parsedValue = parseRollbackValue(action.value);
+
+  if (!parsedValue) {
+    logger.warn({ action, correlationId }, 'Invalid rollback action value');
+    return;
+  }
+
+  const request = buildRollbackActionRequest(parsedValue, payload, correlationId);
+  const startMs = Date.now();
+  let result: RollbackActionResult;
+  let rollbackOutcome: 'ok' | 'error' = 'ok';
+
+  try {
+    result = await handler.handle(request);
+  } catch (err) {
+    rollbackOutcome = 'error';
+    result = {
+      ok: false,
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const wideEvent = new WideEventBuilder(correlationId, Component.Rollback)
+    .set('outcome', result.ok ? Outcome.Success : Outcome.Error)
+    .set('rollback', {
+      actionId: ROLLBACK_ACTION_ID,
+      channel: 'slack',
+      outcome: rollbackOutcome,
+      handlerMessage: result.message,
+    })
+    .set('durationMs', Date.now() - startMs)
+    .flush();
+
+  logger.info(wideEvent);
+
+  // Best-effort Slack feedback; failures here must not affect the HTTP response.
+  await sendSlackResponse(payload.response_url, result);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -188,6 +339,10 @@ async function _handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyR
         { actionId: action.action_id, value: action.value, user },
         'Slack interaction received',
       );
+
+      if (action.action_id === ROLLBACK_ACTION_ID) {
+        await handleRollbackAction(action, actionPayload, correlationId, config);
+      }
     }
 
     metrics.webhookRequestsTotal.inc({ endpoint: '/webhook/slack-interactivity', status: '200' });

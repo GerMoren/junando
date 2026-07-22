@@ -14,6 +14,7 @@ export const Component = {
   Dedup: 'dedup',
   Traces: 'traces',
   Ingest: 'ingest',
+  Rollback: 'rollback',
 } as const;
 export type Component = (typeof Component)[keyof typeof Component];
 

@@ -2,7 +2,7 @@ import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
 import { NotifyOutcome } from '../../domain/ports/index.js';
-import { HTTP_TIMEOUT_MS, SLACK_API_URL, URGENCY_EMOJI } from '../../shared/constants.js';
+import { HTTP_TIMEOUT_MS, ROLLBACK_ACTION_ID, SLACK_API_URL, URGENCY_EMOJI } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
 import { notificationsTotal } from '../../shared/metrics/index.js';
 
@@ -123,8 +123,8 @@ export class SlackNotifier implements INotifier {
                     type: 'button',
                     text: { type: 'plain_text', text: '⏪ Trigger Rollback' },
                     style: 'danger',
-                    action_id: 'trigger_rollback',
-                    value: cluster.fingerprint,
+                    action_id: ROLLBACK_ACTION_ID,
+                    value: `${cluster.fingerprint}|${cluster.serviceName}|${cluster.endpointPath}|${cluster.alertType}|${analysis.urgency_level}`,
                     confirm: {
                       title: { type: 'plain_text', text: 'Confirm rollback' },
                       text: {

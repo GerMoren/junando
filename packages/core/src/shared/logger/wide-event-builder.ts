@@ -54,6 +54,13 @@ export interface NotifySection {
   latencyMs: number;
 }
 
+export interface RollbackSection {
+  actionId: string;
+  channel: string;
+  outcome: 'ok' | 'error';
+  handlerMessage: string;
+}
+
 export interface ErrorSection {
   message: string;
   name?: string;
@@ -72,6 +79,7 @@ export interface WideEvent {
   rule?: RuleSection;
   llm?: LlmSection;
   notify?: NotifySection;
+  rollback?: RollbackSection;
   durationMs?: number;
   error?: ErrorSection;
   /** Present only when the 256 KB guard truncated the event. */

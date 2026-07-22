@@ -143,6 +143,7 @@ describe('logger enums', () => {
       Dedup: 'dedup',
       Traces: 'traces',
       Ingest: 'ingest',
+      Rollback: 'rollback',
     });
   });
 
