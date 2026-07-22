@@ -283,7 +283,16 @@ body {
   gap: 2rem;
 }
 
+.mock-section img {
+  max-width: min(100%, 520px);
+  height: auto;
+}
+
 @media (max-width: 768px) {
+  .features {
+    grid-template-columns: 1fr;
+  }
+
   .trust-section > div {
     grid-template-columns: 1fr;
   }

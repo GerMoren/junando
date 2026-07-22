@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 180" fill="none" aria-label="Junando pipeline: Ingest, Deduplicate, Enrich, Notify">
+  <defs>
+    <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(59,130,246,0.15)"/>
+      <stop offset="100%" stop-color="rgba(59,130,246,0.05)"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="920" height="180" rx="12" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+  <!-- Alert sources label -->
+  <text x="30" y="100" fill="#a1a1aa" font-size="13" font-family="Inter, system-ui, sans-serif">Alert sources</text>
+
+  <!-- Arrow from alerts to ingest -->
+  <path d="M 105 94 L 145 94" stroke="rgba(255,255,255,0.15)" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Box 1: Ingest -->
+  <g transform="translate(160, 60)">
+    <rect width="140" height="80" rx="8" fill="url(#boxGrad)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5"/>
+    <text x="70" y="32" fill="#fafafa" font-size="15" font-weight="700" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Ingest</text>
+    <text x="70" y="55" fill="#a1a1aa" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Webhook</text>
+  </g>
+
+  <!-- Arrow 1-2 -->
+  <path d="M 300 100 L 340 100" stroke="rgba(255,255,255,0.15)" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Box 2: Deduplicate -->
+  <g transform="translate(355, 60)">
+    <rect width="140" height="80" rx="8" fill="url(#boxGrad)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5"/>
+    <text x="70" y="32" fill="#fafafa" font-size="15" font-weight="700" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Deduplicate</text>
+    <text x="70" y="55" fill="#a1a1aa" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Fingerprint</text>
+  </g>
+
+  <!-- Arrow 2-3 -->
+  <path d="M 495 100 L 535 100" stroke="rgba(255,255,255,0.15)" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Box 3: Enrich -->
+  <g transform="translate(550, 60)">
+    <rect width="140" height="80" rx="8" fill="url(#boxGrad)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5"/>
+    <text x="70" y="32" fill="#fafafa" font-size="15" font-weight="700" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Enrich</text>
+    <text x="70" y="55" fill="#a1a1aa" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">LLM analysis</text>
+  </g>
+
+  <!-- Arrow 3-4 -->
+  <path d="M 690 100 L 730 100" stroke="rgba(255,255,255,0.15)" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Box 4: Notify -->
+  <g transform="translate(745, 60)">
+    <rect width="140" height="80" rx="8" fill="url(#boxGrad)" stroke="rgba(59,130,246,0.3)" stroke-width="1.5"/>
+    <text x="70" y="32" fill="#fafafa" font-size="15" font-weight="700" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Notify</text>
+    <text x="70" y="55" fill="#a1a1aa" font-size="12" text-anchor="middle" font-family="Inter, system-ui, sans-serif">Slack / Teams</text>
+  </g>
+
+  <!-- Arrowhead marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,255,255,0.15)"/>
+    </marker>
+  </defs>
+</svg>
