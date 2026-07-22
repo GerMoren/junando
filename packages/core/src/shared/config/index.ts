@@ -69,6 +69,21 @@ const ConfigSchema = z
     slackBotToken: z.string().startsWith('xoxb-').optional(),
     slackSigningSecret: z.string().min(1).optional(),
     slackChannel: z.string().startsWith('#').optional(),
+    // Rollback action authorization — only applies when notifierType is 'slack'
+    rollbackActionEnabled: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    rollbackActionAllowedSlackUserIds: z
+      .string()
+      .optional()
+      .transform((v) => {
+        if (!v) return undefined;
+        return v
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }),
     // Teams field
     teamsWebhookUrl: z.string().url().optional(),
     lokiUrl: z.string().optional().transform((v) => v === '' ? undefined : v), // URL with embedded credentials — skip .url() which rejects user:pass@ format. Optional: containers may run without Loki; logger falls back to stdout. Empty string is coerced to undefined (env var unset vs empty are equivalent).

@@ -50,6 +50,8 @@ export enum LLMProviderType {
 export const HTTP_TIMEOUT_MS = Object.freeze({
   Default: 5_000,
   LLM: 30_000,
+  SlackResponseUrl: 2_000,
+  RollbackHandler: 5_000,
 });
 
 export const CIRCUIT_BREAKER = Object.freeze({

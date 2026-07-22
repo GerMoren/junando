@@ -4,7 +4,6 @@ import {
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
   createNotifier,
-  createRollbackActionHandler,
   metrics,
   createLLMProvider,
   createLogger,
@@ -60,7 +59,6 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
   const notifier = createNotifier(config);
-  const rollbackHandler = createRollbackActionHandler(config);
 
   useCase = new ProcessIncidentUseCase({
     dedup,
@@ -70,7 +68,6 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
     logger,
     dedupTtlSeconds: config.dedupTtlSeconds,
     onClustersBuilt: (count) => metrics.alertClusters.set(count),
-    rollbackHandler,
   });
 
   return useCase;

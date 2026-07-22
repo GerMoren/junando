@@ -116,9 +116,13 @@ describe('SlackNotifier', () => {
     expect(actions.elements[1].text.text).toBe('⏪ Trigger Rollback');
     expect(actions.elements[1].style).toBe('danger');
     expect(actions.elements[1].action_id).toBe(ROLLBACK_ACTION_ID);
-    expect(actions.elements[1].value).toBe(
-      `${cluster.fingerprint}|${cluster.serviceName}|${cluster.endpointPath}|${cluster.alertType}|${analysis.urgency_level}`,
-    );
+    expect(JSON.parse(actions.elements[1].value as string)).toEqual({
+      fingerprint: cluster.fingerprint,
+      serviceName: cluster.serviceName,
+      endpointPath: cluster.endpointPath,
+      alertType: cluster.alertType,
+      urgencyLevel: analysis.urgency_level,
+    });
   });
 
   it('sends fallback message when analysis is null', async () => {

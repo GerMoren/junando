@@ -5,7 +5,6 @@ import type {
   IDeduplicationStore,
   ILLMProvider,
   INotifier,
-  IRollbackActionHandler,
   IRuleEngine,
   ITraceRepository,
 } from '../../domain/ports/index.js';
@@ -45,7 +44,6 @@ interface Dependencies {
   clustering?: ClusteringService;
   onClustersBuilt?: (count: number) => void;
   ruleEngine?: IRuleEngine;
-  rollbackHandler?: IRollbackActionHandler;
 }
 
 function toErrorSection(err: unknown): ErrorSection {

@@ -15,7 +15,9 @@ vi.stubGlobal('fetch', mockFetch);
 // Set up module-level spies before importing the handler so the handler reads
 // the mocked core methods at import time.
 vi.spyOn(core, 'loadConfig').mockResolvedValue({
+  notifierType: 'slack',
   slackSigningSecret: 'test-secret',
+  rollbackActionEnabled: true,
   logLevel: 'error',
 } as unknown as Awaited<ReturnType<typeof core.loadConfig>>);
 vi.spyOn(core, 'createLogger').mockReturnValue({
@@ -141,7 +143,13 @@ describe('Webhook Handler', () => {
       actions: [
         {
           action_id: 'trigger_rollback',
-          value: 'fp-abc|checkout-service|/api/orders|http_500|high',
+          value: JSON.stringify({
+            fingerprint: 'fp-abc',
+            serviceName: 'checkout-service',
+            endpointPath: '/api/orders',
+            alertType: 'http_500',
+            urgencyLevel: 'high',
+          }),
           type: 'button',
         },
       ],
@@ -202,7 +210,13 @@ describe('Webhook Handler', () => {
       actions: [
         {
           action_id: 'trigger_rollback',
-          value: 'fp-xyz|payment-service|/api/pay|latency_spike|critical',
+          value: JSON.stringify({
+            fingerprint: 'fp-xyz',
+            serviceName: 'payment-service',
+            endpointPath: '/api/pay',
+            alertType: 'latency_spike',
+            urgencyLevel: 'critical',
+          }),
           type: 'button',
         },
       ],
@@ -233,6 +247,121 @@ describe('Webhook Handler', () => {
       'https://hooks.slack.com/actions/response',
       expect.objectContaining({
         body: expect.stringContaining('pipeline unreachable'),
+      }),
+    );
+  });
+
+  it('returns an ephemeral message when rollback actions are disabled', async () => {
+    vi.spyOn(core, 'loadConfig').mockResolvedValueOnce({
+      notifierType: 'slack',
+      slackSigningSecret: 'test-secret',
+      rollbackActionEnabled: false,
+      logLevel: 'error',
+    } as unknown as Awaited<ReturnType<typeof core.loadConfig>>);
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const payload = {
+      type: 'block_actions',
+      user: { username: 'alice', id: 'U123' },
+      actions: [
+        {
+          action_id: 'trigger_rollback',
+          value: JSON.stringify({
+            fingerprint: 'fp-abc',
+            serviceName: 'checkout-service',
+            endpointPath: '/api/orders',
+            alertType: 'http_500',
+            urgencyLevel: 'high',
+          }),
+          type: 'button',
+        },
+      ],
+      container: { message_ts: '1234567890.123456' },
+      message: { ts: '1234567890.123456' },
+      response_url: 'https://hooks.slack.com/actions/response',
+    };
+    const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+    const secret = 'test-secret';
+    const baseString = `v0:${timestamp}:${body}`;
+    const hmac = createHmac('sha256', secret);
+    hmac.update(baseString, 'utf8');
+    const signature = `v0=${hmac.digest('hex')}`;
+
+    const event = {
+      rawPath: '/webhook/slack-interactivity',
+      body,
+      headers: {
+        'x-slack-signature': signature,
+        'x-slack-request-timestamp': timestamp,
+      },
+    } as Partial<APIGatewayProxyEventV2>;
+
+    const result = await handler(event as APIGatewayProxyEventV2);
+    expect(result).toMatchObject({ statusCode: 200 });
+
+    expect(mockRollbackHandle).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://hooks.slack.com/actions/response',
+      expect.objectContaining({
+        body: expect.stringContaining('Rollback actions are disabled'),
+      }),
+    );
+  });
+
+  it('returns an ephemeral message when the Slack user is not in the allowlist', async () => {
+    vi.spyOn(core, 'loadConfig').mockResolvedValueOnce({
+      notifierType: 'slack',
+      slackSigningSecret: 'test-secret',
+      rollbackActionEnabled: true,
+      rollbackActionAllowedSlackUserIds: ['U_ADMIN'],
+      logLevel: 'error',
+    } as unknown as Awaited<ReturnType<typeof core.loadConfig>>);
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const payload = {
+      type: 'block_actions',
+      user: { username: 'alice', id: 'U123' },
+      actions: [
+        {
+          action_id: 'trigger_rollback',
+          value: JSON.stringify({
+            fingerprint: 'fp-abc',
+            serviceName: 'checkout-service',
+            endpointPath: '/api/orders',
+            alertType: 'http_500',
+            urgencyLevel: 'high',
+          }),
+          type: 'button',
+        },
+      ],
+      container: { message_ts: '1234567890.123456' },
+      message: { ts: '1234567890.123456' },
+      response_url: 'https://hooks.slack.com/actions/response',
+    };
+    const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+    const secret = 'test-secret';
+    const baseString = `v0:${timestamp}:${body}`;
+    const hmac = createHmac('sha256', secret);
+    hmac.update(baseString, 'utf8');
+    const signature = `v0=${hmac.digest('hex')}`;
+
+    const event = {
+      rawPath: '/webhook/slack-interactivity',
+      body,
+      headers: {
+        'x-slack-signature': signature,
+        'x-slack-request-timestamp': timestamp,
+      },
+    } as Partial<APIGatewayProxyEventV2>;
+
+    const result = await handler(event as APIGatewayProxyEventV2);
+    expect(result).toMatchObject({ statusCode: 200 });
+
+    expect(mockRollbackHandle).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://hooks.slack.com/actions/response',
+      expect.objectContaining({
+        body: expect.stringContaining('not authorized'),
       }),
     );
   });

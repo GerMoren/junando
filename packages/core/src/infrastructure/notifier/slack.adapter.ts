@@ -124,7 +124,13 @@ export class SlackNotifier implements INotifier {
                     text: { type: 'plain_text', text: '⏪ Trigger Rollback' },
                     style: 'danger',
                     action_id: ROLLBACK_ACTION_ID,
-                    value: `${cluster.fingerprint}|${cluster.serviceName}|${cluster.endpointPath}|${cluster.alertType}|${analysis.urgency_level}`,
+                    value: JSON.stringify({
+                      fingerprint: cluster.fingerprint,
+                      serviceName: cluster.serviceName,
+                      endpointPath: cluster.endpointPath,
+                      alertType: cluster.alertType,
+                      urgencyLevel: analysis.urgency_level,
+                    }),
                     confirm: {
                       title: { type: 'plain_text', text: 'Confirm rollback' },
                       text: {
