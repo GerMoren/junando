@@ -28,8 +28,11 @@
         <p class="tagline" style="font-size:clamp(1.1rem,2vw,1.35rem);color:#a1a1aa;line-height:1.6;margin:0 0 1.5rem;max-width:600px;margin-left:auto;margin-right:auto;">
           Junando correlates alerts from your observability stack and delivers actionable incident context directly to Slack or Teams.
         </p>
-        <p class="value-prop" style="font-size:1rem;color:#71717a;line-height:1.7;margin:0 auto 2.5rem;max-width:560px;">
+        <p class="value-prop" style="font-size:1rem;color:#71717a;line-height:1.7;margin:0 auto 1rem;max-width:560px;">
           Instead of raw alerts flooding your channel at 3am, your team gets one structured message per incident with probable cause and recommended steps.
+        </p>
+        <p style="font-size:0.85rem;color:#52525b;line-height:1.6;margin:0 auto 2.5rem;max-width:560px;">
+          Built for engineering teams running multi-service observability stacks.
         </p>
         <div class="hero-cta" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
           <a href="/getting-started/" class="cta-primary" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.75rem 1.75rem;border-radius:0.5rem;font-size:1rem;font-weight:600;color:#fff;background:linear-gradient(135deg,#3b82f6,#2563eb);text-decoration:none;transition:all 0.2s ease;box-shadow:0 4px 14px rgba(59,130,246,0.3);">
@@ -46,12 +49,12 @@
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;">
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
           <div style="width:2.5rem;height:2.5rem;border-radius:0.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:1rem;">🧠</div>
-          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Carga mental zero</h3>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Zero mental load</h3>
           <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">LLM enrichment analyzes each incident and delivers probable cause with recommended steps — no more context switching.</p>
         </div>
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
           <div style="width:2.5rem;height:2.5rem;border-radius:0.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:1rem;">⚡</div>
-          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Fácil de probar</h3>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Easy to try</h3>
           <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">Docker Compose local setup gets the full stack running in minutes. Perfect for evaluation and development.</p>
         </div>
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
@@ -91,6 +94,25 @@ Alert sources → Webhook → Queue → Worker → Enrichment → Slack / Teams
           <div style="font-size:0.75rem;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Step 4</div>
           <div style="font-size:0.9rem;color:#e4e4e7;font-weight:600;">Notify</div>
           <div style="font-size:0.8rem;color:#71717a;line-height:1.5;">One structured message goes to Slack or Teams</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-section" style="padding:4rem 1.5rem;max-width:960px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:2rem;">
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.75rem;padding:1.75rem;">
+          <div style="font-size:1.25rem;margin-bottom:0.75rem;">🏗️</div>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Built for real production stacks</h3>
+          <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">
+            Designed for teams running tens to hundreds of services. Plugs into your existing Alertmanager, Grafana, and AWS infrastructure.
+          </p>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.75rem;padding:1.75rem;">
+          <div style="font-size:1.25rem;margin-bottom:0.75rem;">🧩</div>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Bring your own LLM</h3>
+          <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">
+            Configurable LLM providers — OpenRouter, Gemini, Claude, or your own endpoint. Keep control over cost, latency, and data residency.
+          </p>
         </div>
       </div>
     </section>

@@ -276,3 +276,15 @@ body {
 .site-footer .footer-docs-link:hover {
   color: #60a5fa;
 }
+
+.trust-section > div {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+@media (max-width: 768px) {
+  .trust-section > div {
+    grid-template-columns: 1fr;
+  }
+}
