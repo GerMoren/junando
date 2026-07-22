@@ -20,10 +20,11 @@ In your `.env` file, set:
 
 ```bash
 SLACK_BOT_TOKEN=<YOUR_TOKEN>
+SLACK_SIGNING_SECRET=<YOUR_TOKEN>
 SLACK_CHANNEL=#incidents
 ```
 
-For AWS deployments, store these values as SSM SecureString parameters under `/junando/slack-bot-token` and `/junando/slack-channel`.
+For AWS deployments, store these values as SSM SecureString parameters under `/junando/slack-bot-token`, `/junando/slack-signing-secret`, and `/junando/slack-channel`.
 
 ## Invite the Bot
 

@@ -54,8 +54,8 @@ Always use safe placeholders in configuration files:
 
 | Placeholder | Usage |
 |---|---|
-| `<YOUR_TOKEN>` | LLM API keys, bot tokens |
-| `<SLACK_WEBHOOK_URL>` | Slack webhook URLs |
+| `<YOUR_TOKEN>` | LLM API keys, bot tokens, signing secrets |
+| `<SLACK_BOT_TOKEN>` | Slack Bot User OAuth token (starts with `xoxb-`) |
 | `<TEAMS_WEBHOOK_URL>` | Teams webhook URLs |
 
 Never commit real credentials to the repository.

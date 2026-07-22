@@ -1,6 +1,6 @@
 ---
 title: Local Docker
-description: Run Junando locally using Docker Compose with Redis, Loki, Grafana, and Alertmanager.
+description: Run Junando locally using Docker Compose with Redis, Loki, Prometheus, Alertmanager, Grafana, and OpenSearch.
 ---
 
 Junando includes a Docker Compose stack for local development and testing.

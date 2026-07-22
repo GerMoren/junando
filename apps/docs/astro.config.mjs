@@ -12,7 +12,7 @@ export default defineConfig({
         {
           label: 'Getting Started',
           items: [
-            { label: 'Overview', slug: 'getting-started' },
+            { label: 'Getting Started', slug: 'getting-started' },
             { label: 'Local Docker', slug: 'local-docker' },
             { label: 'AWS Deployment', slug: 'aws' },
           ],
