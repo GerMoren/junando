@@ -35,6 +35,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate docs content
+        run: pnpm docs:validate
+
+      - name: Build docs
+        run: pnpm --filter @junando/docs build
+
       - name: Build
         run: pnpm build
 

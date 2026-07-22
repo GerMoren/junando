@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "examples/nestjs-snippets"
+  - "apps/*"
 allowBuilds:
   '@nestjs/core': false
   esbuild: false
