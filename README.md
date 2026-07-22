@@ -10,6 +10,7 @@ Junando eliminates that gap.
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-green.svg)](https://nodejs.org)
 [![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-blue.svg)](https://typescriptlang.org)
+[![Docs](https://img.shields.io/badge/Docs-junando--docs--rouge.vercel.app-3b82f6)](https://junando-docs-rouge.vercel.app/)
 
 ---
 
