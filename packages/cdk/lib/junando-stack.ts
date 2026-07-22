@@ -67,7 +67,7 @@ export class JunandoStack extends cdk.Stack {
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('webhook')),
       memorySize: 256,
-      timeout: cdk.Duration.seconds(5),
+      timeout: cdk.Duration.seconds(10),
       layers: [coreLayer],
       environment: {
         SQS_QUEUE_URL: queue.queueUrl,

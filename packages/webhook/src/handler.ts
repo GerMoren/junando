@@ -255,11 +255,18 @@ async function handleRollbackAction(
   let rollbackOutcome: 'ok' | 'error' = 'ok';
 
   try {
-    const raceResult = await Promise.race([
-      handler.handle(request),
-      sleep(HTTP_TIMEOUT_MS.RollbackHandler),
-    ]);
+    const handlerPromise = handler.handle(request);
+    const timeoutPromise = sleep(HTTP_TIMEOUT_MS.RollbackHandler);
+
+    const raceResult = await Promise.race([handlerPromise, timeoutPromise]);
+
     if (raceResult === ROLLBACK_HANDLER_TIMEOUT) {
+      handlerPromise.catch((error) => {
+        logger.debug(
+          { err: error },
+          'Rollback handler completed after timeout; ignoring late rejection',
+        );
+      });
       rollbackOutcome = 'error';
       result = { ok: false, message: 'Rollback handler timed out.' };
     } else {
