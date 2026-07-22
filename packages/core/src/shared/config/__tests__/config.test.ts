@@ -53,6 +53,8 @@ function clearEnv() {
   delete process.env.LLM_FALLBACK_MODELS;
   delete process.env.LLM_FALLBACK_TIMEOUT_MS;
   delete process.env.RULES_CONFIG_PATH;
+  delete process.env.ROLLBACK_ACTION_ENABLED;
+  delete process.env.ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -667,6 +669,63 @@ describe('Config — loadConfig', () => {
       process.env['RULES_CONFIG_PATH'] = './rules.yaml';
       const config = await loadConfig();
       expect(config.rulesConfigPath).toBe('./rules.yaml');
+    });
+  });
+
+  // ── Rollback action config ───────────────────────────────────────────────
+
+  describe('rollback action config', () => {
+    it('defaults rollbackActionEnabled to false when env var is absent', async () => {
+      setEnv({ ...validConfig });
+      delete process.env['ROLLBACK_ACTION_ENABLED'];
+      const config = await loadConfig();
+      expect(config.rollbackActionEnabled).toBe(false);
+    });
+
+    it('parses ROLLBACK_ACTION_ENABLED=true', async () => {
+      setEnv({ ...validConfig, ROLLBACK_ACTION_ENABLED: 'true' });
+      const config = await loadConfig();
+      expect(config.rollbackActionEnabled).toBe(true);
+    });
+
+    it('parses ROLLBACK_ACTION_ENABLED=false', async () => {
+      setEnv({ ...validConfig, ROLLBACK_ACTION_ENABLED: 'false' });
+      const config = await loadConfig();
+      expect(config.rollbackActionEnabled).toBe(false);
+    });
+
+    it('parses ROLLBACK_ACTION_ENABLED=1 as true', async () => {
+      setEnv({ ...validConfig, ROLLBACK_ACTION_ENABLED: '1' });
+      const config = await loadConfig();
+      expect(config.rollbackActionEnabled).toBe(true);
+    });
+
+    it('defaults rollbackActionAllowedSlackUserIds to undefined when absent', async () => {
+      setEnv({ ...validConfig });
+      delete process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'];
+      const config = await loadConfig();
+      expect(config.rollbackActionAllowedSlackUserIds).toBeUndefined();
+    });
+
+    it('parses comma-separated user IDs', async () => {
+      setEnv({ ...validConfig });
+      process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = 'U123,U456,U789';
+      const config = await loadConfig();
+      expect(config.rollbackActionAllowedSlackUserIds).toEqual(['U123', 'U456', 'U789']);
+    });
+
+    it('trims whitespace and filters empty entries', async () => {
+      setEnv({ ...validConfig });
+      process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = ' U123 , , U456 ';
+      const config = await loadConfig();
+      expect(config.rollbackActionAllowedSlackUserIds).toEqual(['U123', 'U456']);
+    });
+
+    it('treats empty string as undefined', async () => {
+      setEnv({ ...validConfig });
+      process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = '';
+      const config = await loadConfig();
+      expect(config.rollbackActionAllowedSlackUserIds).toBeUndefined();
     });
   });
 });

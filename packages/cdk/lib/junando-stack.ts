@@ -67,7 +67,7 @@ export class JunandoStack extends cdk.Stack {
       handler: 'handler.handler',
       code: lambda.Code.fromAsset(assetPath('webhook')),
       memorySize: 256,
-      timeout: cdk.Duration.seconds(5),
+      timeout: cdk.Duration.seconds(10),
       layers: [coreLayer],
       environment: {
         SQS_QUEUE_URL: queue.queueUrl,
@@ -76,6 +76,9 @@ export class JunandoStack extends cdk.Stack {
         // Wide events rollout flag (default: enabled). Set to 'false' to revert
         // to legacy scattered logs without redeploying code.
         WIDE_EVENTS_ENABLED: 'true',
+        // Rollback action configuration. Values are pulled from SSM by loadConfig.
+        ROLLBACK_ACTION_ENABLED: '',
+        ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS: '',
       },
     });
     queue.grantSendMessages(webhookFn);

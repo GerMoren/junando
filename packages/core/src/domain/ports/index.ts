@@ -2,6 +2,7 @@ import type { NormalizedAlert } from '../entities/alert.js';
 import type { AlertCluster } from '../entities/cluster.js';
 import type { LLMAnalysis } from '../entities/incident.js';
 import type { RuleAction } from '../entities/rule.js';
+import type { AlertType } from '../../shared/constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PORTS — interfaces defined by the domain.
@@ -154,4 +155,41 @@ export interface IRuleEngine {
    * Returns additional actions based on analysis (escalate, tag, etc.).
    */
   evaluatePostLlm(cluster: AlertCluster, analysis: LLMAnalysis): RuleActionResult;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rollback action handler — configurable hook for deployment pipelines
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Request dispatched to a rollback action handler.
+ * Minimal incident metadata encoded in the Slack button value plus the user
+ * who triggered the action.
+ */
+export interface RollbackActionRequest {
+  fingerprint: string;
+  serviceName: string;
+  endpointPath: string;
+  alertType: AlertType;
+  urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
+  triggeredBy: { id?: string; username?: string; channel: 'slack' | 'teams' };
+  correlationId?: string;
+  messageTs?: string;
+}
+
+/**
+ * Result of a rollback action handler invocation.
+ */
+export interface RollbackActionResult {
+  ok: boolean;
+  message: string;
+}
+
+/**
+ * Configurable rollback action handler.
+ * Implementations wire Junando to a team's deployment pipeline.
+ * The default no-op adapter logs and returns success so nothing breaks.
+ */
+export interface IRollbackActionHandler {
+  handle(request: RollbackActionRequest): Promise<RollbackActionResult>;
 }

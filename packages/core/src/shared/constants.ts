@@ -50,6 +50,8 @@ export enum LLMProviderType {
 export const HTTP_TIMEOUT_MS = Object.freeze({
   Default: 5_000,
   LLM: 30_000,
+  SlackResponseUrl: 500,
+  RollbackHandler: 2_000,
 });
 
 export const CIRCUIT_BREAKER = Object.freeze({
@@ -94,6 +96,7 @@ export const LLM_MODELS = Object.freeze({
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
 export const SLACK_API_URL = 'https://slack.com/api/chat.postMessage';
+export const ROLLBACK_ACTION_ID = 'trigger_rollback';
 
 // ── Teams ─────────────────────────────────────────────────────────────────────
 export const TEAMS_WEBHOOK_TIMEOUT_MS = 10_000;

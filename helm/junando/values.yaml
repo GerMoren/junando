@@ -188,6 +188,11 @@ secrets:
   SLACK_SIGNING_SECRET: ""
   # SLACK_CHANNEL: default Slack channel for alerts (e.g. "#alerts").
   SLACK_CHANNEL: ""
+  # ROLLBACK_ACTION_ENABLED: enable the Slack "Trigger Rollback" button (true | false).
+  ROLLBACK_ACTION_ENABLED: ""
+  # ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS: comma-separated Slack user IDs allowed to
+  # trigger rollback actions. Empty allows all users.
+  ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS: ""
   # TEAMS_WEBHOOK_URL: Power Automate webhook URL (required when NOTIFIER_TYPE=teams).
   TEAMS_WEBHOOK_URL: ""
   # LOKI_URL: Loki push endpoint URL (may include embedded credentials).

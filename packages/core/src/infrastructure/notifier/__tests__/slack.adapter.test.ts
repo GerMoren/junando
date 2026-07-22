@@ -3,7 +3,7 @@ import { ConsoleNotifier, SlackNotifier } from '../slack.adapter.js';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
 import { NotifyOutcome } from '../../../domain/ports/index.js';
-import { AlertType } from '../../../shared/constants.js';
+import { AlertType, ROLLBACK_ACTION_ID } from '../../../shared/constants.js';
 import * as metricsModule from '../../../shared/metrics/index.js';
 
 function makeCluster(overrides: Partial<AlertCluster> = {}): AlertCluster {
@@ -115,7 +115,14 @@ describe('SlackNotifier', () => {
     expect(actions.elements).toHaveLength(2);
     expect(actions.elements[1].text.text).toBe('⏪ Trigger Rollback');
     expect(actions.elements[1].style).toBe('danger');
-    expect(actions.elements[1].action_id).toBe('trigger_rollback');
+    expect(actions.elements[1].action_id).toBe(ROLLBACK_ACTION_ID);
+    expect(JSON.parse(actions.elements[1].value as string)).toEqual({
+      fingerprint: cluster.fingerprint,
+      serviceName: cluster.serviceName,
+      endpointPath: cluster.endpointPath,
+      alertType: cluster.alertType,
+      urgencyLevel: analysis.urgency_level,
+    });
   });
 
   it('sends fallback message when analysis is null', async () => {

@@ -1,6 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handler } from '../handler.js';
+import * as core from '@junando/core';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+
+const { mockFetch, mockRollbackHandle } = vi.hoisted(() => ({
+  mockFetch: vi.fn().mockResolvedValue({ ok: true }),
+  mockRollbackHandle: vi.fn().mockResolvedValue({
+    ok: true,
+    message: 'Rollback handled',
+  }),
+}));
+
+vi.stubGlobal('fetch', mockFetch);
 
 // Mock the SQSClient
 vi.mock('@aws-sdk/client-sqs', () => ({
@@ -11,14 +22,19 @@ vi.mock('@aws-sdk/client-sqs', () => ({
 }));
 
 // Mock config - needed for Slack signature verification
-vi.mock('@junando/core', async () => {
-  const actual = await vi.importActual('@junando/core');
+vi.mock('@junando/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@junando/core')>();
   return {
     ...actual,
+    createRollbackActionHandler: vi.fn().mockReturnValue({
+      handle: mockRollbackHandle,
+    }),
     loadConfig: vi.fn().mockResolvedValue({
+      notifierType: 'slack',
       slackSigningSecret: 'test-signing-secret',
       slackBotToken: 'test-bot-token',
       slackChannel: 'test-channel',
+      rollbackActionEnabled: true,
       sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
       llmProvider: 'openai',
       llmApiKey: 'test-key',
@@ -60,6 +76,12 @@ function createEvent(path: string, body: string | null, options: {
 describe('Webhook Lambda Handler', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
+    mockFetch.mockResolvedValue({ ok: true });
+    mockRollbackHandle.mockResolvedValue({
+      ok: true,
+      message: 'Rollback handled',
+    });
     // Reset environment for each test
     delete process.env.SQS_QUEUE_URL;
   });
@@ -179,6 +201,237 @@ describe('Webhook Lambda Handler', () => {
       const response = await handler(event);
 
       expect(response.statusCode).toBe(200);
+    });
+  });
+
+  describe('POST /webhook/slack-interactivity — rollback dispatch', () => {
+    const createSlackEvent = (body: string, overrides: {
+      signature?: string;
+      timestamp?: string;
+    } = {}): APIGatewayProxyEventV2 => {
+      const timestamp = overrides.timestamp ?? Math.floor(Date.now() / 1000).toString();
+      const { createHmac } = require('crypto');
+      const baseString = `v0:${timestamp}:${body}`;
+      const hmac = createHmac('sha256', 'test-signing-secret');
+      hmac.update(baseString, 'utf8');
+      const signature = `v0=${hmac.digest('hex')}`;
+
+      return createEvent('/webhook/slack-interactivity', body, {
+        headers: {
+          'x-slack-signature': overrides.signature ?? signature,
+          'x-slack-request-timestamp': timestamp,
+        },
+      });
+    };
+
+    it('calls the rollback handler with parsed action value and posts ephemeral response', async () => {
+      const payload = {
+        type: 'block_actions',
+        user: { username: 'test-user', id: 'U12345' },
+        actions: [
+          {
+            action_id: 'trigger_rollback',
+            value: JSON.stringify({
+              fingerprint: 'fp-123',
+              serviceName: 'checkout-service',
+              endpointPath: '/api/orders',
+              alertType: 'http_500',
+              urgencyLevel: 'high',
+            }),
+            type: 'button',
+          },
+        ],
+        container: { message_ts: '1234567890.123456' },
+        message: { ts: '1234567890.123456' },
+        response_url: 'https://hooks.slack.com/actions/response',
+      };
+      const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+      const event = createSlackEvent(body);
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(mockRollbackHandle).toHaveBeenCalledOnce();
+      const [request] = mockRollbackHandle.mock.calls[0] as [{
+        fingerprint: string;
+        serviceName: string;
+        endpointPath: string;
+        alertType: string;
+        urgencyLevel: string;
+        triggeredBy: { id?: string; username?: string; channel: string };
+        messageTs?: string;
+      }];
+      expect(request.fingerprint).toBe('fp-123');
+      expect(request.serviceName).toBe('checkout-service');
+      expect(request.endpointPath).toBe('/api/orders');
+      expect(request.alertType).toBe('http_500');
+      expect(request.urgencyLevel).toBe('high');
+      expect(request.triggeredBy).toEqual({ id: 'U12345', username: 'test-user', channel: 'slack' });
+      expect(request.messageTs).toBe('1234567890.123456');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://hooks.slack.com/actions/response',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('Rollback handled'),
+        }),
+      );
+    });
+
+    it('returns 200 and posts an error message when the rollback handler throws', async () => {
+      mockRollbackHandle.mockRejectedValueOnce(new Error('handler down'));
+
+      const payload = {
+        type: 'block_actions',
+        user: { username: 'test-user', id: 'U12345' },
+        actions: [
+          {
+            action_id: 'trigger_rollback',
+            value: JSON.stringify({
+              fingerprint: 'fp-123',
+              serviceName: 'checkout-service',
+              endpointPath: '/api/orders',
+              alertType: 'http_500',
+              urgencyLevel: 'high',
+            }),
+            type: 'button',
+          },
+        ],
+        container: { message_ts: '1234567890.123456' },
+        message: { ts: '1234567890.123456' },
+        response_url: 'https://hooks.slack.com/actions/response',
+      };
+      const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+      const event = createSlackEvent(body);
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://hooks.slack.com/actions/response',
+        expect.objectContaining({
+          body: expect.stringContaining('handler down'),
+        }),
+      );
+    });
+
+    it('returns 200 and skips handler when rollback value is malformed', async () => {
+      const payload = {
+        type: 'block_actions',
+        user: { username: 'test-user', id: 'U12345' },
+        actions: [
+          { action_id: 'trigger_rollback', value: 'malformed', type: 'button' },
+        ],
+        container: { message_ts: '1234567890.123456' },
+        message: { ts: '1234567890.123456' },
+      };
+      const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+      const event = createSlackEvent(body);
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(mockRollbackHandle).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns 200 and sends an ephemeral message when rollback actions are disabled', async () => {
+      vi.mocked(core.loadConfig).mockResolvedValueOnce({
+        notifierType: 'slack',
+        slackSigningSecret: 'test-signing-secret',
+        slackBotToken: 'test-bot-token',
+        slackChannel: 'test-channel',
+        rollbackActionEnabled: false,
+        sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
+        llmProvider: 'openai',
+        llmApiKey: 'test-key',
+        llmModel: 'gpt-4',
+        dedupTtlSeconds: 300,
+      });
+
+      const payload = {
+        type: 'block_actions',
+        user: { username: 'test-user', id: 'U12345' },
+        actions: [
+          {
+            action_id: 'trigger_rollback',
+            value: JSON.stringify({
+              fingerprint: 'fp-123',
+              serviceName: 'checkout-service',
+              endpointPath: '/api/orders',
+              alertType: 'http_500',
+              urgencyLevel: 'high',
+            }),
+            type: 'button',
+          },
+        ],
+        container: { message_ts: '1234567890.123456' },
+        message: { ts: '1234567890.123456' },
+        response_url: 'https://hooks.slack.com/actions/response',
+      };
+      const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+      const event = createSlackEvent(body);
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(mockRollbackHandle).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://hooks.slack.com/actions/response',
+        expect.objectContaining({
+          body: expect.stringContaining('Rollback actions are disabled'),
+        }),
+      );
+    });
+
+    it('returns 200 and sends an ephemeral message when the Slack user is not in the allowlist', async () => {
+      vi.mocked(core.loadConfig).mockResolvedValueOnce({
+        notifierType: 'slack',
+        slackSigningSecret: 'test-signing-secret',
+        slackBotToken: 'test-bot-token',
+        slackChannel: 'test-channel',
+        rollbackActionEnabled: true,
+        rollbackActionAllowedSlackUserIds: ['U_ADMIN'],
+        sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
+        llmProvider: 'openai',
+        llmApiKey: 'test-key',
+        llmModel: 'gpt-4',
+        dedupTtlSeconds: 300,
+      });
+
+      const payload = {
+        type: 'block_actions',
+        user: { username: 'test-user', id: 'U12345' },
+        actions: [
+          {
+            action_id: 'trigger_rollback',
+            value: JSON.stringify({
+              fingerprint: 'fp-123',
+              serviceName: 'checkout-service',
+              endpointPath: '/api/orders',
+              alertType: 'http_500',
+              urgencyLevel: 'high',
+            }),
+            type: 'button',
+          },
+        ],
+        container: { message_ts: '1234567890.123456' },
+        message: { ts: '1234567890.123456' },
+        response_url: 'https://hooks.slack.com/actions/response',
+      };
+      const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+      const event = createSlackEvent(body);
+
+      const response = await handler(event);
+
+      expect(response.statusCode).toBe(200);
+      expect(mockRollbackHandle).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://hooks.slack.com/actions/response',
+        expect.objectContaining({
+          body: expect.stringContaining('not authorized'),
+        }),
+      );
     });
   });
 
