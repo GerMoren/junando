@@ -1,5 +1,11 @@
 # @junando/ingest
 
+## 0.12.2
+
+### Patch Changes
+
+- 04b4127: Silence install-time `UNRESOLVED_IMPORT` warnings for `@junando/core` during the `prepare` (tsdown) build by marking it via `deps.neverBundle` only when core's `dist/` is not built yet; publish-time builds still bundle core as before. Path check is CWD-independent (`import.meta.url`). Refs #205.
+
 ## 0.12.1
 
 ## 0.12.0
