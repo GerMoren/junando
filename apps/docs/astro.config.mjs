@@ -10,9 +10,31 @@ export default defineConfig({
       title: 'Junando Documentation',
       sidebar: [
         {
-          label: 'Onboarding',
+          label: 'Getting Started',
           items: [
-            { label: 'Documentation foundation', slug: 'index' },
+            { label: 'Overview', slug: 'getting-started' },
+            { label: 'Local Docker', slug: 'local-docker' },
+            { label: 'AWS Deployment', slug: 'aws' },
+          ],
+        },
+        {
+          label: 'Integrations',
+          items: [
+            { label: 'Slack', slug: 'slack' },
+            { label: 'Teams', slug: 'teams' },
+          ],
+        },
+        {
+          label: 'Concepts',
+          items: [
+            { label: 'Wide Events', slug: 'wide-events' },
+          ],
+        },
+        {
+          label: 'Production',
+          items: [
+            { label: 'Pilot', slug: 'pilot' },
+            { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],
         },
       ],
