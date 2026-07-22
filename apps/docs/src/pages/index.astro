@@ -1,6 +1,10 @@
 ---
 // Landing page — takes priority over Starlight's /docs/index.md
 // because Astro pages dir route `/` wins over content collection
+
+// This is a standalone page outside Starlight, so it does NOT get the
+// `customCss` bundle that Starlight injects into docs pages — import it here.
+import '../styles/custom.css';
 ---
 
 <!doctype html>
@@ -15,6 +19,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <style is:global>
+      /* Dark page base for the standalone landing: unlike Starlight docs pages,
+         this page gets no framework-provided body background/color. */
+      body {
+        background: #0a0a0f;
+        color: #e4e4e7;
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
     <section class="hero">
