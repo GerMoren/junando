@@ -8,11 +8,12 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Junando Documentation',
+      customCss: ['./src/styles/custom.css'],
       sidebar: [
         {
           label: 'Onboarding',
           items: [
-            { label: 'Documentation foundation', slug: 'index' },
+            { label: 'Documentation', slug: 'index' },
           ],
         },
       ],
