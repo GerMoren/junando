@@ -1,4 +1,9 @@
-:root {
+/* Force dark mode across all Starlight theme selectors — light mode is not supported yet */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"],
+html[data-theme="light"],
+html[data-theme="dark"] {
   --sl-color-accent: #3b82f6;
   --sl-color-accent-high: #60a5fa;
   --sl-color-accent-low: #1e3a5f;
@@ -9,6 +14,7 @@
   --sl-color-text-accent: #93c5fd;
   --sl-color-hairline: #1e1e2a;
   --sl-font: 'Inter', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
 }
 
 body {
@@ -176,15 +182,16 @@ body {
 }
 
 .feature-card .icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.5rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.625rem;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
   margin-bottom: 1rem;
+  color: #93c5fd;
 }
 
 .feature-card h3 {
@@ -286,6 +293,43 @@ body {
 .mock-section img {
   max-width: min(100%, 520px);
   height: auto;
+}
+
+/* Hide Starlight theme switcher — light mode is not supported yet */
+starlight-theme-select,
+.theme-select,
+[data-theme-toggle],
+.sl-theme-switcher {
+  display: none !important;
+}
+
+/* Minimalist refinements */
+.feature-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  padding: 1.75rem;
+  transition: all 0.2s ease;
+}
+
+.feature-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+}
+
+.feature-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fafafa;
+  margin: 0 0 0.5rem;
+}
+
+.feature-card p {
+  font-size: 0.9rem;
+  color: #a3a3a3;
+  line-height: 1.6;
+  margin: 0;
 }
 
 @media (max-width: 768px) {
