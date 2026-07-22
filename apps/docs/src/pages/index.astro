@@ -1,0 +1,124 @@
+---
+// Landing page — takes priority over Starlight's /docs/index.md
+// because Astro pages dir route `/` wins over content collection
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Junando — Alert correlation and incident context delivery</title>
+    <meta name="description" content="Junando correlates alerts from your observability stack and delivers actionable incident context directly to Slack or Teams." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body style="margin:0;background:#0a0a0f;color:#e4e4e7;font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;">
+    <section class="hero" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6rem 1.5rem 4rem;min-height:80vh;background:linear-gradient(180deg,#0a0a0f 0%,#0e0e1a 50%,#0a0a0f 100%);position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(59,130,246,0.08) 0%,transparent 60%),radial-gradient(circle at 70% 50%,rgba(59,130,246,0.05) 0%,transparent 60%);pointer-events:none;"></div>
+      <div class="hero-content" style="position:relative;max-width:800px;width:100%;">
+        <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.375rem 1rem;border-radius:9999px;font-size:0.8rem;font-weight:500;color:#93c5fd;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);margin-bottom:2rem;letter-spacing:0.05em;text-transform:uppercase;">
+          Open source · Apache 2.0
+        </div>
+        <h1 style="font-size:clamp(2.5rem,6vw,4rem);font-weight:800;line-height:1.1;color:#fafafa;margin:0 0 0.5rem;letter-spacing:-0.03em;">
+          Alert correlation that<br />
+          <span style="background:linear-gradient(135deg,#3b82f6,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">actually helps at 3am</span>
+        </h1>
+        <p class="tagline" style="font-size:clamp(1.1rem,2vw,1.35rem);color:#a1a1aa;line-height:1.6;margin:0 0 1.5rem;max-width:600px;margin-left:auto;margin-right:auto;">
+          Junando correlates alerts from your observability stack and delivers actionable incident context directly to Slack or Teams.
+        </p>
+        <p class="value-prop" style="font-size:1rem;color:#71717a;line-height:1.7;margin:0 auto 2.5rem;max-width:560px;">
+          Instead of raw alerts flooding your channel at 3am, your team gets one structured message per incident with probable cause and recommended steps.
+        </p>
+        <div class="hero-cta" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+          <a href="/getting-started/" class="cta-primary" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.75rem 1.75rem;border-radius:0.5rem;font-size:1rem;font-weight:600;color:#fff;background:linear-gradient(135deg,#3b82f6,#2563eb);text-decoration:none;transition:all 0.2s ease;box-shadow:0 4px 14px rgba(59,130,246,0.3);">
+            Get Started →
+          </a>
+          <a href="https://github.com/GerMoren/junando" class="cta-secondary" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.75rem 1.75rem;border-radius:0.5rem;font-size:1rem;font-weight:500;color:#e4e4e7;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);text-decoration:none;transition:all 0.2s ease;">
+            View on GitHub
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:0 1.5rem;max-width:960px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div style="width:2.5rem;height:2.5rem;border-radius:0.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:1rem;">🧠</div>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Carga mental zero</h3>
+          <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">LLM enrichment analyzes each incident and delivers probable cause with recommended steps — no more context switching.</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div style="width:2.5rem;height:2.5rem;border-radius:0.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:1rem;">⚡</div>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Fácil de probar</h3>
+          <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">Docker Compose local setup gets the full stack running in minutes. Perfect for evaluation and development.</p>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:1.75rem;transition:all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div style="width:2.5rem;height:2.5rem;border-radius:0.5rem;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:1rem;">🔓</div>
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Open source</h3>
+          <p style="font-size:0.9rem;color:#a1a1aa;line-height:1.6;margin:0;">Apache 2.0 licensed. Deploy in your own AWS account with CDK — full control, no vendor lock-in.</p>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding:3rem 1.5rem;max-width:960px;margin:0 auto;text-align:center;">
+      <h2 style="font-size:1.75rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">How It Works</h2>
+      <p style="color:#a1a1aa;font-size:0.95rem;margin:0 0 2rem;">From alert to actionable notification in seconds</p>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:0.75rem;padding:2rem;overflow-x:auto;text-align:left;font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.85rem;line-height:1.7;color:#a1a1aa;">
+        <pre style="margin:0;">
+Alert sources → Webhook → Queue → Worker → Enrichment → Slack / Teams
+                                               │
+                                    LLM analysis + log correlation</pre>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-top:1.5rem;text-align:left;">
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:1rem;">
+          <div style="font-size:0.75rem;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Step 1</div>
+          <div style="font-size:0.9rem;color:#e4e4e7;font-weight:600;">Ingest</div>
+          <div style="font-size:0.8rem;color:#71717a;line-height:1.5;">Alerts arrive via webhook (Alertmanager-compatible)</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:1rem;">
+          <div style="font-size:0.75rem;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Step 2</div>
+          <div style="font-size:0.9rem;color:#e4e4e7;font-weight:600;">Deduplicate</div>
+          <div style="font-size:0.8rem;color:#71717a;line-height:1.5;">Fingerprint-based clustering groups related alerts</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:1rem;">
+          <div style="font-size:0.75rem;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Step 3</div>
+          <div style="font-size:0.9rem;color:#e4e4e7;font-weight:600;">Enrich</div>
+          <div style="font-size:0.8rem;color:#71717a;line-height:1.5;">LLM analysis generates probable cause and recommendations</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:0.5rem;padding:1rem;">
+          <div style="font-size:0.75rem;color:#3b82f6;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.25rem;">Step 4</div>
+          <div style="font-size:0.9rem;color:#e4e4e7;font-weight:600;">Notify</div>
+          <div style="font-size:0.8rem;color:#71717a;line-height:1.5;">One structured message goes to Slack or Teams</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:linear-gradient(180deg,transparent,rgba(59,130,246,0.03));padding:4rem 1.5rem;text-align:center;">
+      <h2 style="font-size:1.75rem;font-weight:700;color:#fafafa;margin:0 0 0.5rem;">Ready to simplify your on-call experience?</h2>
+      <p style="color:#a1a1aa;font-size:1rem;margin:0 0 2rem;max-width:500px;margin-left:auto;margin-right:auto;">
+        Get started with Docker Compose in minutes. No credit card required — just your terminal.
+      </p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+        <a href="/getting-started/" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.75rem 1.75rem;border-radius:0.5rem;font-size:1rem;font-weight:600;color:#fff;background:linear-gradient(135deg,#3b82f6,#2563eb);text-decoration:none;box-shadow:0 4px 14px rgba(59,130,246,0.3);transition:all 0.2s ease;">
+          Get Started →
+        </a>
+        <a href="/local-docker/" style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.75rem 1.75rem;border-radius:0.5rem;font-size:1rem;font-weight:500;color:#e4e4e7;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);text-decoration:none;transition:all 0.2s ease;">
+          Try Local Docker
+        </a>
+      </div>
+    </section>
+
+    <footer style="border-top:1px solid rgba(255,255,255,0.08);padding:3rem 1.5rem;text-align:center;">
+      <div style="display:flex;justify-content:center;gap:2rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+        <a href="https://github.com/GerMoren/junando" style="color:#a1a1aa;text-decoration:none;font-size:0.9rem;">GitHub</a>
+        <a href="/getting-started/" style="color:#3b82f6;text-decoration:none;font-size:0.9rem;font-weight:500;">Docs</a>
+        <a href="https://github.com/GerMoren/junando/blob/main/LICENSE" style="color:#a1a1aa;text-decoration:none;font-size:0.9rem;">License</a>
+      </div>
+      <div style="color:#52525b;font-size:0.8rem;">
+        Junando — Apache 2.0 licensed
+      </div>
+    </footer>
+  </body>
+</html>
