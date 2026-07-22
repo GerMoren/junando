@@ -2,7 +2,9 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://docs.junando.dev',
+  // Real deployment URL. Switch back to https://docs.junando.dev once DNS for
+  // the custom domain is configured (currently it has no A/CNAME records).
+  site: 'https://junando-docs-rouge.vercel.app',
   base: '/',
   output: 'static',
   integrations: [
