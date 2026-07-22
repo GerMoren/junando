@@ -3,6 +3,20 @@ import { z } from 'zod';
 import { LLM_FALLBACK_DEFAULTS } from '../constants.js';
 import { createLogger } from '../logger/index.js';
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  if (value === undefined || value === '') return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
+}
+
+function parseOptionalStringArray(value: string | undefined): string[] | undefined {
+  if (value === undefined || value === '') return undefined;
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Config — reads and validates all env vars at startup.
 // The process exits immediately if a required variable is missing.
@@ -36,6 +50,8 @@ async function loadSecretsFromSSM(): Promise<void> {
     `${prefix}/redis-url`,
     `${prefix}/llm-fallback-models`,
     `${prefix}/llm-fallback-timeout-ms`,
+    `${prefix}/rollback-action-enabled`,
+    `${prefix}/rollback-action-allowed-slack-user-ids`,
   ];
 
   try {
@@ -70,20 +86,8 @@ const ConfigSchema = z
     slackSigningSecret: z.string().min(1).optional(),
     slackChannel: z.string().startsWith('#').optional(),
     // Rollback action authorization — only applies when notifierType is 'slack'
-    rollbackActionEnabled: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((v) => v === 'true'),
-    rollbackActionAllowedSlackUserIds: z
-      .string()
-      .optional()
-      .transform((v) => {
-        if (!v) return undefined;
-        return v
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-      }),
+    rollbackActionEnabled: z.boolean().default(false),
+    rollbackActionAllowedSlackUserIds: z.array(z.string()).optional(),
     // Teams field
     teamsWebhookUrl: z.string().url().optional(),
     lokiUrl: z.string().optional().transform((v) => v === '' ? undefined : v), // URL with embedded credentials — skip .url() which rejects user:pass@ format. Optional: containers may run without Loki; logger falls back to stdout. Empty string is coerced to undefined (env var unset vs empty are equivalent).
@@ -188,6 +192,10 @@ export async function loadConfig(): Promise<Config> {
     llmFallbackModels: process.env['LLM_FALLBACK_MODELS'],
     llmFallbackTimeoutMs: process.env['LLM_FALLBACK_TIMEOUT_MS'],
     rulesConfigPath: process.env['RULES_CONFIG_PATH'],
+    rollbackActionEnabled: parseBooleanEnv(process.env['ROLLBACK_ACTION_ENABLED']) ?? false,
+    rollbackActionAllowedSlackUserIds: parseOptionalStringArray(
+      process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'],
+    ),
   });
 
   if (!result.success) {

@@ -30,10 +30,11 @@ import { z } from 'zod';
 
 const logger = createLogger();
 
-function sleep(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(`Rollback handler timed out after ${ms}ms`)), ms);
-  });
+const ROLLBACK_HANDLER_TIMEOUT = Symbol('ROLLBACK_HANDLER_TIMEOUT');
+
+async function sleep(ms: number): Promise<typeof ROLLBACK_HANDLER_TIMEOUT> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+  return ROLLBACK_HANDLER_TIMEOUT;
 }
 
 /**
@@ -254,10 +255,16 @@ async function handleRollbackAction(
   let rollbackOutcome: 'ok' | 'error' = 'ok';
 
   try {
-    result = await Promise.race([
+    const raceResult = await Promise.race([
       handler.handle(request),
       sleep(HTTP_TIMEOUT_MS.RollbackHandler),
     ]);
+    if (raceResult === ROLLBACK_HANDLER_TIMEOUT) {
+      rollbackOutcome = 'error';
+      result = { ok: false, message: 'Rollback handler timed out.' };
+    } else {
+      result = raceResult;
+    }
   } catch (err) {
     rollbackOutcome = 'error';
     result = {

@@ -251,6 +251,62 @@ describe('Webhook Handler', () => {
     );
   });
 
+  it('returns a timeout message when the rollback handler exceeds the deadline', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockRollbackHandle.mockImplementation(() => new Promise(() => {}));
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const payload = {
+      type: 'block_actions',
+      user: { username: 'carol', id: 'U789' },
+      actions: [
+        {
+          action_id: 'trigger_rollback',
+          value: JSON.stringify({
+            fingerprint: 'fp-timeout',
+            serviceName: 'order-service',
+            endpointPath: '/api/orders',
+            alertType: 'http_500',
+            urgencyLevel: 'high',
+          }),
+          type: 'button',
+        },
+      ],
+      container: { message_ts: '1234567890.111111' },
+      message: { ts: '1234567890.111111' },
+      response_url: 'https://hooks.slack.com/actions/response',
+    };
+    const body = 'payload=' + encodeURIComponent(JSON.stringify(payload));
+    const secret = 'test-secret';
+    const baseString = `v0:${timestamp}:${body}`;
+    const hmac = createHmac('sha256', secret);
+    hmac.update(baseString, 'utf8');
+    const signature = `v0=${hmac.digest('hex')}`;
+
+    const event = {
+      rawPath: '/webhook/slack-interactivity',
+      body,
+      headers: {
+        'x-slack-signature': signature,
+        'x-slack-request-timestamp': timestamp,
+      },
+    } as Partial<APIGatewayProxyEventV2>;
+
+    const handlerPromise = handler(event as APIGatewayProxyEventV2);
+    await vi.advanceTimersByTimeAsync(core.HTTP_TIMEOUT_MS.RollbackHandler + 100);
+    const result = await handlerPromise;
+
+    expect(result).toMatchObject({ statusCode: 200 });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://hooks.slack.com/actions/response',
+      expect.objectContaining({
+        body: expect.stringContaining('Rollback handler timed out'),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
   it('returns an ephemeral message when rollback actions are disabled', async () => {
     vi.spyOn(core, 'loadConfig').mockResolvedValueOnce({
       notifierType: 'slack',

@@ -76,6 +76,9 @@ export class JunandoStack extends cdk.Stack {
         // Wide events rollout flag (default: enabled). Set to 'false' to revert
         // to legacy scattered logs without redeploying code.
         WIDE_EVENTS_ENABLED: 'true',
+        // Rollback action configuration. Values are pulled from SSM by loadConfig.
+        ROLLBACK_ACTION_ENABLED: '',
+        ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS: '',
       },
     });
     queue.grantSendMessages(webhookFn);
