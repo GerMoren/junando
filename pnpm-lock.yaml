@@ -27,8 +27,8 @@ importers:
         specifier: ^5.5.15
         version: 5.5.15
       '@smithy/signature-v4':
-        specifier: ^5.6.7
-        version: 5.6.7
+        specifier: ^5.6.11
+        version: 5.6.11
       bottleneck:
         specifier: ^2.19.5
         version: 2.19.5
@@ -1584,12 +1584,8 @@ packages:
     resolution: {integrity: sha512-IvAQ6m+Mb9Ty2Hb1qSy3A8MGzpnL75xgzAU6w08XJ8x5upb5ia5LybxkKLDFvMyiOzuUJzD9bPUiPBlZDlogoQ==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/signature-v4@5.6.6':
-    resolution: {integrity: sha512-efP6DN3UTFrzIsGO42/xcabv8jU7+9nwEdphFUH7yL0k010ERyAWaO41KFQIDLcFZLZ8xzIQr4wplFxNzslSGQ==}
-    engines: {node: '>=18.0.0'}
-
-  '@smithy/signature-v4@5.6.7':
-    resolution: {integrity: sha512-32PmEsuZV9lz7SZk3gJcm+EfIAoIVu83AJyEzgALpwmSqLvuacdAu0fvCVNMbDbegyk1S0lHUDrMWIfR47Micw==}
+  '@smithy/signature-v4@5.6.11':
+    resolution: {integrity: sha512-7HsspeiNCZvZHEJ22vV5L/QYuJdTyJvPJvMrYD3AgkM3IJB0pkln4jkjPvtpTWRMkHXbO8WKwNjoVdVlBFwHmw==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/types@4.16.1':
@@ -4485,7 +4481,7 @@ snapshots:
       '@aws-sdk/xml-builder': 3.972.36
       '@aws/lambda-invoke-store': 0.3.0
       '@smithy/core': 3.31.0
-      '@smithy/signature-v4': 5.6.6
+      '@smithy/signature-v4': 5.6.11
       '@smithy/types': 4.16.1
       bowser: 2.14.1
       tslib: 2.8.1
@@ -4595,7 +4591,7 @@ snapshots:
   '@aws-sdk/signature-v4-multi-region@3.996.41':
     dependencies:
       '@aws-sdk/types': 3.974.2
-      '@smithy/signature-v4': 5.6.7
+      '@smithy/signature-v4': 5.6.11
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -5512,15 +5508,9 @@ snapshots:
       '@smithy/core': 3.31.0
       tslib: 2.8.1
 
-  '@smithy/signature-v4@5.6.6':
+  '@smithy/signature-v4@5.6.11':
     dependencies:
       '@smithy/core': 3.31.0
-      '@smithy/types': 4.16.1
-      tslib: 2.8.1
-
-  '@smithy/signature-v4@5.6.7':
-    dependencies:
-      '@smithy/core': 3.29.6
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
