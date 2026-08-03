@@ -9,7 +9,7 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "deps"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 15
 
   - package-ecosystem: "github-actions"
     directory: "/"
