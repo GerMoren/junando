@@ -27,7 +27,7 @@
     "@anthropic-ai/sdk": "^0.115.0",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "opossum": "^10.0.0",
     "pino": "^10.3.1",
     "prom-client": "^15.1.3",
