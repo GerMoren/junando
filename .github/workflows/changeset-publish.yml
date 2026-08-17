@@ -48,7 +48,7 @@ jobs:
         run: node scripts/verify-package-files.mjs
 
       - name: Publish packages
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           # OIDC-only: no NODE_AUTH_TOKEN so npm CLI falls through to Trusted
           # Publisher token exchange. Provenance is requested via the
