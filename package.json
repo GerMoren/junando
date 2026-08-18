@@ -61,7 +61,7 @@
     "@aws-sdk/client-ssm": "^3.1106.0",
     "@aws-sdk/credential-provider-node": "^3.972.78",
     "@smithy/protocol-http": "^5.6.0",
-    "@smithy/signature-v4": "^5.6.12",
+    "@smithy/signature-v4": "^5.7.0",
     "bottleneck": "^2.19.5",
     "ioredis": "^6.0.0",
     "opossum": "^10.0.0",
