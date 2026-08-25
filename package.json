@@ -43,7 +43,7 @@
     "ingest:opensearch:smoke": "tsx scripts/ingest-opensearch-smoke.ts"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.0",
+    "@changesets/cli": "^3.0.1",
     "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.10",
     "oxlint": "^1.79.0",
