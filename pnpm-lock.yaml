@@ -27,8 +27,8 @@ importers:
         specifier: ^5.6.0
         version: 5.6.0
       '@smithy/signature-v4':
-        specifier: ^5.7.0
-        version: 5.7.0
+        specifier: ^5.7.3
+        version: 5.7.3
       bottleneck:
         specifier: ^2.19.5
         version: 2.19.5
@@ -1760,20 +1760,12 @@ packages:
     resolution: {integrity: sha512-8XwMdtETS0/pEGPa9wbWu1XQmFIrgPUx6yjxcsR0oVyXYeY15JRpwz3RJHIhpr0uXgEJDPbQbdF5eLcfagI7pA==}
     engines: {node: '>=18.0.0'}
 
-  '@smithy/signature-v4@5.7.0':
-    resolution: {integrity: sha512-hCynhm22wMJ8wTF9crcwu8mxggtUrSLLJgDcGUvYFBqpofxycYJCGKOMYg4xtPPFtgNiDJSYmhsWLTrcU/g59Q==}
-    engines: {node: '>=18.0.0'}
-
   '@smithy/signature-v4@5.7.3':
     resolution: {integrity: sha512-7ImGm+FkHRLcBaRttIAMZ6bzJZWb2cJGoYjq46F2UjycujWzrL9GEN9h4w7eQyXJYnltrUhxbbieBAIRrdqpow==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/types@4.16.1':
     resolution: {integrity: sha512-0JFs3V2y2M9tKW5na/qxe69Zv+uxLMO7QBbhxF/FHu/Gp2NFZAAL9tWl9PU02xxo07pb3G9FTyjNc6D5uZrJIg==}
-    engines: {node: '>=18.0.0'}
-
-  '@smithy/types@4.17.0':
-    resolution: {integrity: sha512-Aw4joiM0ZdErpo39lCj8phT2lxoiKZV+KZzBxnnQhWVtU2Is/WffQSL04uUWRcXUse9Ln8vXZK6V/FwqRVnQpg==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/types@4.17.2':
@@ -4440,7 +4432,7 @@ snapshots:
       '@aws-sdk/xml-builder': 3.972.39
       '@aws/lambda-invoke-store': 0.3.0
       '@smithy/core': 3.33.3
-      '@smithy/signature-v4': 5.7.0
+      '@smithy/signature-v4': 5.7.3
       '@smithy/types': 4.17.2
       bowser: 2.14.1
       tslib: 2.8.1
@@ -5515,12 +5507,6 @@ snapshots:
       '@smithy/core': 3.33.0
       tslib: 2.8.1
 
-  '@smithy/signature-v4@5.7.0':
-    dependencies:
-      '@smithy/core': 3.33.0
-      '@smithy/types': 4.17.0
-      tslib: 2.8.1
-
   '@smithy/signature-v4@5.7.3':
     dependencies:
       '@smithy/core': 3.33.3
@@ -5528,10 +5514,6 @@ snapshots:
       tslib: 2.8.1
 
   '@smithy/types@4.16.1':
-    dependencies:
-      tslib: 2.8.1
-
-  '@smithy/types@4.17.0':
     dependencies:
       tslib: 2.8.1
 
