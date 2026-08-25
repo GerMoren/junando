@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
+    "@anthropic-ai/sdk": "^0.120.0",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
     "ioredis": "^6.0.0",
