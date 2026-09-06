@@ -38,6 +38,7 @@ const validConfig = {
   CLUSTER_WINDOW_MS: '60000',
   LOG_LEVEL: 'debug',
   NODE_ENV: 'production',
+  DEDUP_TABLE_NAME: 'junando-dedup',
 };
 
 function setEnv(vars: Partial<typeof validConfig>) {
@@ -60,6 +61,7 @@ function clearEnv() {
   delete process.env.RULES_CONFIG_PATH;
   delete process.env.ROLLBACK_ACTION_ENABLED;
   delete process.env.ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS;
+  delete process.env.DEDUP_STORE;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,6 +352,7 @@ describe('Config — loadConfig', () => {
 
       // Only set SSM_PREFIX, the rest come from SSM
       process.env.SSM_PREFIX = '/junando';
+      process.env.DEDUP_TABLE_NAME = 'junando-dedup';
       delete process.env.LLM_PROVIDER;
       delete process.env.LLM_API_KEY;
       delete process.env.SLACK_BOT_TOKEN;
@@ -385,6 +388,7 @@ describe('Config — loadConfig', () => {
       });
 
       process.env.SSM_PREFIX = '/junando';
+      process.env.DEDUP_TABLE_NAME = 'junando-dedup';
 
       // Set env vars that SSM should override
       process.env.LLM_PROVIDER = 'gemini';
@@ -456,7 +460,7 @@ describe('Config — loadConfig', () => {
       await loadConfig();
 
       expect(mockWarn).toHaveBeenCalledTimes(1);
-      const [payload] = mockWarn.mock.calls[0];
+      const payload = mockWarn.mock.calls[0]?.[0];
       expect(payload.missingParameters).toEqual([
         '/junando/redis-url',
         '/junando/teams-webhook-url',
@@ -782,6 +786,34 @@ describe('Config — loadConfig', () => {
       process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = '';
       const config = await loadConfig();
       expect(config.rollbackActionAllowedSlackUserIds).toBeUndefined();
+    });
+  });
+
+  // ── dedupStore selector ─────────────────────────────────────────────────
+
+  describe('dedupStore validation', () => {
+    it('defaults to dynamodb when DEDUP_STORE is unset', async () => {
+      setEnv({ ...validConfig });
+      const config = await loadConfig();
+      expect(config.dedupStore).toBe('dynamodb');
+    });
+
+    it('rejects dynamodb selector without DEDUP_TABLE_NAME', async () => {
+      setEnv({ ...validConfig, DEDUP_TABLE_NAME: undefined });
+      await expect(loadConfig()).rejects.toThrow(/dedupTableName/);
+    });
+
+    it('rejects redis selector without REDIS_URL', async () => {
+      setEnv({ ...validConfig, REDIS_URL: undefined });
+      process.env['DEDUP_STORE'] = 'redis';
+      await expect(loadConfig()).rejects.toThrow(/redisUrl/);
+    });
+
+    it('succeeds for redis selector when REDIS_URL is present and DEDUP_TABLE_NAME is absent', async () => {
+      setEnv({ ...validConfig, DEDUP_TABLE_NAME: undefined });
+      process.env['DEDUP_STORE'] = 'redis';
+      const config = await loadConfig();
+      expect(config.dedupStore).toBe('redis');
     });
   });
 });

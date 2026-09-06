@@ -42,7 +42,7 @@ export function createProcessIncidentUseCase(
 
   const { config, logger } = deps;
 
-  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+  const redis = new Redis(config.redisUrl ?? 'redis://localhost:6379', { lazyConnect: true });
   const dedup = new RedisDeduplicationStore(redis);
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);

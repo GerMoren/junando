@@ -53,7 +53,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   reinitLogger({ level: config.logLevel }); // swap in Loki transport now that LOKI_URL is set
   logger = createLogger(config.logLevel);
 
-  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+  const redis = new Redis(config.redisUrl ?? 'redis://localhost:6379', { lazyConnect: true });
 
   const dedup = new RedisDeduplicationStore(redis);
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');

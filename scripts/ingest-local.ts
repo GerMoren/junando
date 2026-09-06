@@ -107,7 +107,7 @@ logger.info(
 // 3. Wire deps — use MockLLMProvider unless --real-llm
 // ---------------------------------------------------------------------------
 
-const redis = new Redis(appConfig.redisUrl, { lazyConnect: true });
+const redis = new Redis(appConfig.redisUrl ?? 'redis://localhost:6379', { lazyConnect: true });
 try {
   await redis.connect();
   logger.info("Redis connected");
