@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { ProcessIncidentUseCase } from '../process-incident.use-case.js';
+import { ProcessIncidentUseCase, resolveOutcome } from '../process-incident.use-case.js';
 import type { NormalizedAlert } from '../../../domain/entities/alert.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
 import type {
@@ -19,6 +19,9 @@ import { AlertType } from '../../../shared/constants.js';
 import { RuleActionType } from '../../../domain/entities/rule.js';
 import type { RuleAction } from '../../../domain/entities/rule.js';
 import * as metricsModule from '../../../shared/metrics/index.js';
+import { OpenRouterProvider } from '../../../infrastructure/llm/llm.adapter.js';
+import { SlackNotifier } from '../../../infrastructure/notifier/slack.adapter.js';
+import { ROLLBACK_ACTION_ID, SLACK_API_URL } from '../../../shared/constants.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test factories
@@ -170,6 +173,67 @@ describe('ProcessIncidentUseCase — pipeline behavior', () => {
 
     expect(deps.llm.analyze).toHaveBeenCalled();
     expect(deps.notifier.send).toHaveBeenCalledWith(expect.anything(), null, undefined);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rollback-vector regression — real SlackNotifier payload, not just parseAnalysis
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ProcessIncidentUseCase — rollback vector closed end-to-end', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('an unparseable response mentioning "rollback" renders no rollback button in the Slack payload', async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url === SLACK_API_URL) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      // OpenRouter call — unparseable prose negating rollback
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            { index: 0, message: { role: 'assistant', content: 'no rollback is needed here' } },
+          ],
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const llm = new OpenRouterProvider('test-key');
+    const notifier = new SlackNotifier('bot-token', 'incidents');
+    const deps = makeDeps({ llm, notifier });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await useCase.execute([makeAlert({ serviceName: 'svc-rollback-vector' })], 'corr-rollback-vector');
+
+    const slackCall = mockFetch.mock.calls.find(([url]) => url === SLACK_API_URL);
+    expect(slackCall).toBeDefined();
+    const body = JSON.parse((slackCall![1] as RequestInit).body as string) as { blocks: unknown[] };
+
+    const hasRollbackAction = JSON.stringify(body.blocks).includes(ROLLBACK_ACTION_ID);
+    expect(hasRollbackAction).toBe(false);
+    expect(JSON.stringify(body.blocks)).toContain('no AI diagnosis');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolveOutcome precedence
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolveOutcome', () => {
+  it.each([
+    ['notifyError only', { notifyError: new Error('x'), llmError: null, llmDegradedReason: null }, Outcome.Error],
+    ['llmError only', { notifyError: null, llmError: new Error('x'), llmDegradedReason: null }, Outcome.Degraded],
+    ['llmDegradedReason only', { notifyError: null, llmError: null, llmDegradedReason: 'unparseable_response' }, Outcome.Degraded],
+    ['none', { notifyError: null, llmError: null, llmDegradedReason: null }, Outcome.Success],
+    ['notifyError wins over llmError', { notifyError: new Error('n'), llmError: new Error('l'), llmDegradedReason: null }, Outcome.Error],
+    ['llmError wins over llmDegradedReason', { notifyError: null, llmError: new Error('l'), llmDegradedReason: 'empty_response' }, Outcome.Degraded],
+  ])('%s → %s', (_label, signals, expected) => {
+    expect(resolveOutcome(signals)).toBe(expected);
   });
 });
 
@@ -615,6 +679,11 @@ describe('ProcessIncidentUseCase — wide events', () => {
       notify: { outcome: NotifyOutcome.Success },
     });
     expect(event['llm']).toBeUndefined();
+    // Redundant today, since the llm section is absent entirely on this path.
+    // Kept as an independent guard: if the section ever starts carrying call
+    // metadata on a transport failure, the two degradation classes must still
+    // stay mutually exclusive so dashboards can filter them apart.
+    expect(JSON.stringify(event)).not.toContain('degradedReason');
   });
 
   it('emits outcome=error with notify failure recorded, then rethrows for the queue retry', async () => {

@@ -55,13 +55,22 @@ export interface ITraceRepository {
 }
 
 /**
+ * Reason a parse attempt could not produce a diagnosis.
+ * `unparseable_response` — non-empty raw text that neither JSON nor regex
+ * stage could extract a usable analysis from.
+ * `empty_response` — the provider returned an empty (or whitespace-only) string.
+ */
+export type LlmDegradedReason = 'unparseable_response' | 'empty_response';
+
+/**
  * Structured result of an LLM analysis call.
  * Carries the diagnosis plus the observability metadata that feeds the
  * `llm` section of the wide event (urgency comes from analysis.urgency_level;
  * total tokens = promptTokens + completionTokens).
  */
 export interface LLMResult {
-  analysis: LLMAnalysis;
+  analysis: LLMAnalysis | null;
+  degradedReason?: LlmDegradedReason;
   provider: string;
   model: string;
   latencyMs: number;

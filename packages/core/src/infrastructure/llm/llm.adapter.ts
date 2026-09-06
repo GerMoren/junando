@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../domain/entities/incident.js';
 import { LLMAnalysisSchema } from '../../domain/entities/incident.js';
-import type { ILLMProvider, LLMResult } from '../../domain/ports/index.js';
+import type { ILLMProvider, LLMResult, LlmDegradedReason } from '../../domain/ports/index.js';
 import {
   CIRCUIT_BREAKER,
   LLM_FALLBACK_DEFAULTS,
@@ -24,9 +24,16 @@ const MOCK_PROVIDER_NAME = 'mock';
  * shared metadata (provider, model, latencyMs) is attached.
  */
 interface LlmRawResult {
-  analysis: LLMAnalysis;
+  analysis: LLMAnalysis | null;
+  degradedReason?: LlmDegradedReason;
   promptTokens: number;
   completionTokens: number;
+}
+
+/** Result of parsing raw LLM text into a diagnosis, or a reason it failed. */
+interface ParsedAnalysis {
+  analysis: LLMAnalysis | null;
+  degradedReason?: LlmDegradedReason;
 }
 
 /**
@@ -87,22 +94,26 @@ function buildUserPrompt(cluster: AlertCluster, traces: Record<string, unknown>[
 
 /**
  * Extracts LLMAnalysis from raw LLM response text.
- * Uses multi-stage parsing: JSON → regex fallback → heuristics.
- * Returns validated LLMAnalysis or falls back to default values.
+ * Two-stage parsing: JSON → regex fallback. Never fabricates a diagnosis —
+ * returns null when neither stage produces a usable analysis.
  */
-function parseAnalysis(raw: string, correlationId?: string): LLMAnalysis {
+function parseAnalysis(raw: string, correlationId?: string): LLMAnalysis | null {
   const startIdx = raw.indexOf('{');
   const endIdx = raw.lastIndexOf('}');
+  let stage1Succeeded = false;
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     try {
-      return LLMAnalysisSchema.parse(JSON.parse(raw.slice(startIdx, endIdx + 1)));
+      const analysis = LLMAnalysisSchema.parse(JSON.parse(raw.slice(startIdx, endIdx + 1)));
+      stage1Succeeded = true;
+      return analysis;
     } catch {
-      logger.warn(
-        { rawResponse: raw.slice(0, 500), correlationId },
-        'llm:parse:failed',
-      );
+      // fall through to stage 2 — warn logged below, outside the brace guard
     }
+  }
+
+  if (!stage1Succeeded) {
+    logger.warn({ rawResponse: raw.slice(0, 500), correlationId }, 'llm:parse:failed');
   }
 
   const probableCauseMatch = RE_PROBABLE_CAUSE.exec(raw);
@@ -126,22 +137,30 @@ function parseAnalysis(raw: string, correlationId?: string): LLMAnalysis {
       urgency_level: urgency as LLMAnalysis['urgency_level'],
       requires_rollback: rollbackMatch?.[1] === 'true',
     };
-    return LLMAnalysisSchema.parse(analysis);
+    const parsed = LLMAnalysisSchema.parse(analysis);
+    logger.warn(
+      { matchedFields: ['probable_cause', 'urgency_level'], correlationId },
+      'llm:parse:partial',
+    );
+    return parsed;
   }
 
-  const lowerRaw = raw.toLowerCase();
-  let urgencyLevel: LLMAnalysis['urgency_level'] = 'medium';
-  if (lowerRaw.includes('critical') || lowerRaw.includes('severity 1')) urgencyLevel = 'critical';
-  else if (lowerRaw.includes('high') || lowerRaw.includes('severity 2')) urgencyLevel = 'high';
-  else if (lowerRaw.includes('low')) urgencyLevel = 'low';
+  logger.warn({ correlationId }, 'llm:parse:unusable');
+  return null;
+}
 
-  return LLMAnalysisSchema.parse({
-    probable_cause: 'Analysis in progress - check logs for details',
-    impacted_services: ['unknown-service'],
-    recommended_steps: ['Review incident details in logs'],
-    urgency_level: urgencyLevel,
-    requires_rollback: lowerRaw.includes('rollback') || lowerRaw.includes('revert'),
-  });
+/**
+ * Shared entry point for turning provider text into a diagnosis (or a
+ * degradedReason explaining why not). Detects empty responses once, here,
+ * before delegating to parseAnalysis.
+ */
+function parseLlmText(raw: string, correlationId?: string): ParsedAnalysis {
+  if (raw.trim() === '') {
+    logger.warn({ correlationId }, 'llm:parse:empty');
+    return { analysis: null, degradedReason: 'empty_response' };
+  }
+  const analysis = parseAnalysis(raw, correlationId);
+  return analysis ? { analysis } : { analysis: null, degradedReason: 'unparseable_response' };
 }
 
 /**
@@ -198,7 +217,7 @@ export class GeminiProvider implements ILLMProvider {
       }
     ).usageMetadata;
     return {
-      analysis: parseAnalysis(result.response.text()),
+      ...parseLlmText(result.response.text()),
       promptTokens: usage?.promptTokenCount ?? 0,
       completionTokens: usage?.candidatesTokenCount ?? 0,
     };
@@ -229,7 +248,7 @@ export class ClaudeProvider implements ILLMProvider {
 
     const text = message.content.find((b) => b.type === 'text')?.text ?? '';
     return {
-      analysis: parseAnalysis(text),
+      ...parseLlmText(text),
       provider: LLMProviderType.Claude,
       model: this.model,
       latencyMs: Date.now() - startMs,
@@ -371,7 +390,7 @@ export class OpenRouterProvider implements ILLMProvider {
       }
 
       const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
-      const analysis = parseAnalysis(text, correlationId);
+      const parsedAnalysis = parseLlmText(text, correlationId);
       const usage = parsed.success ? parsed.data.usage : undefined;
 
       if (usage) {
@@ -391,7 +410,7 @@ export class OpenRouterProvider implements ILLMProvider {
       llmInferenceDuration.observe({ model: this.model }, latencyMs / 1000);
 
       return {
-        analysis,
+        ...parsedAnalysis,
         provider: this.providerName,
         model: this.model,
         latencyMs,
@@ -448,7 +467,7 @@ export class OpenRouterProvider implements ILLMProvider {
       const text = parsed.success ? (parsed.data.choices?.[0]?.message?.content ?? '') : '';
       const usage = parsed.success ? parsed.data.usage : undefined;
       return {
-        analysis: parseAnalysis(text, correlationId),
+        ...parseLlmText(text, correlationId),
         provider: this.providerName,
         model: toModel,
         latencyMs: Date.now() - startMs,

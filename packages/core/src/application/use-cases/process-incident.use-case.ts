@@ -60,16 +60,19 @@ function toErrorSection(err: unknown): ErrorSection {
 interface OutcomeSignals {
   llmError: unknown | null;
   notifyError: unknown | null;
+  llmDegradedReason: string | null;
 }
 
 /**
  * Terminal outcome for a processed cluster. Early returns — no switch/case.
- * Notify failure is fatal (the batch is retried via SQS); LLM failure is
- * degraded (notification still went out without a diagnosis).
+ * Notify failure is fatal (the batch is retried via SQS); LLM transport
+ * failure and a parse-degraded diagnosis both leave the cluster degraded
+ * (notification still went out, with or without a diagnosis).
  */
-function resolveOutcome({ llmError, notifyError }: OutcomeSignals): Outcome {
+export function resolveOutcome({ llmError, notifyError, llmDegradedReason }: OutcomeSignals): Outcome {
   if (notifyError != null) return Outcome.Error;
   if (llmError != null) return Outcome.Degraded;
+  if (llmDegradedReason != null) return Outcome.Degraded;
   return Outcome.Success;
 }
 
@@ -173,14 +176,17 @@ export class ProcessIncidentUseCase {
       // 5. LLM inference — fail gracefully, notify anyway with null analysis
       let analysis: LLMAnalysis | null = null;
       let llmError: unknown | null = null;
+      let llmDegradedReason: string | null = null;
       try {
         const llmResult = await llm.analyze(cluster, allSpans);
         analysis = llmResult.analysis;
+        llmDegradedReason = llmResult.degradedReason ?? null;
         builder.set('llm', {
           provider: llmResult.provider,
           model: llmResult.model,
           latencyMs: llmResult.latencyMs,
-          urgency: llmResult.analysis.urgency_level,
+          ...(llmResult.analysis && { urgency: llmResult.analysis.urgency_level }),
+          ...(llmResult.degradedReason && { degradedReason: llmResult.degradedReason }),
           tokens: llmResult.promptTokens + llmResult.completionTokens,
         });
       } catch (err) {
@@ -242,7 +248,7 @@ export class ProcessIncidentUseCase {
       if (llmError != null) {
         builder.set('error', toErrorSection(llmError));
       }
-      this.emit(builder, resolveOutcome({ llmError, notifyError: null }), clusterStartMs);
+      this.emit(builder, resolveOutcome({ llmError, notifyError: null, llmDegradedReason }), clusterStartMs);
     }
   }
 

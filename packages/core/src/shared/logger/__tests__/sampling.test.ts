@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { shouldSample } from '../sampling.js';
-import { Component } from '../enums.js';
+import { Component, Outcome } from '../enums.js';
 import type { WideEvent } from '../wide-event-builder.js';
 
 const SLOW_THRESHOLD_MS = 10_000;
@@ -58,6 +58,13 @@ describe('shouldSample', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9999);
 
     expect(shouldSample(baseEvent())).toBe(false);
+  });
+
+  it('always samples a degraded event with no error section, regardless of the random draw', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.9999);
+    const event = baseEvent({ outcome: Outcome.Degraded, durationMs: 100 });
+
+    expect(shouldSample(event)).toBe(true);
   });
 
   it('samples roughly 5% of normal events over 1000 runs', () => {

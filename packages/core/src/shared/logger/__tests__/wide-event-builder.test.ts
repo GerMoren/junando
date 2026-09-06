@@ -68,6 +68,27 @@ describe('WideEventBuilder', () => {
         tokens: 512,
       });
     });
+
+    it('stores an llm section with degradedReason and no urgency, when analysis was null', () => {
+      const event = new WideEventBuilder('req-1', Component.Llm)
+        .set('llm', {
+          provider: 'openrouter',
+          model: 'qwen/qwen-2.5-72b-instruct',
+          latencyMs: 900,
+          degradedReason: 'unparseable_response',
+          tokens: 128,
+        })
+        .flush();
+
+      expect(event.llm).toEqual({
+        provider: 'openrouter',
+        model: 'qwen/qwen-2.5-72b-instruct',
+        latencyMs: 900,
+        degradedReason: 'unparseable_response',
+        tokens: 128,
+      });
+      expect(event.llm).not.toHaveProperty('urgency');
+    });
   });
 
   describe('merge', () => {
