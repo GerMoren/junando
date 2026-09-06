@@ -19,7 +19,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.typecheck.json",
     "clean": "rm -rf dist"
   },
   "dependencies": {

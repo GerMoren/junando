@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handler } from '../handler.js';
 import * as core from '@junando/core';
-import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyResultV2,
+  APIGatewayProxyStructuredResultV2,
+} from 'aws-lambda';
+
+function assertStructuredResponse(
+  response: APIGatewayProxyResultV2,
+): asserts response is APIGatewayProxyStructuredResultV2 {
+  if (typeof response === 'string') {
+    throw new Error('expected an API Gateway structured response');
+  }
+}
 
 const { mockFetch, mockRollbackHandle } = vi.hoisted(() => ({
   mockFetch: vi.fn().mockResolvedValue({ ok: true }),
@@ -12,6 +24,36 @@ const { mockFetch, mockRollbackHandle } = vi.hoisted(() => ({
 }));
 
 vi.stubGlobal('fetch', mockFetch);
+
+type AppConfig = Awaited<ReturnType<typeof core.loadConfig>>;
+
+function makeAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
+  return {
+    llmProvider: 'openrouter',
+    llmApiKey: 'test-key',
+    llmModel: 'gpt-4',
+    notifierType: 'slack',
+    slackBotToken: 'xoxb-test-token',
+    slackSigningSecret: 'test-signing-secret',
+    slackChannel: '#test-channel',
+    rollbackActionEnabled: true,
+    rollbackActionAllowedSlackUserIds: undefined,
+    teamsWebhookUrl: undefined,
+    lokiUrl: undefined,
+    dedupStore: 'dynamodb',
+    dedupTableName: undefined,
+    redisUrl: undefined,
+    sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
+    dedupTtlSeconds: 300,
+    clusterWindowMs: 120_000,
+    logLevel: 'info',
+    nodeEnv: 'test' as AppConfig['nodeEnv'],
+    llmFallbackModels: [],
+    llmFallbackTimeoutMs: 5_000,
+    rulesConfigPath: undefined,
+    ...overrides,
+  };
+}
 
 // Mock the SQSClient
 vi.mock('@aws-sdk/client-sqs', () => ({
@@ -36,7 +78,7 @@ vi.mock('@junando/core', async (importOriginal) => {
       slackChannel: 'test-channel',
       rollbackActionEnabled: true,
       sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
-      llmProvider: 'openai',
+      llmProvider: 'openrouter',
       llmApiKey: 'test-key',
       llmModel: 'gpt-4',
       dedupTtlSeconds: 300,
@@ -45,33 +87,42 @@ vi.mock('@junando/core', async (importOriginal) => {
 });
 
 // Helper to create API Gateway event
-function createEvent(path: string, body: string | null, options: {
-  isBase64Encoded?: boolean;
-  headers?: Record<string, string>;
-} = {}): APIGatewayProxyEventV2 {
+function createEvent(
+  path: string,
+  body: string | null,
+  options: {
+    isBase64Encoded?: boolean;
+    headers?: Record<string, string>;
+  } = {},
+): APIGatewayProxyEventV2 {
   return {
     version: '2.0',
     routeKey: path,
     rawPath: path,
-    body: body,
+    rawQueryString: '',
+    body: body ?? '',
     isBase64Encoded: options.isBase64Encoded ?? false,
     headers: options.headers ?? {},
     requestContext: {
       accountId: 'test-account',
+      routeKey: path,
+      time: '12/May/2026:12:00:00 +0000',
+      timeEpoch: 1715515200000,
       apiId: 'test-api',
       domainName: 'test.execute-api.amazonaws.com',
       domainPrefix: 'test',
       requestId: 'test-request-id',
-      requestTime: '2026-05-12T12:00:00Z',
-      requestTimeEpoch: 1715515200000,
       stage: 'test',
-      protocol: 'HTTP/1.1',
-      identity: { sourceIp: '127.0.0.1' },
-      http: { method: 'GET', path: path, protocol: 'HTTP/1.1' },
+      http: {
+        method: 'GET',
+        path: path,
+        protocol: 'HTTP/1.1',
+        sourceIp: '127.0.0.1',
+        userAgent: 'vitest',
+      },
     },
   };
 }
-
 
 describe('Webhook Lambda Handler', () => {
   beforeEach(() => {
@@ -94,6 +145,7 @@ describe('Webhook Lambda Handler', () => {
     it('returns 200 with correct JSON', async () => {
       const event = createEvent('/health', null);
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body!);
@@ -105,6 +157,7 @@ describe('Webhook Lambda Handler', () => {
     it('returns 200 with Prometheus metrics', async () => {
       const event = createEvent('/metrics', null);
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(response.headers?.['Content-Type']).toBe('text/plain');
@@ -137,6 +190,7 @@ describe('Webhook Lambda Handler', () => {
 
       const event = createEvent('/webhook/alert', JSON.stringify(payload));
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body!);
@@ -145,10 +199,13 @@ describe('Webhook Lambda Handler', () => {
   });
 
   describe('POST /webhook/slack-interactivity — error paths', () => {
-    const createSlackEvent = (body: string, overrides: {
-      signature?: string;
-      timestamp?: string;
-    } = {}): APIGatewayProxyEventV2 => {
+    const createSlackEvent = (
+      body: string,
+      overrides: {
+        signature?: string;
+        timestamp?: string;
+      } = {},
+    ): APIGatewayProxyEventV2 => {
       const timestamp = overrides.timestamp ?? Math.floor(Date.now() / 1000).toString();
       const { createHmac } = require('crypto');
       const baseString = `v0:${timestamp}:${body}`;
@@ -169,6 +226,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(400);
       expect(response.body).toContain('Invalid JSON');
@@ -181,6 +239,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(422);
     });
@@ -189,9 +248,7 @@ describe('Webhook Lambda Handler', () => {
       const payload = {
         type: 'block_actions',
         user: { username: 'test-user', id: 'U12345' },
-        actions: [
-          { action_id: 'ack_alert', value: 'fp-123', type: 'button' },
-        ],
+        actions: [{ action_id: 'ack_alert', value: 'fp-123', type: 'button' }],
         container: { message_ts: '1234567890.123456' },
         message: { ts: '1234567890.123456' },
       };
@@ -199,16 +256,20 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
     });
   });
 
   describe('POST /webhook/slack-interactivity — rollback dispatch', () => {
-    const createSlackEvent = (body: string, overrides: {
-      signature?: string;
-      timestamp?: string;
-    } = {}): APIGatewayProxyEventV2 => {
+    const createSlackEvent = (
+      body: string,
+      overrides: {
+        signature?: string;
+        timestamp?: string;
+      } = {},
+    ): APIGatewayProxyEventV2 => {
       const timestamp = overrides.timestamp ?? Math.floor(Date.now() / 1000).toString();
       const { createHmac } = require('crypto');
       const baseString = `v0:${timestamp}:${body}`;
@@ -249,24 +310,31 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(mockRollbackHandle).toHaveBeenCalledOnce();
-      const [request] = mockRollbackHandle.mock.calls[0] as [{
-        fingerprint: string;
-        serviceName: string;
-        endpointPath: string;
-        alertType: string;
-        urgencyLevel: string;
-        triggeredBy: { id?: string; username?: string; channel: string };
-        messageTs?: string;
-      }];
+      const [request] = mockRollbackHandle.mock.calls[0] as [
+        {
+          fingerprint: string;
+          serviceName: string;
+          endpointPath: string;
+          alertType: string;
+          urgencyLevel: string;
+          triggeredBy: { id?: string; username?: string; channel: string };
+          messageTs?: string;
+        },
+      ];
       expect(request.fingerprint).toBe('fp-123');
       expect(request.serviceName).toBe('checkout-service');
       expect(request.endpointPath).toBe('/api/orders');
       expect(request.alertType).toBe('http_500');
       expect(request.urgencyLevel).toBe('high');
-      expect(request.triggeredBy).toEqual({ id: 'U12345', username: 'test-user', channel: 'slack' });
+      expect(request.triggeredBy).toEqual({
+        id: 'U12345',
+        username: 'test-user',
+        channel: 'slack',
+      });
       expect(request.messageTs).toBe('1234567890.123456');
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -305,6 +373,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(mockFetch).toHaveBeenCalledWith(
@@ -319,9 +388,7 @@ describe('Webhook Lambda Handler', () => {
       const payload = {
         type: 'block_actions',
         user: { username: 'test-user', id: 'U12345' },
-        actions: [
-          { action_id: 'trigger_rollback', value: 'malformed', type: 'button' },
-        ],
+        actions: [{ action_id: 'trigger_rollback', value: 'malformed', type: 'button' }],
         container: { message_ts: '1234567890.123456' },
         message: { ts: '1234567890.123456' },
       };
@@ -329,6 +396,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(mockRollbackHandle).not.toHaveBeenCalled();
@@ -336,18 +404,9 @@ describe('Webhook Lambda Handler', () => {
     });
 
     it('returns 200 and sends an ephemeral message when rollback actions are disabled', async () => {
-      vi.mocked(core.loadConfig).mockResolvedValueOnce({
-        notifierType: 'slack',
-        slackSigningSecret: 'test-signing-secret',
-        slackBotToken: 'test-bot-token',
-        slackChannel: 'test-channel',
-        rollbackActionEnabled: false,
-        sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
-        llmProvider: 'openai',
-        llmApiKey: 'test-key',
-        llmModel: 'gpt-4',
-        dedupTtlSeconds: 300,
-      });
+      vi.mocked(core.loadConfig).mockResolvedValueOnce(
+        makeAppConfig({ rollbackActionEnabled: false }),
+      );
 
       const payload = {
         type: 'block_actions',
@@ -373,6 +432,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(mockRollbackHandle).not.toHaveBeenCalled();
@@ -385,19 +445,9 @@ describe('Webhook Lambda Handler', () => {
     });
 
     it('returns 200 and sends an ephemeral message when the Slack user is not in the allowlist', async () => {
-      vi.mocked(core.loadConfig).mockResolvedValueOnce({
-        notifierType: 'slack',
-        slackSigningSecret: 'test-signing-secret',
-        slackBotToken: 'test-bot-token',
-        slackChannel: 'test-channel',
-        rollbackActionEnabled: true,
-        rollbackActionAllowedSlackUserIds: ['U_ADMIN'],
-        sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
-        llmProvider: 'openai',
-        llmApiKey: 'test-key',
-        llmModel: 'gpt-4',
-        dedupTtlSeconds: 300,
-      });
+      vi.mocked(core.loadConfig).mockResolvedValueOnce(
+        makeAppConfig({ rollbackActionAllowedSlackUserIds: ['U_ADMIN'] }),
+      );
 
       const payload = {
         type: 'block_actions',
@@ -423,6 +473,7 @@ describe('Webhook Lambda Handler', () => {
       const event = createSlackEvent(body);
 
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       expect(mockRollbackHandle).not.toHaveBeenCalled();
@@ -461,6 +512,7 @@ describe('Webhook Lambda Handler', () => {
 
       const event = createEvent('/webhook/alert', JSON.stringify(payload));
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       // Inline path returns 200 immediately (fire-and-forget)
       expect(response.statusCode).toBe(200);
@@ -497,6 +549,7 @@ describe('Webhook Lambda Handler', () => {
         headers: { 'x-correlation-id': upstreamCorrelationId },
       });
       const response = await handler(event);
+      assertStructuredResponse(response);
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body!);

@@ -3,14 +3,11 @@ import { createNotifier, collectUnresolvedChannels } from '../factory.js';
 import { SlackNotifier } from '../slack.adapter.js';
 import { TeamsNotifier } from '../teams.adapter.js';
 import { RoutingNotifier } from '../routing-notifier.js';
+import { NodeEnvironment } from '../../../shared/config/index.js';
 import type { Config } from '../../../shared/config/index.js';
 
 function makeSlackConfig(overrides: Partial<Config> = {}): Config {
   return {
-    llmProvider: 'gemini',
-    llmApiKey: 'test-key',
-    llmModel: undefined,
-    notifierType: 'slack',
     slackBotToken: 'xoxb-test',
     slackSigningSecret: 'signing-secret',
     slackChannel: '#alerts',
@@ -18,13 +15,21 @@ function makeSlackConfig(overrides: Partial<Config> = {}): Config {
     lokiUrl: undefined,
     redisUrl: 'redis://localhost:6379',
     sqsQueueUrl: undefined,
-    dedupTtlSeconds: 300,
-    clusterWindowMs: 120_000,
-    logLevel: 'info',
-    nodeEnv: 'test',
-    llmFallbackModels: [],
-    llmFallbackTimeoutMs: 60_000,
     ...overrides,
+    llmProvider: overrides.llmProvider ?? 'gemini',
+    llmApiKey: overrides.llmApiKey ?? 'test-key',
+    llmModel: overrides.llmModel,
+    notifierType: overrides.notifierType ?? 'slack',
+    dedupTtlSeconds: overrides.dedupTtlSeconds ?? 300,
+    clusterWindowMs: overrides.clusterWindowMs ?? 120_000,
+    logLevel: overrides.logLevel ?? 'info',
+    nodeEnv: overrides.nodeEnv ?? NodeEnvironment.Test,
+    llmFallbackModels: overrides.llmFallbackModels ?? [],
+    llmFallbackTimeoutMs: overrides.llmFallbackTimeoutMs ?? 60_000,
+    rollbackActionEnabled: overrides.rollbackActionEnabled ?? false,
+    dedupStore: overrides.dedupStore ?? 'dynamodb',
+    dedupTableName: overrides.dedupTableName ?? 'junando-dedup',
+    rulesConfigPath: overrides.rulesConfigPath,
   };
 }
 

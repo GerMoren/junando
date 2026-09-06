@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { PrometheusIngestRunner } from '../prometheus-ingest-runner.js';
 import { AlertType } from '@junando/core';
-import type { PrometheusHttpClientPort, PrometheusInstantResponse } from '../../ports/prometheus-http-client.port.js';
+import type {
+  PrometheusHttpClientPort,
+  PrometheusInstantResponse,
+} from '../../ports/prometheus-http-client.port.js';
 import type { PrometheusIngestConfig } from '../../config/ingest-config.schema.js';
 
 // ---------------------------------------------------------------------------
@@ -59,7 +62,11 @@ function makeLogger() {
 }
 
 function makeUseCase() {
-  return { execute: vi.fn<[unknown[], string], Promise<void>>().mockResolvedValue(undefined) };
+  return {
+    execute: vi
+      .fn<(alerts: unknown[], correlationId: string) => Promise<void>>()
+      .mockResolvedValue(undefined),
+  };
 }
 
 async function flushMicrotasks() {
@@ -79,12 +86,17 @@ describe('PrometheusIngestRunner', () => {
 
   it('PRR-01: happy path — single series above threshold calls useCase.execute once', async () => {
     vi.useFakeTimers();
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
     const now = vi.fn().mockReturnValue(NOW_MS);
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -99,11 +111,16 @@ describe('PrometheusIngestRunner', () => {
 
   it('PRR-02: empty vector — useCase.execute NOT called', async () => {
     vi.useFakeTimers();
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockResolvedValue(PROM_EMPTY) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockResolvedValue(PROM_EMPTY),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now: () => NOW_MS });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now: () => NOW_MS },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -118,7 +135,10 @@ describe('PrometheusIngestRunner', () => {
     const useCase = makeUseCase();
     const logger = makeLogger();
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now: () => NOW_MS });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now: () => NOW_MS },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -130,11 +150,16 @@ describe('PrometheusIngestRunner', () => {
   it('PRR-04: parse error — error logged, loop continues', async () => {
     vi.useFakeTimers();
     const parseError = new Error('Unexpected token');
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockRejectedValue(parseError) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockRejectedValue(parseError),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now: () => NOW_MS });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now: () => NOW_MS },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -145,13 +170,20 @@ describe('PrometheusIngestRunner', () => {
   it('PRR-05: lagging rule is skipped on next tick', async () => {
     vi.useFakeTimers();
     let resolveQuery!: (v: PrometheusInstantResponse) => void;
-    const slowPromise = new Promise<PrometheusInstantResponse>((res) => { resolveQuery = res; });
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockReturnValueOnce(slowPromise).mockResolvedValue(PROM_EMPTY) };
+    const slowPromise = new Promise<PrometheusInstantResponse>((res) => {
+      resolveQuery = res;
+    });
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockReturnValueOnce(slowPromise).mockResolvedValue(PROM_EMPTY),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
     const config = makeConfig(100);
 
-    const runner = new PrometheusIngestRunner({ config, promClient: client, processIncidentUseCase: useCase, logger }, { now: () => NOW_MS });
+    const runner = new PrometheusIngestRunner(
+      { config, promClient: client, processIncidentUseCase: useCase, logger },
+      { now: () => NOW_MS },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -167,11 +199,16 @@ describe('PrometheusIngestRunner', () => {
 
   it('PRR-06: useCase.execute throws — error logged, runner does not crash', async () => {
     vi.useFakeTimers();
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS),
+    };
     const useCase = { execute: vi.fn().mockRejectedValue(new Error('use case boom')) };
     const logger = makeLogger();
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now: () => NOW_MS });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now: () => NOW_MS },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -181,12 +218,17 @@ describe('PrometheusIngestRunner', () => {
 
   it('PRR-07: correlation ID format is prometheus-{ruleIndex}-{timestamp}', async () => {
     vi.useFakeTimers();
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
     const now = vi.fn().mockReturnValue(NOW_MS);
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now },
+    );
     runner.start();
     await flushMicrotasks();
 
@@ -198,12 +240,17 @@ describe('PrometheusIngestRunner', () => {
   it('PRR-08: clock injection — nowMs comes from opts.now, not Date.now', async () => {
     vi.useFakeTimers();
     const FIXED_NOW = 9_999_999_000;
-    const client: PrometheusHttpClientPort = { queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS) };
+    const client: PrometheusHttpClientPort = {
+      queryInstant: vi.fn().mockResolvedValue(PROM_SUCCESS),
+    };
     const useCase = makeUseCase();
     const logger = makeLogger();
     const now = vi.fn().mockReturnValue(FIXED_NOW);
 
-    const runner = new PrometheusIngestRunner({ config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger }, { now });
+    const runner = new PrometheusIngestRunner(
+      { config: makeConfig(), promClient: client, processIncidentUseCase: useCase, logger },
+      { now },
+    );
     runner.start();
     await flushMicrotasks();
 

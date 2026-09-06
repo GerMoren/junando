@@ -5,6 +5,7 @@ import { AlertType } from '../../../shared/constants.js';
 
 function makeAlert(overrides: Partial<NormalizedAlert> = {}): NormalizedAlert {
   return {
+    fingerprint: 'test-fingerprint',
     alertName: 'HighErrorRate',
     serviceName: 'checkout',
     alertType: AlertType.Error,

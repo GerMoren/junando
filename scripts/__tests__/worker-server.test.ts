@@ -50,7 +50,7 @@ describe('processBatch', () => {
     // DeleteMessageBatch must have been called
     expect(mockSend).toHaveBeenCalledTimes(2);
     // Second call should be DeleteMessageBatch
-    const deleteCall = mockSend.mock.calls[1][0];
+    const deleteCall = mockSend.mock.calls[1]?.[0];
     expect(deleteCall.input.Entries).toHaveLength(1);
     expect(deleteCall.input.Entries[0].ReceiptHandle).toBe('rh-1');
   });

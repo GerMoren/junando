@@ -24,8 +24,8 @@ describe('NoopRollbackActionHandler', () => {
       serviceName: 'checkout-service',
       endpointPath: '/api/orders',
       alertType: AlertType.Error,
-      urgencyLevel: 'high',
-      triggeredBy: { id: 'U123', username: 'alice', channel: 'slack' },
+      urgencyLevel: 'high' as const,
+      triggeredBy: { id: 'U123', username: 'alice', channel: 'slack' as const },
       messageTs: '1234567890.123456',
     });
 
@@ -42,8 +42,8 @@ describe('NoopRollbackActionHandler', () => {
       serviceName: 'checkout-service',
       endpointPath: '/api/orders',
       alertType: AlertType.Error,
-      urgencyLevel: 'high',
-      triggeredBy: { id: 'U123', username: 'alice', channel: 'slack' },
+      urgencyLevel: 'high' as const,
+      triggeredBy: { id: 'U123', username: 'alice', channel: 'slack' as const },
       messageTs: '1234567890.123456',
     };
 
@@ -57,7 +57,7 @@ describe('NoopRollbackActionHandler', () => {
       serviceName: 'checkout-service',
       endpointPath: '/api/orders',
       alertType: AlertType.Error,
-      urgencyLevel: 'high',
+      urgencyLevel: 'high' as const,
       triggeredBy: request.triggeredBy,
       messageTs: '1234567890.123456',
     });
@@ -70,7 +70,7 @@ describe('NoopRollbackActionHandler', () => {
       serviceName: 'tiny-service',
       endpointPath: '/ping',
       alertType: AlertType.Warning,
-      triggeredBy: { channel: 'slack' },
+      triggeredBy: { channel: 'slack' as const },
     });
 
     expect(result.ok).toBe(true);

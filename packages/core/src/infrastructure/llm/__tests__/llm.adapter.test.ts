@@ -110,8 +110,8 @@ describe('MockLLMProvider', () => {
     await provider.analyze(cluster, []);
 
     expect(provider.callLog).toHaveLength(2);
-    expect(provider.callLog[0].cluster.serviceName).toBe('auth-service');
-    expect(provider.callLog[1].cluster.serviceName).toBe('auth-service');
+    expect(provider.callLog[0]!.cluster.serviceName).toBe('auth-service');
+    expect(provider.callLog[1]!.cluster.serviceName).toBe('auth-service');
   });
 
   it('ignores traces param but accepts it', async () => {
@@ -166,7 +166,7 @@ describe('OpenRouterProvider', () => {
     await provider.analyze(makeCluster(), []);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const [url, options] = mockFetch.mock.calls[0]! as [string, RequestInit];
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(options.method).toBe('POST');
     expect(options.headers).toMatchObject({
@@ -318,7 +318,7 @@ describe('OpenRouterProvider', () => {
     const defaultProvider = new OpenRouterProvider('key');
     await defaultProvider.analyze(makeCluster(), []);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     expect(body.model).toBe('qwen/qwen-2.5-72b-instruct');
   });
 });
@@ -476,7 +476,7 @@ describe('OpenRouterProvider — fallback chain', () => {
     // model-b was tried (not model-a again), fetch called 3 times total (2 primary + 1 fallback)
     expect(result.analysis?.probable_cause).toBe('fixed');
     const calls = mockFetch.mock.calls as [string, RequestInit][];
-    const fallbackBody = JSON.parse(calls[2][1].body as string);
+    const fallbackBody = JSON.parse(calls[2]![1].body as string);
     expect(fallbackBody.model).toBe('model-b');
   });
 
@@ -498,12 +498,12 @@ describe('OpenRouterProvider — fallback chain', () => {
     );
     // Two transitions: a→b and b→c
     expect(hopCalls).toHaveLength(2);
-    expect(hopCalls[0][0]).toMatchObject({
+    expect(hopCalls[0]![0]).toMatchObject({
       from_model: 'model-a',
       to_model: 'model-b',
       reason: '429',
     });
-    expect(hopCalls[1][0]).toMatchObject({
+    expect(hopCalls[1]![0]).toMatchObject({
       from_model: 'model-b',
       to_model: 'model-c',
       reason: '429',

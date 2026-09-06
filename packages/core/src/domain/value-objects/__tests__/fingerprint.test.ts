@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { Fingerprint } from '../fingerprint.js';
 import type { NormalizedAlert } from '../../entities/alert.js';
-import { AlertType } from '../../../shared/constants';
+import { AlertType } from '../../../shared/constants.js';
 
 describe('Fingerprint Value Object', () => {
   it('generates deterministic hash regardless of case or whitespace', () => {
     const alert1: NormalizedAlert = {
-      alertName: 'HighErrorRate',
+      fingerprint: 'test-fingerprint',
+  alertName: 'HighErrorRate',
       serviceName: 'Auth-Service ',
       alertType: AlertType.Error,
       endpointPath: '/api/v1/login',
@@ -32,7 +33,8 @@ describe('Fingerprint Value Object', () => {
 
   it('generates different hashes for different alerts', () => {
     const alert1: NormalizedAlert = {
-      alertName: 'HighErrorRate',
+      fingerprint: 'test-fingerprint',
+  alertName: 'HighErrorRate',
       serviceName: 'auth-service',
       alertType: AlertType.Error,
       endpointPath: '/login',

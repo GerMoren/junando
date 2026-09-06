@@ -168,8 +168,9 @@ describe('flushLoki', () => {
 
     const options = fetchSpy.mock.calls[0]![1] as RequestInit;
     expect(options.method).toBe('POST');
-    expect(options.headers!['Content-Type']).toBe('application/json');
-    expect(options.headers!['Authorization']).toBe('Basic ' + Buffer.from('user:pass').toString('base64'));
+    const headers = new Headers(options.headers);
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('Basic ' + Buffer.from('user:pass').toString('base64'));
 
     const body = JSON.parse(options.body as string);
     expect(body.streams).toHaveLength(1);

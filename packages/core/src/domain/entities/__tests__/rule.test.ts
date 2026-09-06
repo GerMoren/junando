@@ -7,6 +7,7 @@ import {
   RuleSectionSchema,
   RuleConfigurationSchema,
 } from '../rule.js';
+import { RuleActionType, SeverityLevel } from '../rule.js';
 import type { RuleConfiguration, RuleAction } from '../rule.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ describe('RuleConditionSchema', () => {
     const condition = {
       serviceName: 'payments-api',
       alertType: AlertType.Error,
-      severity: 'critical',
+      severity: SeverityLevel.Critical,
       endpointPath: '/api/pay',
       labels: { team: 'payments', env: 'production' },
     };
@@ -78,7 +79,7 @@ describe('RuleConditionSchema', () => {
 
 describe('RuleActionSchema (discriminated union)', () => {
   it('validates Suppress action', () => {
-    const result = RuleActionSchema.safeParse({ type: 'suppress' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Suppress });
     expect(result.success).toBe(true);
     if (result.success) {
       const action = result.data as RuleAction;
@@ -87,7 +88,7 @@ describe('RuleActionSchema (discriminated union)', () => {
   });
 
   it('validates Route action with channel', () => {
-    const result = RuleActionSchema.safeParse({ type: 'route', channel: 'slack-sre' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Route, channel: 'slack-sre' });
     expect(result.success).toBe(true);
     if (result.success) {
       const action = result.data as RuleAction;
@@ -99,7 +100,7 @@ describe('RuleActionSchema (discriminated union)', () => {
   });
 
   it('validates Escalate action with channel', () => {
-    const result = RuleActionSchema.safeParse({ type: 'escalate', channel: 'pagerduty-critical' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Escalate, channel: 'pagerduty-critical' });
     expect(result.success).toBe(true);
     if (result.success) {
       const action = result.data as RuleAction;
@@ -111,7 +112,7 @@ describe('RuleActionSchema (discriminated union)', () => {
   });
 
   it('validates Tag action with key and value', () => {
-    const result = RuleActionSchema.safeParse({ type: 'tag', key: 'team', value: 'dba' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Tag, key: 'team', value: 'dba' });
     expect(result.success).toBe(true);
     if (result.success) {
       const action = result.data as RuleAction;
@@ -129,12 +130,12 @@ describe('RuleActionSchema (discriminated union)', () => {
   });
 
   it('rejects Route action missing channel', () => {
-    const result = RuleActionSchema.safeParse({ type: 'route' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Route });
     expect(result.success).toBe(false);
   });
 
   it('rejects Tag action missing key', () => {
-    const result = RuleActionSchema.safeParse({ type: 'tag', value: 'dba' });
+    const result = RuleActionSchema.safeParse({ type: RuleActionType.Tag, value: 'dba' });
     expect(result.success).toBe(false);
   });
 });
@@ -148,7 +149,7 @@ describe('RuleSchema', () => {
         serviceName: 'legacy-api',
         alertType: AlertType.Warning,
       },
-      actions: [{ type: 'suppress' }],
+      actions: [{ type: RuleActionType.Suppress }],
     };
     const result = RuleSchema.safeParse(rule);
     expect(result.success).toBe(true);
@@ -161,7 +162,7 @@ describe('RuleSchema', () => {
   it('rejects a rule without id', () => {
     const result = RuleSchema.safeParse({
       condition: {},
-      actions: [{ type: 'suppress' }],
+      actions: [{ type: RuleActionType.Suppress }],
     });
     expect(result.success).toBe(false);
   });
@@ -181,11 +182,11 @@ describe('RuleSchema', () => {
       name: 'Route and Escalate Payments',
       condition: {
         serviceName: 'payments-api',
-        severity: 'critical',
+        severity: SeverityLevel.Critical,
       },
       actions: [
-        { type: 'route', channel: 'slack-sre' },
-        { type: 'escalate', channel: 'pagerduty-critical' },
+        { type: RuleActionType.Route, channel: 'slack-sre' },
+        { type: RuleActionType.Escalate, channel: 'pagerduty-critical' },
       ],
     };
     const result = RuleSchema.safeParse(rule);
@@ -204,13 +205,13 @@ describe('RuleSectionSchema', () => {
           id: 'r1',
           name: 'Rule One',
           condition: { serviceName: 'test' },
-          actions: [{ type: 'suppress' }],
+          actions: [{ type: RuleActionType.Suppress }],
         },
         {
           id: 'r2',
           name: 'Rule Two',
           condition: { severity: 'high' },
-          actions: [{ type: 'tag', key: 'priority', value: 'p1' }],
+          actions: [{ type: RuleActionType.Tag, key: 'priority', value: 'p1' }],
         },
       ],
     };
@@ -239,19 +240,19 @@ describe('RuleConfigurationSchema — full YAML shape', () => {
               serviceName: 'legacy-api',
               alertType: AlertType.Error,
             },
-            actions: [{ type: 'suppress' }],
+            actions: [{ type: RuleActionType.Suppress }],
           },
           {
             id: 'route-payments',
             name: 'Route Payments to SRE',
             condition: {
               serviceName: 'payments-api',
-              severity: 'critical',
+              severity: SeverityLevel.Critical,
               alertCount: { min: 5 },
             },
             actions: [
-              { type: 'route', channel: 'slack-sre' },
-              { type: 'escalate', channel: 'pagerduty-critical' },
+              { type: RuleActionType.Route, channel: 'slack-sre' },
+              { type: RuleActionType.Escalate, channel: 'pagerduty-critical' },
             ],
           },
         ],
@@ -266,8 +267,8 @@ describe('RuleConfigurationSchema — full YAML shape', () => {
               requiresRollback: true,
             },
             actions: [
-              { type: 'escalate', channel: 'pagerduty-critical' },
-              { type: 'tag', key: 'incident-class', value: 'rollback-required' },
+              { type: RuleActionType.Escalate, channel: 'pagerduty-critical' },
+              { type: RuleActionType.Tag, key: 'incident-class', value: 'rollback-required' },
             ],
           },
         ],

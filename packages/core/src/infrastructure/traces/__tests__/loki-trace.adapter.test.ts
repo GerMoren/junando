@@ -33,7 +33,7 @@ describe('LokiTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, options] = mockFetch.mock.calls[0];
+    const [url, options] = mockFetch.mock.calls[0]!;
 
     expect(url).toContain('trace-123');
     expect(url).toContain('loki/api/v1/query_range');
@@ -43,12 +43,12 @@ describe('LokiTraceRepository', () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0].timestamp).toBe('1715592000000000000');
-    expect(result[0].level).toBe('info');
-    expect(result[0].message).toBe('trace started');
-    expect(result[1].timestamp).toBe('1715592001000000000');
-    expect(result[1].level).toBe('error');
-    expect(result[1].message).toBe('trace failed');
+    expect(result[0]!.timestamp).toBe('1715592000000000000');
+    expect(result[0]!.level).toBe('info');
+    expect(result[0]!.message).toBe('trace started');
+    expect(result[1]!.timestamp).toBe('1715592001000000000');
+    expect(result[1]!.level).toBe('error');
+    expect(result[1]!.message).toBe('trace failed');
   });
 
   it('fetches traces without API key when not provided', async () => {
@@ -61,7 +61,7 @@ describe('LokiTraceRepository', () => {
 
     await repoNoKey.findByTraceId('trace-456');
 
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
     expect(options.headers).toEqual({
       'Content-Type': 'application/json',
     });
@@ -114,11 +114,11 @@ describe('LokiTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({
+    expect(result[0]!).toEqual({
       timestamp: '1715592000000000000',
       message: 'plain log message without json',
     });
-    expect(result[1]).toEqual({
+    expect(result[1]!).toEqual({
       timestamp: '1715592001000000000',
       message: 'another plain line',
     });
@@ -162,9 +162,9 @@ describe('LokiTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(result).toHaveLength(3);
-    expect(result[0].msg).toBe('A1');
-    expect(result[1].msg).toBe('B1');
-    expect(result[2].msg).toBe('B2');
+    expect(result[0]!.msg).toBe('A1');
+    expect(result[1]!.msg).toBe('B1');
+    expect(result[2]!.msg).toBe('B2');
   });
 });
 
@@ -185,8 +185,8 @@ describe('MockTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(result).toHaveLength(2);
-    expect(result[0].message).toBe('test');
-    expect(result[1].message).toBe('fail');
+    expect(result[0]!.message).toBe('test');
+    expect(result[1]!.message).toBe('fail');
   });
 
   it('returns different fixtures for different trace IDs', async () => {
@@ -198,9 +198,9 @@ describe('MockTraceRepository', () => {
     const result2 = await repository.findByTraceId('trace-2');
 
     expect(result1).toHaveLength(1);
-    expect(result1[0].id).toBe('1');
+    expect(result1[0]!.id).toBe('1');
     expect(result2).toHaveLength(1);
-    expect(result2[0].id).toBe('2');
+    expect(result2[0]!.id).toBe('2');
   });
 
   it('overwrites existing fixture when adding new one with same trace ID', async () => {
@@ -211,7 +211,7 @@ describe('MockTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(result).toHaveLength(1);
-    expect(result[0].v).toBe('new');
+    expect(result[0]!.v).toBe('new');
   });
 
   it('accepts fixtures in constructor', async () => {
@@ -221,6 +221,6 @@ describe('MockTraceRepository', () => {
     const result = await repository.findByTraceId('trace-123');
 
     expect(result).toHaveLength(1);
-    expect(result[0].custom).toBe('data');
+    expect(result[0]!.custom).toBe('data');
   });
 });
