@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  ioredis: ^6.0.0
-
 importers:
 
   .:
@@ -3195,7 +3192,7 @@ packages:
       aws4fetch: ^1.0.20
       db0: '>=0.2.1'
       idb-keyval: ^6.2.1
-      ioredis: ^6.0.0
+      ioredis: ^5.4.2
       uploadthing: ^7.4.4
     peerDependenciesMeta:
       '@azure/app-configuration':
