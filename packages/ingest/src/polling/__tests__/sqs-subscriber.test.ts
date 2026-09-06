@@ -26,7 +26,7 @@ vi.mock('@aws-sdk/client-sqs', async (importActual) => {
   const actual = await importActual<typeof import('@aws-sdk/client-sqs')>();
   return {
     ...actual,
-    SQSClient: vi.fn(function() {
+    SQSClient: vi.fn(function MockSQSClient() {
       registry.constructorCalls++;
       return { send: registry.send };
     }),
@@ -45,6 +45,7 @@ function makeConfig(overrides: Partial<SqsIngestConfig['ingest']['sqs']> = {}): 
         maxInFlight: 20,
         ...overrides,
       },
+      mapper: { kind: 'test' },
     },
   };
 }
@@ -77,11 +78,13 @@ function makeIndexer(): { index: ReturnType<typeof vi.fn> } & IIndexer<Traceabil
 
 function makeMapper(): IMessageMapper {
   const stubDoc: TraceabilityDocument = {
+    '@timestamp': '2026-01-01T00:00:00.000Z',
+    channel: 'test',
+    application: 'junando',
+    messageType: 'alert',
+    message: 'test traceability document',
     correlationId: 'corr-1',
     fingerprint: 'fp-1',
-    sourceSystem: 'test',
-    timestamp: '2026-01-01T00:00:00.000Z',
-    payload: {},
   };
   return {
     kind: 'test',
@@ -335,14 +338,14 @@ describe('SqsSubscriber', () => {
       }),
     };
 
-    const MESSAGE_PROMISE_MAP: Record<string, () => Promise<unknown>> = {
+    const MESSAGE_PROMISE_MAP: Record<string, () => Promise<void>> = {
       'm-1': () => firstDone.promise,
       'm-2': () => secondDone.promise,
       'm-3': () => thirdDone.promise,
     };
 
     const processMessage = vi.fn((message: Message) => {
-      return MESSAGE_PROMISE_MAP[message.MessageId]?.() ?? Promise.resolve();
+      return (message.MessageId ? MESSAGE_PROMISE_MAP[message.MessageId] : undefined)?.() ?? Promise.resolve();
     });
 
     const subscriber = new SqsSubscriber({
@@ -409,7 +412,7 @@ describe('SqsSubscriber', () => {
 
     const subscriber = new SqsSubscriber({
       config: makeConfig({ batchSize: 1, maxInFlight: 2 }),
-      processMessage: vi.fn(function() { return firstDone.promise; }),
+      processMessage: vi.fn(() => firstDone.promise),
       logger: makeLogger(),
       sqsClient: sqsClient as Pick<SQSClient, 'send'>,
     });

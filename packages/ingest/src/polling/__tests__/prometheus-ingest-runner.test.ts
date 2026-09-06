@@ -59,7 +59,7 @@ function makeLogger() {
 }
 
 function makeUseCase() {
-  return { execute: vi.fn<[unknown[], string], Promise<void>>().mockResolvedValue(undefined) };
+  return { execute: vi.fn<(alerts: unknown[], correlationId: string) => Promise<void>>().mockResolvedValue(undefined) };
 }
 
 async function flushMicrotasks() {

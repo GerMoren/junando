@@ -4,7 +4,7 @@ import {
   parseCsvBody,
   generateFingerprint,
   type CsvColumnMapping,
-} from '../csv-input.adapter';
+} from '../csv-input.adapter.js';
 import { AlertType } from '@junando/core';
 
 describe('csv-input.adapter', () => {
@@ -75,7 +75,8 @@ auth-service,High latency detected,warning,2024-06-09T10:01:00Z`;
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
 
-      const [alert1, alert2] = result!.alerts;
+      const alert1 = result!.alerts[0]!;
+      const alert2 = result!.alerts[1]!;
       expect(alert1.serviceName).toBe('api-gateway');
       expect(alert1.alertName).toBe('Connection timeout to db');
       expect(alert1.alertType).toBe(AlertType.Error);
@@ -100,8 +101,8 @@ api-gateway,Error alert,critical,2024-06-09T10:00:00Z`;
       const result = parseCsvBody(csv, mapping);
       expect(result).not.toBeNull();
       expect(result!.alerts).toHaveLength(1);
-      expect(result!.alerts[0].serviceName).toBe('api-gateway');
-      expect(result!.alerts[0].labels.env).toBe('prod');
+      expect(result!.alerts[0]!.serviceName).toBe('api-gateway');
+      expect(result!.alerts[0]!.labels.env).toBe('prod');
     });
 
     it('returns null for CSV with fewer than 2 rows (no data)', () => {
@@ -131,7 +132,7 @@ api-gateway,Error alert,error,${unixSeconds}`;
 
       const result = parseCsvBody(csv);
       expect(result).not.toBeNull();
-      expect(result!.alerts[0].startsAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(result!.alerts[0]!.startsAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it('respects custom fingerprint column', () => {
@@ -147,7 +148,7 @@ api-gateway,Error alert,error,2024-06-09T10:00:00Z,my-custom-fingerprint`;
       };
 
       const result = parseCsvBody(csv, mapping);
-      expect(result!.alerts[0].fingerprint).toBe('my-custom-fingerprint');
+      expect(result!.alerts[0]!.fingerprint).toBe('my-custom-fingerprint');
     });
 
     it('handles quoted fields with commas inside', () => {
@@ -156,7 +157,7 @@ api-gateway,"Error: connection failed, timeout after 30s",error,2024-06-09T10:00
 
       const result = parseCsvBody(csv);
       expect(result).not.toBeNull();
-      expect(result!.alerts[0].alertName).toBe('Error: connection failed, timeout after 30s');
+      expect(result!.alerts[0]!.alertName).toBe('Error: connection failed, timeout after 30s');
     });
 
     it('returns null when no rows produce valid alerts', () => {
@@ -176,7 +177,7 @@ api-gateway,msg,invalid_severity,2024-06-09T10:00:00Z`;
 svc,msg,${sev},2024-06-09T10:00:00Z`;
 
         const result = parseCsvBody(csv);
-        expect(result?.alerts[0].alertType).toBeDefined();
+        expect(result?.alerts[0]!.alertType).toBeDefined();
       }
     });
   });

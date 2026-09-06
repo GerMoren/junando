@@ -24,6 +24,10 @@ const PILOT_RESOURCE_NAMES = {
   worker: 'junando-pilot-worker',
 };
 
+function isReference(value: unknown): value is { Ref: string } {
+  return typeof value === 'object' && value !== null && 'Ref' in value && typeof value.Ref === 'string';
+}
+
 function resourceProperties(template: Template) {
   const functions = Object.values(template.findResources('AWS::Lambda::Function'));
   const layers = Object.values(template.findResources('AWS::Lambda::LayerVersion'));
@@ -38,7 +42,7 @@ function resourceProperties(template: Template) {
 describe('JunandoStack staging configuration', () => {
   it('propagates staging values and scopes both Lambda roles to the staging SSM prefix', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(import.meta.dirname, '../..'));
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
     const app = new App();
     const stack = new JunandoStack(app, 'JunandoStack-staging', {
@@ -63,7 +67,7 @@ describe('JunandoStack staging configuration', () => {
 
   it('preserves the default SSM prefix resource ARN', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(import.meta.dirname, '../..'));
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
     const app = new App();
     const stack = new JunandoStack(app, 'JunandoStack-default', {
@@ -87,7 +91,7 @@ describe('JunandoStack staging configuration', () => {
 
   it('uses isolated physical names for the pilot without changing construct IDs', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(import.meta.dirname, '../..'));
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
     const app = new App();
     const stack = new JunandoStack(app, 'JunandoStack-pilot', {
@@ -116,7 +120,7 @@ describe('JunandoStack staging configuration', () => {
 describe('JunandoStack dedup table', () => {
   function buildTemplate() {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(import.meta.dirname, '../..'));
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
     const app = new App();
     const stack = new JunandoStack(app, 'JunandoStack-dedup', {
@@ -159,7 +163,9 @@ describe('JunandoStack dedup table', () => {
 
     const dedupPolicy = dedupPolicies[0];
     if (!dedupPolicy) throw new Error('expected exactly one dedup policy');
-    const roleRefs = (dedupPolicy.Properties.Roles as unknown[]).map((role: any) => role.Ref);
+    const roleRefs = (dedupPolicy.Properties.Roles as unknown[])
+      .filter(isReference)
+      .map((role) => role.Ref);
     expect(roleRefs).toContain(workerRoleLogicalId);
   });
 
