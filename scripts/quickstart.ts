@@ -52,6 +52,7 @@ LLM_API_KEY=dummy-key
 NOTIFIER_TYPE=teams
 TEAMS_WEBHOOK_URL=https://example.com/junando?api-version=2024-10-01
 LOKI_URL=http://localhost:3100
+DEDUP_STORE=redis
 REDIS_URL=redis://localhost:6379
 NODE_ENV=development
 LOG_LEVEL=info
