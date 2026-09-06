@@ -706,6 +706,67 @@ describe('ProcessIncidentUseCase — wide events', () => {
     });
   });
 
+  it('releases the dedup claim when notify fails, so the retry is not discarded', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const resetMock = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      dedup: { isNew: vi.fn().mockResolvedValue({ ...DEFAULT_DEDUP_RESULT }), reset: resetMock },
+      notifier: { send: vi.fn().mockRejectedValue(new Error('Slack 500')) },
+    });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await expect(
+      useCase.execute([makeAlert({ serviceName: 'svc-release-claim' })], 'corr-release-claim'),
+    ).rejects.toThrow('Slack 500');
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(resetMock).toHaveBeenCalledWith(expect.any(String));
+  });
+
+  it('does NOT release the dedup claim on a successful run', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const resetMock = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      dedup: { isNew: vi.fn().mockResolvedValue({ ...DEFAULT_DEDUP_RESULT }), reset: resetMock },
+    });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await useCase.execute([makeAlert({ serviceName: 'svc-success-no-release' })], 'corr-success');
+
+    expect(resetMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT release the dedup claim when only the LLM fails but notify succeeds', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const resetMock = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      dedup: { isNew: vi.fn().mockResolvedValue({ ...DEFAULT_DEDUP_RESULT }), reset: resetMock },
+      llm: { analyze: vi.fn().mockRejectedValue(new Error('LLM Down')) },
+    });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await useCase.execute([makeAlert({ serviceName: 'svc-llm-fail-no-release' })], 'corr-llm-fail');
+
+    expect(resetMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates the notifier error, not the release error, when dedup.reset itself rejects', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const resetMock = vi.fn().mockRejectedValue(new Error('DynamoDB unreachable'));
+    const deps = makeDeps({
+      dedup: { isNew: vi.fn().mockResolvedValue({ ...DEFAULT_DEDUP_RESULT }), reset: resetMock },
+      notifier: { send: vi.fn().mockRejectedValue(new Error('Slack 500')) },
+    });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await expect(
+      useCase.execute([makeAlert({ serviceName: 'svc-release-fails' })], 'corr-release-fails'),
+    ).rejects.toThrow('Slack 500');
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
+    expect(deps.logger.warn).toHaveBeenCalled();
+  });
+
   it('aggregates route and escalate channels into the notify section', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const mockRuleEngine: IRuleEngine = {
