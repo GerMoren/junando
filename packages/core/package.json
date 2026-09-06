@@ -1,6 +1,6 @@
 {
   "name": "@junando/core",
-  "version": "0.12.3",
+  "version": "0.14.0",
   "description": "Core domain types, interfaces, and shared utilities for the Junando alerting platform",
   "license": "Apache-2.0",
   "type": "module",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@aws-sdk/client-dynamodb": "^3.1127.0",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
     "ioredis": "^6.0.0",

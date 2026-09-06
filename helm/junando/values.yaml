@@ -197,7 +197,12 @@ secrets:
   TEAMS_WEBHOOK_URL: ""
   # LOKI_URL: Loki push endpoint URL (may include embedded credentials).
   LOKI_URL: ""
+  # DEDUP_STORE: deduplication backend (dynamodb | redis). Defaults to
+  # dynamodb, which requires DEDUP_TABLE_NAME and AWS credentials — this chart
+  # provisions neither, so Helm deployments must set redis explicitly.
+  DEDUP_STORE: "redis"
   # REDIS_URL: Redis connection URL (redis:// or rediss://).
+  # Required when DEDUP_STORE=redis.
   REDIS_URL: ""
   # SQS_QUEUE_URL: AWS SQS queue URL for the worker.
   SQS_QUEUE_URL: ""

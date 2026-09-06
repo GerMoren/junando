@@ -25,6 +25,7 @@ vi.mock('@junando/core', async () => {
     reinitLogger: vi.fn(),
     flushLoki: vi.fn().mockResolvedValue(undefined),
     RedisDeduplicationStore: vi.fn(function() { return {}; }),
+    DynamoDBDeduplicationStore: vi.fn(function() { return {}; }),
     LokiTraceRepository: MockLokiTraceRepository,
     SlackNotifier: vi.fn(function() { return {}; }),
     createLLMProvider: vi.fn(function() { return {}; }),
@@ -167,6 +168,50 @@ describe('Worker Handler', () => {
     expect(mockLogger.fatal).toHaveBeenCalledWith(
       { err: expect.any(Error) },
       'getUseCase() failed — Lambda will retry via SQS',
+    );
+  });
+
+  it('constructs DynamoDBDeduplicationStore when dedupStore is dynamodb', async () => {
+    mockLoadConfig.mockResolvedValueOnce({
+      ...baseConfig,
+      dedupStore: 'dynamodb' as const,
+      dedupTableName: 'junando-dedup',
+    });
+
+    await vi.resetModules();
+    const { handler: freshHandler } = await import('../handler.js');
+    const coreFresh = await import('@junando/core');
+
+    const event: Partial<SQSEvent> = { Records: [] };
+    await freshHandler(event as SQSEvent);
+
+    expect(coreFresh.DynamoDBDeduplicationStore).toHaveBeenCalledWith('junando-dedup');
+    expect(coreFresh.RedisDeduplicationStore).not.toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupStore: 'dynamodb' }),
+      'Dedup store initialised',
+    );
+  });
+
+  it('constructs RedisDeduplicationStore when dedupStore is redis', async () => {
+    mockLoadConfig.mockResolvedValueOnce({
+      ...baseConfig,
+      dedupStore: 'redis' as const,
+      redisUrl: 'redis://localhost:6379',
+    });
+
+    await vi.resetModules();
+    const { handler: freshHandler } = await import('../handler.js');
+    const coreFresh = await import('@junando/core');
+
+    const event: Partial<SQSEvent> = { Records: [] };
+    await freshHandler(event as SQSEvent);
+
+    expect(coreFresh.RedisDeduplicationStore).toHaveBeenCalled();
+    expect(coreFresh.DynamoDBDeduplicationStore).not.toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupStore: 'redis' }),
+      'Dedup store initialised',
     );
   });
 });

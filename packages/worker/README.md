@@ -47,7 +47,9 @@ All configuration is loaded via `@junando/core`'s `loadConfig()`, which reads fr
 
 | Variable | Description |
 |----------|-------------|
-| `REDIS_URL` | Redis connection URL for deduplication |
+| `DEDUP_STORE` | `dynamodb` (default, AWS free-tier) or `redis` |
+| `DEDUP_TABLE_NAME` | DynamoDB table name; required when `DEDUP_STORE=dynamodb` |
+| `REDIS_URL` | Redis connection URL for deduplication; required when `DEDUP_STORE=redis` |
 | `LOKI_URL` | Loki URL for trace fetching |
 | `SQS_QUEUE_URL` | Source SQS queue URL |
 | `LLM_PROVIDER` | `claude` or `gemini` |

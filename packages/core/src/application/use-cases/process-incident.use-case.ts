@@ -241,6 +241,7 @@ export class ProcessIncidentUseCase {
         // The fatal error owns the error section (it triggers the SQS retry);
         // a prior LLM failure is shadowed here but already marked the event degraded-eligible.
         builder.set('error', toErrorSection(err));
+        await this.releaseDedupClaim(cluster.fingerprint);
         this.emit(builder, Outcome.Error, clusterStartMs);
         throw err; // let the worker retry via SQS
       }
@@ -249,6 +250,21 @@ export class ProcessIncidentUseCase {
         builder.set('error', toErrorSection(llmError));
       }
       this.emit(builder, resolveOutcome({ llmError, notifyError: null, llmDegradedReason }), clusterStartMs);
+    }
+  }
+
+  /**
+   * Releases the dedup claim so an SQS retry is not discarded as a duplicate.
+   * Concurrency: safe without a lock — sqs.adapter.ts sets messageGroupId to
+   * the fingerprint, so SQS FIFO serialises delivery per fingerprint and two
+   * runs for the same fingerprint are never in flight simultaneously.
+   */
+  private async releaseDedupClaim(fingerprint: string): Promise<void> {
+    try {
+      await this.deps.dedup.reset(fingerprint);
+    } catch (err) {
+      // Never mask the original failure — it owns the rethrow.
+      this.deps.logger.warn({ err, fingerprint }, 'Failed to release dedup claim; retry may be suppressed');
     }
   }
 

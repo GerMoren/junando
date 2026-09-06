@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -58,6 +59,22 @@ export class JunandoStack extends cdk.Stack {
       fifo: true,
       contentBasedDeduplication: true,
       encryption: sqs.QueueEncryption.KMS_MANAGED,
+    });
+
+    // ── Dedup Table ──────────────────────────────────────────────────────────
+    // PROVISIONED 25/25 with no autoscaling is a cost constraint, not a
+    // performance one: the DynamoDB always-free allowance is provisioned-only
+    // and stops at 25 RCU / 25 WCU. On-demand bills from the first request and
+    // any scaling policy silently leaves the free tier. 25 WCU is ~64M
+    // writes/month against a real volume of 500-10,000 alerts/month.
+    const dedupTable = new dynamodb.Table(this, 'DedupTable', {
+      tableName: resourceName(resourceNamePrefix, 'dedup'),
+      partitionKey: { name: 'fingerprint', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 25,
+      writeCapacity: 25,
+      timeToLiveAttribute: 'expiresAt',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
     // ── Lambda A — Webhook Receiver ──────────────────────────────────────────
@@ -119,6 +136,9 @@ export class JunandoStack extends cdk.Stack {
         // Wide events rollout flag (default: enabled). Set to 'false' to revert
         // to legacy scattered logs without redeploying code.
         WIDE_EVENTS_ENABLED: 'true',
+        // DEDUP_STORE deliberately not set — the config default is 'dynamodb'.
+        // An operator rolling back sets DEDUP_STORE=redis on the function.
+        DEDUP_TABLE_NAME: dedupTable.tableName,
       },
     });
 
@@ -142,6 +162,7 @@ export class JunandoStack extends cdk.Stack {
       }),
     );
     queue.grantConsumeMessages(workerFn);
+    dedupTable.grantReadWriteData(workerFn);
 
     // ── Worker Function URL — /metrics scrape endpoint ──────────────────────
     // IAM auth only: never exposed to anonymous internet traffic. Callers must

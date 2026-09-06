@@ -34,10 +34,10 @@
 | Package             | Current | Minimum peer |
 |---------------------|---------|--------------|
 | `@junando/cdk` | 0.1.0 | — |
-| `@junando/core` | 0.12.3 | — |
-| `@junando/ingest` | 0.12.3 | — |
-| `@junando/webhook` | 0.12.3 | — |
-| `@junando/worker` | 0.12.3 | — |
+| `@junando/core` | 0.14.0 | — |
+| `@junando/ingest` | 0.14.0 | — |
+| `@junando/webhook` | 0.14.0 | — |
+| `@junando/worker` | 0.14.0 | — |
 
 All packages are versioned in lockstep. Install the same version across packages to avoid type mismatches.
 

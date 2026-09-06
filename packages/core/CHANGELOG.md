@@ -1,5 +1,42 @@
 # @junando/core
 
+## 0.14.0
+
+### Minor Changes
+
+- a22d10f: Adds `DynamoDBDeduplicationStore`, a store-agnostic `IDeduplicationStore` implementation backed by a
+  single conditional `PutItem` (`attribute_not_exists(fingerprint) OR expiresAt < :now`), and a new
+  `DEDUP_STORE` config selector (`dynamodb` — the AWS free-tier default — or `redis`). `redisUrl` is now
+  optional at the schema level; the active selector's required field is enforced via `superRefine` at
+  startup instead.
+
+  This is a **minor bump, not a patch**, because the fail-open failover counter is renamed from
+  `metrics.dedupRedisFailoverTotal` to `metrics.dedupFailoverTotal` now that it applies to any dedup
+  store, not just Redis. Existing consumers of the Redis metric name must update to the new name.
+
+  `DEDUP_STORE=redis` preserves the exact existing Redis dedup behaviour for the Helm chart and
+  `docker/docker-compose.prod.yml` targets — no manifest changes required.
+
+## 0.13.0
+
+### Minor Changes
+
+- c269950: `LLMResult.analysis` is now `LLMAnalysis | null` instead of always fabricating a diagnosis when the LLM
+  response could not be parsed. `parseAnalysis` no longer has a heuristic third stage that guessed
+  `probable_cause`, `urgency_level`, and `requires_rollback` from raw keyword matching — a genuinely
+  unparseable or empty response now returns `null`.
+
+  `LLMResult` (and the internal `LlmRawResult`) gains an optional `degradedReason: 'unparseable_response'
+| 'empty_response'`, propagated through `resolveOutcome` (mapped to `Outcome.Degraded`) and the wide
+  event's `llm` section (`urgency` becomes optional, absent when there is no diagnosis). Degraded events
+  with no `error` section now always survive tail sampling, so this failure mode stays observable in
+  production.
+
+  This is a **breaking change for consumers that dereference `LLMResult.analysis` without a null check**
+  — hence the minor bump under 0.x. The notifier is still invoked with `analysis: null` on every parse
+  failure (no dropped alerts), and the Slack payload already renders the existing "manual investigation
+  required" fallback with no rollback action when analysis is null. Refs #292.
+
 ## 0.12.3
 
 ### Patch Changes
