@@ -19,6 +19,7 @@ export type {
   IRollbackActionHandler,
   IRuleEngine,
   ITraceRepository,
+  LlmDegradedReason,
   LLMResult,
   NotifyResult,
   RollbackActionRequest,

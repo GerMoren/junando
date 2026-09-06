@@ -44,7 +44,10 @@ export interface LlmSection {
   provider: string;
   model: string;
   latencyMs: number;
-  urgency: string;
+  /** Present only when parseAnalysis produced a diagnosis. */
+  urgency?: string;
+  /** Present only when analysis is null — why no diagnosis was produced. */
+  degradedReason?: string;
   tokens: number;
 }
 

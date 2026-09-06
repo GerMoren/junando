@@ -1,3 +1,4 @@
+import { Outcome } from './enums.js';
 import type { WideEvent } from './wide-event-builder.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,6 +23,9 @@ export function shouldSample(event: WideEvent): boolean {
     return true;
   }
   if (event.durationMs !== undefined && event.durationMs > SLOW_EVENT_THRESHOLD_MS) {
+    return true;
+  }
+  if (event.outcome === Outcome.Degraded) {
     return true;
   }
   return Math.random() < NORMAL_SAMPLE_RATE;

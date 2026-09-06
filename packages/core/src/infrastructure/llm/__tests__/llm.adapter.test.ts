@@ -233,21 +233,23 @@ describe('OpenRouterProvider', () => {
     vi.useRealTimers();
   });
 
-  it('returns fallback analysis when response JSON is invalid', async () => {
-    // fetch succeeds but JSON schema validation fails
+  it('returns null analysis with degradedReason=unparseable_response when neither stage parses', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ choices: [{ bad: 'structure' }] }),
+      json: async () => ({
+        choices: [
+          { index: 0, message: { role: 'assistant', content: '{this is not valid json and matches no fields}' } },
+        ],
+      }),
     });
 
     const result = await provider.analyze(makeCluster(), []);
-    // Falls back to heuristic analysis
-    expect(result.analysis?.urgency_level).toBeDefined();
-    expect(result.analysis?.probable_cause).toBe('Analysis in progress - check logs for details');
+    expect(result.analysis).toBeNull();
+    expect(result.degradedReason).toBe('unparseable_response');
   });
 
-  it('returns fallback when choices array is empty', async () => {
+  it('returns null analysis with degradedReason=empty_response when choices array is empty', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -255,7 +257,8 @@ describe('OpenRouterProvider', () => {
     });
 
     const result = await provider.analyze(makeCluster(), []);
-    expect(result.analysis?.probable_cause).toBe('Analysis in progress - check logs for details');
+    expect(result.analysis).toBeNull();
+    expect(result.degradedReason).toBe('empty_response');
   });
 
   it('handles cluster with missing optional fields', async () => {
@@ -586,47 +589,12 @@ describe('parseAnalysis edge cases', () => {
     expect(result?.urgency_level).toBe('critical');
   });
 
-  it('falls back to heuristic urgency detection when JSON parse fails', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: 'This is a CRITICAL issue with rollback needed' } }],
-      }),
-    });
-    const provider = new OpenRouterProvider('key');
-    const result = await provider.analyze(makeCluster(), []);
-    expect(result.analysis?.urgency_level).toBe('critical');
-    expect(result.analysis?.requires_rollback).toBe(true);
+  it('returns null with no fabricated analysis for raw prose containing urgency-sounding words', async () => {
+    const result = await parseViaOpenRouter('this is critical, consider rollback');
+    expect(result).toBeNull();
   });
 
-  it('detects low urgency via heuristics', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: 'Low impact, low severity, no action needed' } }],
-      }),
-    });
-    const provider = new OpenRouterProvider('key');
-    const result = await provider.analyze(makeCluster(), []);
-    expect(result.analysis?.urgency_level).toBe('low');
-  });
-
-  it('detects high urgency via severity-2 keyword', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: 'This is severity 2 issue' } }],
-      }),
-    });
-    const provider = new OpenRouterProvider('key');
-    const result = await provider.analyze(makeCluster(), []);
-    expect(result.analysis?.urgency_level).toBe('high');
-  });
-
-  it('uses unknown-service default when impacted_services cannot be parsed', async () => {
+  it('uses unknown-service default when impacted_services cannot be parsed (stage-2 regex fallback)', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
@@ -636,16 +604,19 @@ describe('parseAnalysis edge cases', () => {
     });
     const provider = new OpenRouterProvider('key');
     const result = await provider.analyze(makeCluster(), []);
-    // Empty array would fail LLMAnalysisSchema min(1), so it falls to heuristic
-    // or uses regex fallback
-    expect(result).toBeDefined();
+    // Stage 1 fails schema validation (impacted_services min(1)); stage 2 regex
+    // matches probable_cause + urgency_level, defaults services to unknown-service.
+    expect(result.analysis?.probable_cause).toBe('x');
+    expect(result.analysis?.impacted_services).toEqual(['unknown-service']);
+    expect(result.analysis?.urgency_level).toBe('low');
+    expect(result.degradedReason).toBeUndefined();
   });
 
   it('handles malformed JSON that is still valid in regex fallback', async () => {
     const raw =
       '{"probable_cause":"bad parse","impacted_services":["svc"],"recommended_steps":["step"],"urgency_level":"medium","requires_rollback":false}';
     const result = await parseViaOpenRouter(raw);
-    expect(result.urgency_level).toBe('medium');
+    expect(result?.urgency_level).toBe('medium');
   });
 });
 
@@ -723,6 +694,76 @@ describe('OpenRouterProvider structured logging', () => {
       expect.objectContaining({ rawResponse: expect.any(String), correlationId: 'corr-789' }),
       'llm:parse:failed',
     );
+  });
+
+  it('logs llm:parse:failed as warn when the response has no braces at all', async () => {
+    // No `{`/`}` anywhere — stage 1 is skipped entirely, but the warn must
+    // still fire (it lives outside the brace-presence guard).
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: 'no braces here at all' } }],
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-nobraces');
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ rawResponse: expect.any(String), correlationId: 'corr-nobraces' }),
+      'llm:parse:failed',
+    );
+  });
+
+  it('logs llm:parse:partial with matched field names when stage 2 succeeds', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '"probable_cause": "disk full" "urgency_level": "high" "recommended_steps": ["free up disk"]',
+            },
+          },
+        ],
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    await provider.analyze(makeCluster(), [], 'corr-partial');
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        matchedFields: expect.arrayContaining(['probable_cause', 'urgency_level']),
+        correlationId: 'corr-partial',
+      }),
+      'llm:parse:partial',
+    );
+  });
+
+  it('logs llm:parse:unusable before returning null when stage 2 cannot match required fields', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ index: 0, message: { role: 'assistant', content: 'no structured fields present' } }],
+      }),
+    });
+
+    const provider = new OpenRouterProvider('key', 'qwen/model');
+    const result = await provider.analyze(makeCluster(), [], 'corr-unusable');
+
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ correlationId: 'corr-unusable' }),
+      'llm:parse:unusable',
+    );
+    expect(result.analysis).toBeNull();
+    expect(result.degradedReason).toBe('unparseable_response');
   });
 
   it('logs llm:validation:failed as warn when OpenRouter schema validation fails', async () => {
