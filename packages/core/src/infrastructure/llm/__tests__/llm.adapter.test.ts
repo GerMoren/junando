@@ -17,8 +17,12 @@ const mockLogger = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
+const GoogleGenerativeAIAbortError = vi.hoisted(
+  () => class GoogleGenerativeAIAbortError extends Error {},
+);
+
 vi.mock('../../../shared/logger/index.js', () => ({
-  createLogger: vi.fn(function() { return mockLogger; }),
+  createLogger: vi.fn(() => mockLogger),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -149,7 +153,11 @@ describe('OpenRouterProvider', () => {
         choices: [
           {
             index: 0,
-            message: { role: 'assistant', content: '{"probable_cause":"bad query","impacted_services":["api"],"recommended_steps":["fix query"],"urgency_level":"high","requires_rollback":false}' },
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"bad query","impacted_services":["api"],"recommended_steps":["fix query"],"urgency_level":"high","requires_rollback":false}',
+            },
           },
         ],
       }),
@@ -187,7 +195,8 @@ describe('OpenRouterProvider', () => {
             index: 0,
             message: {
               role: 'assistant',
-              content: '{"probable_cause":"memory leak","impacted_services":["web"],"recommended_steps":["restart pod"],"urgency_level":"critical","requires_rollback":true}',
+              content:
+                '{"probable_cause":"memory leak","impacted_services":["web"],"recommended_steps":["restart pod"],"urgency_level":"critical","requires_rollback":true}',
             },
           },
         ],
@@ -210,9 +219,7 @@ describe('OpenRouterProvider', () => {
       json: async () => ({}),
     });
 
-    await expect(provider.analyze(makeCluster(), [])).rejects.toThrow(
-      'OpenRouter API failed: 500',
-    );
+    await expect(provider.analyze(makeCluster(), [])).rejects.toThrow('OpenRouter API failed: 500');
   });
 
   it('retries once on 429 and throws if still rate-limited', async () => {
@@ -239,7 +246,13 @@ describe('OpenRouterProvider', () => {
       status: 200,
       json: async () => ({
         choices: [
-          { index: 0, message: { role: 'assistant', content: '{this is not valid json and matches no fields}' } },
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '{this is not valid json and matches no fields}',
+            },
+          },
         ],
       }),
     });
@@ -271,7 +284,8 @@ describe('OpenRouterProvider', () => {
             index: 0,
             message: {
               role: 'assistant',
-              content: '{"probable_cause":"timeout","impacted_services":["svc"],"recommended_steps":["timeout fix"],"urgency_level":"medium","requires_rollback":false}',
+              content:
+                '{"probable_cause":"timeout","impacted_services":["svc"],"recommended_steps":["timeout fix"],"urgency_level":"medium","requires_rollback":false}',
             },
           },
         ],
@@ -291,7 +305,11 @@ describe('OpenRouterProvider', () => {
         choices: [
           {
             index: 0,
-            message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["x"],"recommended_steps":["x"],"urgency_level":"low","requires_rollback":false}' },
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":["x"],"recommended_steps":["x"],"urgency_level":"low","requires_rollback":false}',
+            },
           },
         ],
       }),
@@ -480,8 +498,16 @@ describe('OpenRouterProvider — fallback chain', () => {
     );
     // Two transitions: a→b and b→c
     expect(hopCalls).toHaveLength(2);
-    expect(hopCalls[0][0]).toMatchObject({ from_model: 'model-a', to_model: 'model-b', reason: '429' });
-    expect(hopCalls[1][0]).toMatchObject({ from_model: 'model-b', to_model: 'model-c', reason: '429' });
+    expect(hopCalls[0][0]).toMatchObject({
+      from_model: 'model-a',
+      to_model: 'model-b',
+      reason: '429',
+    });
+    expect(hopCalls[1][0]).toMatchObject({
+      from_model: 'model-b',
+      to_model: 'model-c',
+      reason: '429',
+    });
   });
 });
 
@@ -497,7 +523,16 @@ describe('createLLMProvider — fallback options forwarded', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}' } }],
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}',
+            },
+          },
+        ],
       }),
     });
 
@@ -599,7 +634,16 @@ describe('parseAnalysis edge cases', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":[],"recommended_steps":["y"],"urgency_level":"low","requires_rollback":false}' } }],
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":[],"recommended_steps":["y"],"urgency_level":"low","requires_rollback":false}',
+            },
+          },
+        ],
       }),
     });
     const provider = new OpenRouterProvider('key');
@@ -639,7 +683,16 @@ describe('OpenRouterProvider structured logging', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}' } }],
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}',
+            },
+          },
+        ],
         usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
       }),
     });
@@ -658,7 +711,16 @@ describe('OpenRouterProvider structured logging', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}' } }],
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":["svc"],"recommended_steps":["s"],"urgency_level":"low","requires_rollback":false}',
+            },
+          },
+        ],
         usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
       }),
     });
@@ -683,7 +745,9 @@ describe('OpenRouterProvider structured logging', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{not valid json: at all}' } }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: '{not valid json: at all}' } },
+        ],
       }),
     });
 
@@ -751,7 +815,9 @@ describe('OpenRouterProvider structured logging', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: 'no structured fields present' } }],
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'no structured fields present' } },
+        ],
       }),
     });
 
@@ -787,7 +853,16 @@ describe('OpenRouterProvider structured logging', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        choices: [{ index: 0, message: { role: 'assistant', content: '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}' } }],
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content:
+                '{"probable_cause":"x","impacted_services":["s"],"recommended_steps":["r"],"urgency_level":"low","requires_rollback":false}',
+            },
+          },
+        ],
         usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10 },
       }),
     });
@@ -986,6 +1061,7 @@ describe('OpenRouterProvider — structured LLMResult', () => {
 // ── Structured LLMResult — Gemini / Claude (SDK mocked) ───────────────────
 
 vi.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAIAbortError,
   GoogleGenerativeAI: class {
     getGenerativeModel() {
       return {
@@ -1040,6 +1116,63 @@ describe('GeminiProvider — structured LLMResult', () => {
 
     expect(result.model).toBe('gemini-2.5-pro');
   });
+
+  it.each([
+    ['Opossum timeout', Object.assign(new Error('irrelevant'), { code: 'ETIMEDOUT' }), 'timeout'],
+    ['Gemini SDK abort', new GoogleGenerativeAIAbortError('irrelevant'), 'timeout'],
+    ['standard fetch timeout', new DOMException('', 'TimeoutError'), 'timeout'],
+    [
+      'Undici timeout cause',
+      Object.assign(new Error('irrelevant'), {
+        cause: Object.assign(new Error('irrelevant'), { code: 'UND_ERR_CONNECT_TIMEOUT' }),
+      }),
+      'timeout',
+    ],
+    [
+      'open circuit',
+      Object.assign(new Error('irrelevant'), { code: 'EOPENBREAKER' }),
+      'circuit_breaker_open',
+    ],
+  ])(
+    'maps %s to a zero-token degraded result without a raw fallback',
+    async (_label, error, degradedReason) => {
+      const { GeminiProvider } = await import('../llm.adapter.js');
+      const provider = new GeminiProvider('test-key');
+      const internals = provider as unknown as {
+        breaker: { fire: ReturnType<typeof vi.fn> };
+        analyzeRaw: ReturnType<typeof vi.fn>;
+      };
+      const rawSpy = vi.spyOn(internals, 'analyzeRaw');
+      internals.breaker.fire = vi.fn().mockRejectedValue(error);
+
+      await expect(provider.analyze(makeCluster(), [])).resolves.toMatchObject({
+        analysis: null,
+        degradedReason,
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+        promptTokens: 0,
+        completionTokens: 0,
+      });
+      expect(rawSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['authentication-shaped', Object.assign(new Error('invalid key'), { status: 401 })],
+    ['generic', new Error('connection reset')],
+  ])('rethrows %s rejections without a raw fallback', async (_label, error) => {
+    const { GeminiProvider } = await import('../llm.adapter.js');
+    const provider = new GeminiProvider('test-key');
+    const internals = provider as unknown as {
+      breaker: { fire: ReturnType<typeof vi.fn> };
+      analyzeRaw: ReturnType<typeof vi.fn>;
+    };
+    const rawSpy = vi.spyOn(internals, 'analyzeRaw');
+    internals.breaker.fire = vi.fn().mockRejectedValue(error);
+
+    await expect(provider.analyze(makeCluster(), [])).rejects.toBe(error);
+    expect(rawSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('ClaudeProvider — structured LLMResult', () => {
@@ -1058,4 +1191,3 @@ describe('ClaudeProvider — structured LLMResult', () => {
     expect(result.analysis?.requires_rollback).toBe(true);
   });
 });
-

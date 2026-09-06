@@ -1,3 +1,4 @@
+import { GoogleGenerativeAI, GoogleGenerativeAIAbortError } from '@google/generative-ai';
 import * as Breaker from 'opossum';
 import { z } from 'zod';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
@@ -28,6 +29,54 @@ interface LlmRawResult {
   degradedReason?: LlmDegradedReason;
   promptTokens: number;
   completionTokens: number;
+}
+
+const OPOSSUM_TIMEOUT_CODE = 'ETIMEDOUT';
+const OPOSSUM_OPEN_BREAKER_CODE = 'EOPENBREAKER';
+const UNDICI_CONNECT_TIMEOUT_CODE = 'UND_ERR_CONNECT_TIMEOUT';
+
+interface ErrorLike {
+  code?: unknown;
+  cause?: unknown;
+}
+
+function isErrorLike(value: unknown): value is ErrorLike {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasTimeoutCode(error: ErrorLike): boolean {
+  return error.code === OPOSSUM_TIMEOUT_CODE || error.code === UNDICI_CONNECT_TIMEOUT_CODE;
+}
+
+function isStandardFetchTimeout(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'TimeoutError';
+}
+
+function classifyGeminiAvailabilityError(error: unknown): LlmDegradedReason | undefined {
+  if (!isErrorLike(error)) return undefined;
+
+  if (error.code === OPOSSUM_OPEN_BREAKER_CODE) return 'circuit_breaker_open';
+  if (hasTimeoutCode(error)) return 'timeout';
+  if (error instanceof GoogleGenerativeAIAbortError) return 'timeout';
+  if (isStandardFetchTimeout(error)) return 'timeout';
+
+  if (
+    isErrorLike(error.cause) &&
+    (hasTimeoutCode(error.cause) || isStandardFetchTimeout(error.cause))
+  ) {
+    return 'timeout';
+  }
+
+  return undefined;
+}
+
+function degradedGeminiResult(degradedReason: LlmDegradedReason): LlmRawResult {
+  return {
+    analysis: null,
+    degradedReason,
+    promptTokens: 0,
+    completionTokens: 0,
+  };
 }
 
 /** Result of parsing raw LLM text into a diagnosis, or a reason it failed. */
@@ -194,8 +243,10 @@ export class GeminiProvider implements ILLMProvider {
   ): Promise<LlmRawResult> {
     try {
       return (await this.breaker.fire(cluster, traces)) as LlmRawResult;
-    } catch {
-      return this.analyzeRaw(cluster, traces);
+    } catch (error) {
+      const degradedReason = classifyGeminiAvailabilityError(error);
+      if (degradedReason !== undefined) return degradedGeminiResult(degradedReason);
+      throw error;
     }
   }
 
@@ -203,7 +254,6 @@ export class GeminiProvider implements ILLMProvider {
     cluster: AlertCluster,
     traces: Record<string, unknown>[],
   ): Promise<LlmRawResult> {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(this.apiKey);
     const gemini = genAI.getGenerativeModel({
       model: this.model,
@@ -322,7 +372,10 @@ export class OpenRouterProvider implements ILLMProvider {
     correlationId?: string,
   ): Promise<LLMResult> {
     const prompt = buildUserPrompt(cluster, traces);
-    logger.debug({ model: this.model, promptLength: prompt.length, correlationId }, 'llm:request:start');
+    logger.debug(
+      { model: this.model, promptLength: prompt.length, correlationId },
+      'llm:request:start',
+    );
 
     const startMs = Date.now();
 
@@ -352,8 +405,8 @@ export class OpenRouterProvider implements ILLMProvider {
 
       if (!res.ok) {
         const retryAfter = Number(
-          (raw as { error?: { metadata?: { retry_after_seconds?: number } } })
-            ?.error?.metadata?.retry_after_seconds ?? 0,
+          (raw as { error?: { metadata?: { retry_after_seconds?: number } } })?.error?.metadata
+            ?.retry_after_seconds ?? 0,
         );
 
         logger.warn(
@@ -398,7 +451,11 @@ export class OpenRouterProvider implements ILLMProvider {
         logger.info(
           {
             model: this.model,
-            usage: { promptTokens: prompt_tokens, completionTokens: completion_tokens, totalTokens: total_tokens },
+            usage: {
+              promptTokens: prompt_tokens,
+              completionTokens: completion_tokens,
+              totalTokens: total_tokens,
+            },
             latencyMs,
             correlationId,
           },
@@ -434,7 +491,10 @@ export class OpenRouterProvider implements ILLMProvider {
         throw new Error('OpenRouter fallback chain timed out');
       }
 
-      logger.info({ from_model: fromModel, to_model: toModel, reason: '429', correlationId }, 'llm:fallback:hop');
+      logger.info(
+        { from_model: fromModel, to_model: toModel, reason: '429', correlationId },
+        'llm:fallback:hop',
+      );
 
       const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -493,11 +553,36 @@ type LLMFactory = (apiKey: string, model?: string, options?: FallbackOptions) =>
 const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, LLMFactory>([
   [LLMProviderType.Gemini, (apiKey, model) => new GeminiProvider(apiKey, model)],
   [LLMProviderType.Claude, (apiKey, model) => new ClaudeProvider(apiKey, model)],
-  [LLMProviderType.OpenRouter, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs, LLMProviderType.OpenRouter)],
-  [LLMProviderType.Qwen, (apiKey, model, options) => new OpenRouterProvider(apiKey, model, options?.fallbackModels, options?.fallbackTimeoutMs, LLMProviderType.Qwen)],
+  [
+    LLMProviderType.OpenRouter,
+    (apiKey, model, options) =>
+      new OpenRouterProvider(
+        apiKey,
+        model,
+        options?.fallbackModels,
+        options?.fallbackTimeoutMs,
+        LLMProviderType.OpenRouter,
+      ),
+  ],
+  [
+    LLMProviderType.Qwen,
+    (apiKey, model, options) =>
+      new OpenRouterProvider(
+        apiKey,
+        model,
+        options?.fallbackModels,
+        options?.fallbackTimeoutMs,
+        LLMProviderType.Qwen,
+      ),
+  ],
 ]);
 
-export function createLLMProvider(provider: string, apiKey: string, model?: string, options?: FallbackOptions): ILLMProvider {
+export function createLLMProvider(
+  provider: string,
+  apiKey: string,
+  model?: string,
+  options?: FallbackOptions,
+): ILLMProvider {
   const factory = LLM_PROVIDER_REGISTRY.get(provider);
   if (!factory) {
     const supported = Array.from(LLM_PROVIDER_REGISTRY.keys()).join(', ');
