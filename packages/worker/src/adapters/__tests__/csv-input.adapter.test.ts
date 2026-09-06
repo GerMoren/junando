@@ -12,7 +12,8 @@ describe('csv-input.adapter', () => {
 
   describe('isCsvBody', () => {
     it('returns true for comma-separated text with newlines', () => {
-      const csv = 'service,message,severity,time\nsvc-api,high error rate,error,2024-01-01T00:00:00Z';
+      const csv =
+        'service,message,severity,time\nsvc-api,high error rate,error,2024-01-01T00:00:00Z';
       expect(isCsvBody(csv)).toBe(true);
     });
 
@@ -170,7 +171,18 @@ api-gateway,msg,invalid_severity,2024-06-09T10:00:00Z`;
     });
 
     it('maps all severity variants correctly', () => {
-      const severities = ['error', 'critical', 'high', 'warning', 'warn', 'latency', 'success', 'recovery', 'resolved', 'info'];
+      const severities = [
+        'error',
+        'critical',
+        'high',
+        'warning',
+        'warn',
+        'latency',
+        'success',
+        'recovery',
+        'resolved',
+        'info',
+      ];
 
       for (const sev of severities) {
         const csv = `service,message,severity,timestamp

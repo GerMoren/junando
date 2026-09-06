@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { handler } from '../handler.js';
 import * as core from '@junando/core';
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyResultV2,
+  APIGatewayProxyStructuredResultV2,
+} from 'aws-lambda';
 
 function assertStructuredResponse(
   response: APIGatewayProxyResultV2,
@@ -83,10 +87,14 @@ vi.mock('@junando/core', async (importOriginal) => {
 });
 
 // Helper to create API Gateway event
-function createEvent(path: string, body: string | null, options: {
-  isBase64Encoded?: boolean;
-  headers?: Record<string, string>;
-} = {}): APIGatewayProxyEventV2 {
+function createEvent(
+  path: string,
+  body: string | null,
+  options: {
+    isBase64Encoded?: boolean;
+    headers?: Record<string, string>;
+  } = {},
+): APIGatewayProxyEventV2 {
   return {
     version: '2.0',
     routeKey: path,
@@ -105,11 +113,16 @@ function createEvent(path: string, body: string | null, options: {
       domainPrefix: 'test',
       requestId: 'test-request-id',
       stage: 'test',
-      http: { method: 'GET', path: path, protocol: 'HTTP/1.1', sourceIp: '127.0.0.1', userAgent: 'vitest' }
+      http: {
+        method: 'GET',
+        path: path,
+        protocol: 'HTTP/1.1',
+        sourceIp: '127.0.0.1',
+        userAgent: 'vitest',
+      },
     },
   };
 }
-
 
 describe('Webhook Lambda Handler', () => {
   beforeEach(() => {
@@ -186,10 +199,13 @@ describe('Webhook Lambda Handler', () => {
   });
 
   describe('POST /webhook/slack-interactivity — error paths', () => {
-    const createSlackEvent = (body: string, overrides: {
-      signature?: string;
-      timestamp?: string;
-    } = {}): APIGatewayProxyEventV2 => {
+    const createSlackEvent = (
+      body: string,
+      overrides: {
+        signature?: string;
+        timestamp?: string;
+      } = {},
+    ): APIGatewayProxyEventV2 => {
       const timestamp = overrides.timestamp ?? Math.floor(Date.now() / 1000).toString();
       const { createHmac } = require('crypto');
       const baseString = `v0:${timestamp}:${body}`;
@@ -232,9 +248,7 @@ describe('Webhook Lambda Handler', () => {
       const payload = {
         type: 'block_actions',
         user: { username: 'test-user', id: 'U12345' },
-        actions: [
-          { action_id: 'ack_alert', value: 'fp-123', type: 'button' },
-        ],
+        actions: [{ action_id: 'ack_alert', value: 'fp-123', type: 'button' }],
         container: { message_ts: '1234567890.123456' },
         message: { ts: '1234567890.123456' },
       };
@@ -249,10 +263,13 @@ describe('Webhook Lambda Handler', () => {
   });
 
   describe('POST /webhook/slack-interactivity — rollback dispatch', () => {
-    const createSlackEvent = (body: string, overrides: {
-      signature?: string;
-      timestamp?: string;
-    } = {}): APIGatewayProxyEventV2 => {
+    const createSlackEvent = (
+      body: string,
+      overrides: {
+        signature?: string;
+        timestamp?: string;
+      } = {},
+    ): APIGatewayProxyEventV2 => {
       const timestamp = overrides.timestamp ?? Math.floor(Date.now() / 1000).toString();
       const { createHmac } = require('crypto');
       const baseString = `v0:${timestamp}:${body}`;
@@ -297,21 +314,27 @@ describe('Webhook Lambda Handler', () => {
 
       expect(response.statusCode).toBe(200);
       expect(mockRollbackHandle).toHaveBeenCalledOnce();
-      const [request] = mockRollbackHandle.mock.calls[0] as [{
-        fingerprint: string;
-        serviceName: string;
-        endpointPath: string;
-        alertType: string;
-        urgencyLevel: string;
-        triggeredBy: { id?: string; username?: string; channel: string };
-        messageTs?: string;
-      }];
+      const [request] = mockRollbackHandle.mock.calls[0] as [
+        {
+          fingerprint: string;
+          serviceName: string;
+          endpointPath: string;
+          alertType: string;
+          urgencyLevel: string;
+          triggeredBy: { id?: string; username?: string; channel: string };
+          messageTs?: string;
+        },
+      ];
       expect(request.fingerprint).toBe('fp-123');
       expect(request.serviceName).toBe('checkout-service');
       expect(request.endpointPath).toBe('/api/orders');
       expect(request.alertType).toBe('http_500');
       expect(request.urgencyLevel).toBe('high');
-      expect(request.triggeredBy).toEqual({ id: 'U12345', username: 'test-user', channel: 'slack' });
+      expect(request.triggeredBy).toEqual({
+        id: 'U12345',
+        username: 'test-user',
+        channel: 'slack',
+      });
       expect(request.messageTs).toBe('1234567890.123456');
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -365,9 +388,7 @@ describe('Webhook Lambda Handler', () => {
       const payload = {
         type: 'block_actions',
         user: { username: 'test-user', id: 'U12345' },
-        actions: [
-          { action_id: 'trigger_rollback', value: 'malformed', type: 'button' },
-        ],
+        actions: [{ action_id: 'trigger_rollback', value: 'malformed', type: 'button' }],
         container: { message_ts: '1234567890.123456' },
         message: { ts: '1234567890.123456' },
       };

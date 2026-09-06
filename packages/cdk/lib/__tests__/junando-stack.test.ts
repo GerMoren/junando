@@ -25,7 +25,9 @@ const PILOT_RESOURCE_NAMES = {
 };
 
 function isReference(value: unknown): value is { Ref: string } {
-  return typeof value === 'object' && value !== null && 'Ref' in value && typeof value.Ref === 'string';
+  return (
+    typeof value === 'object' && value !== null && 'Ref' in value && typeof value.Ref === 'string'
+  );
 }
 
 function resourceProperties(template: Template) {
@@ -55,13 +57,17 @@ describe('JunandoStack staging configuration', () => {
 
     const functions = Object.values(template.findResources('AWS::Lambda::Function'));
     expect(functions).toHaveLength(2);
-    expect(functions.every((fn) =>
-      fn.Properties.Environment.Variables.NODE_ENV === STAGING_NODE_ENV &&
-      fn.Properties.Environment.Variables.SSM_PREFIX === STAGING_SSM_PREFIX,
-    )).toBe(true);
+    expect(
+      functions.every(
+        (fn) =>
+          fn.Properties.Environment.Variables.NODE_ENV === STAGING_NODE_ENV &&
+          fn.Properties.Environment.Variables.SSM_PREFIX === STAGING_SSM_PREFIX,
+      ),
+    ).toBe(true);
 
-    const ssmPolicies = Object.values(template.findResources('AWS::IAM::Policy'))
-      .filter((policy) => JSON.stringify(policy).includes(STAGING_SSM_RESOURCE));
+    const ssmPolicies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
+      JSON.stringify(policy).includes(STAGING_SSM_RESOURCE),
+    );
     expect(ssmPolicies).toHaveLength(2);
   });
 
@@ -78,12 +84,16 @@ describe('JunandoStack staging configuration', () => {
     const template = Template.fromStack(stack);
     process.chdir(originalCwd);
 
-    const ssmPolicies = Object.values(template.findResources('AWS::IAM::Policy'))
-      .filter((policy) => JSON.stringify(policy).includes(DEFAULT_SSM_RESOURCE));
+    const ssmPolicies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
+      JSON.stringify(policy).includes(DEFAULT_SSM_RESOURCE),
+    );
     expect(ssmPolicies).toHaveLength(2);
 
     expect(resourceProperties(template)).toEqual({
-      functions: expect.arrayContaining([DEFAULT_RESOURCE_NAMES.webhook, DEFAULT_RESOURCE_NAMES.worker]),
+      functions: expect.arrayContaining([
+        DEFAULT_RESOURCE_NAMES.webhook,
+        DEFAULT_RESOURCE_NAMES.worker,
+      ]),
       layer: DEFAULT_RESOURCE_NAMES.layer,
       queues: expect.arrayContaining([DEFAULT_RESOURCE_NAMES.dlq, DEFAULT_RESOURCE_NAMES.queue]),
     });
@@ -104,7 +114,10 @@ describe('JunandoStack staging configuration', () => {
     process.chdir(originalCwd);
 
     expect(resourceProperties(template)).toEqual({
-      functions: expect.arrayContaining([PILOT_RESOURCE_NAMES.webhook, PILOT_RESOURCE_NAMES.worker]),
+      functions: expect.arrayContaining([
+        PILOT_RESOURCE_NAMES.webhook,
+        PILOT_RESOURCE_NAMES.worker,
+      ]),
       layer: PILOT_RESOURCE_NAMES.layer,
       queues: expect.arrayContaining([PILOT_RESOURCE_NAMES.dlq, PILOT_RESOURCE_NAMES.queue]),
     });
@@ -157,8 +170,9 @@ describe('JunandoStack dedup table', () => {
     const workerRoleLogicalId = workerEntry?.Properties.Role['Fn::GetAtt'][0];
     expect(workerRoleLogicalId).toBeTruthy();
 
-    const dedupPolicies = Object.values(template.findResources('AWS::IAM::Policy'))
-      .filter((policy) => JSON.stringify(policy).includes('dynamodb:PutItem'));
+    const dedupPolicies = Object.values(template.findResources('AWS::IAM::Policy')).filter(
+      (policy) => JSON.stringify(policy).includes('dynamodb:PutItem'),
+    );
     expect(dedupPolicies).toHaveLength(1);
 
     const dedupPolicy = dedupPolicies[0];
