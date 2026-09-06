@@ -43,7 +43,9 @@ describe('E2E: LLM parse-degraded — acceptance gate for #292', () => {
   });
 
   it('notifies with null analysis, marks the wide event degraded, survives sampling, and closes the rollback vector', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9999); // would drop a normal event — degraded must survive anyway
+    // Not needed to pass: shouldSample returns early on Degraded. Set so that
+    // deleting that exemption fails this test every run instead of ~95% of them.
+    vi.spyOn(Math, 'random').mockReturnValue(0.9999);
 
     const mockFetch = vi.fn().mockImplementation(async (url: string) => {
       if (url === SLACK_API_URL) {

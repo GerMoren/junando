@@ -679,6 +679,11 @@ describe('ProcessIncidentUseCase — wide events', () => {
       notify: { outcome: NotifyOutcome.Success },
     });
     expect(event['llm']).toBeUndefined();
+    // Redundant today, since the llm section is absent entirely on this path.
+    // Kept as an independent guard: if the section ever starts carrying call
+    // metadata on a transport failure, the two degradation classes must still
+    // stay mutually exclusive so dashboards can filter them apart.
+    expect(JSON.stringify(event)).not.toContain('degradedReason');
   });
 
   it('emits outcome=error with notify failure recorded, then rethrows for the queue retry', async () => {
