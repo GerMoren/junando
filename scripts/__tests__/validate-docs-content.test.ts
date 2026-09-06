@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { validateDocsContent } from '../validate-docs-content';
+import { validateDocsContent } from '../validate-docs-content.js';
 
 const GITHUB_SOURCE_URL = 'https://github.com/GerMoren/junando/blob/main/README.md';
 const SAFE_TOKEN_PLACEHOLDER = '<YOUR_TOKEN>';

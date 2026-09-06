@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Type-checked NestJS integration snippets. Referenced from docs/integrations/nestjs.md. Not meant to run.",
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

@@ -10,36 +10,36 @@ describe('metrics label taxonomy — contract tests', () => {
   it('exports dedupNew counter with source label', async () => {
     const { dedupNew } = await import('../index.js');
     expect(dedupNew).toBeDefined();
-    expect((dedupNew as any).labelNames).toContain('source');
+    expect((dedupNew as unknown as { labelNames: string[] }).labelNames).toContain('source');
   });
 
   it('exports dedupDuplicate counter with source label', async () => {
     const { dedupDuplicate } = await import('../index.js');
     expect(dedupDuplicate).toBeDefined();
-    expect((dedupDuplicate as any).labelNames).toContain('source');
+    expect((dedupDuplicate as unknown as { labelNames: string[] }).labelNames).toContain('source');
   });
 
   it('exports notificationsTotal counter with channel and outcome labels', async () => {
     const { notificationsTotal } = await import('../index.js');
     expect(notificationsTotal).toBeDefined();
-    expect((notificationsTotal as any).labelNames).toContain('channel');
-    expect((notificationsTotal as any).labelNames).toContain('outcome');
+    expect((notificationsTotal as unknown as { labelNames: string[] }).labelNames).toContain('channel');
+    expect((notificationsTotal as unknown as { labelNames: string[] }).labelNames).toContain('outcome');
   });
 
   it('exports sqsQueueLag gauge with queue_name label', async () => {
     const { sqsQueueLag } = await import('../index.js');
     expect(sqsQueueLag).toBeDefined();
-    expect((sqsQueueLag as any).labelNames).toContain('queue_name');
+    expect((sqsQueueLag as unknown as { labelNames: string[] }).labelNames).toContain('queue_name');
   });
 
   it('alertsProcessed counter has result label', async () => {
     const { alertsProcessed } = await import('../index.js');
-    expect((alertsProcessed as any).labelNames).toContain('result');
+    expect((alertsProcessed as unknown as { labelNames: string[] }).labelNames).toContain('result');
   });
 
   it('latency histogram has status label and correct buckets', async () => {
     const { latency } = await import('../index.js');
-    expect((latency as any).labelNames).toContain('status');
+    expect((latency as unknown as { labelNames: string[] }).labelNames).toContain('status');
   });
 
   it('all new metrics are present in the registry', async () => {
