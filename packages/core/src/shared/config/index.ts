@@ -69,6 +69,12 @@ async function loadSecretsFromSSM(): Promise<void> {
         process.env[key] = param.Value;
       }
     }
+
+    const missing = result.InvalidParameters ?? [];
+    if (missing.length > 0) {
+      // Paths only — the paths are not secrets, the values are.
+      createLogger().warn({ missingParameters: missing }, 'SSM parameters not found');
+    }
   } catch (err) {
     createLogger().error({ err }, 'Failed to load SSM parameters');
   }
