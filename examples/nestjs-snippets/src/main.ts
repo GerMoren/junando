@@ -11,10 +11,10 @@ import { NestFactory } from "@nestjs/core";
 import { Logger, LoggerModule } from "nestjs-pino";
 import { Module } from "@nestjs/common";
 
-import { CorrelationIdInterceptor } from "./common/correlation-id.interceptor";
-import { AllExceptionsFilter } from "./filters/all-exceptions.filter";
-import { pinoLoggerOptions } from "./modules/logger.module-options";
-import { MetricsController } from "./modules/metrics.controller";
+import { CorrelationIdInterceptor } from "./common/correlation-id.interceptor.js";
+import { AllExceptionsFilter } from "./filters/all-exceptions.filter.js";
+import { pinoLoggerOptions } from "./modules/logger.module-options.js";
+import { MetricsController } from "./modules/metrics.controller.js";
 
 @Module({
   imports: [LoggerModule.forRoot(pinoLoggerOptions)],

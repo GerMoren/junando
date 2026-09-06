@@ -18,7 +18,7 @@ import {
 } from "@nestjs/common";
 import { Logger } from "nestjs-pino";
 import type { Request, Response } from "express";
-import { httpErrors } from "../modules/metrics.controller";
+import { httpErrors } from "../modules/metrics.controller.js";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
