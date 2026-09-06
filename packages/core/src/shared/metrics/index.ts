@@ -60,10 +60,10 @@ export const pipelineInlineFailuresTotal = new Counter({
   registers: [registry],
 });
 
-/** Tracks Redis dedup fallback activations. */
-export const dedupRedisFailoverTotal = new Counter({
-  name: 'junando_dedup_redis_failover_total',
-  help: 'Total number of Redis dedup fallback activations',
+/** Tracks dedup store fail-open activations (any store). */
+export const dedupFailoverTotal = new Counter({
+  name: 'junando_dedup_failover_total',
+  help: 'Total number of dedup store fail-open activations',
   registers: [registry],
 });
 

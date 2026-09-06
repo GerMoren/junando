@@ -1,6 +1,6 @@
 import type { Redis } from 'ioredis';
 import type { DedupResult, IDeduplicationStore } from '../../domain/ports/index.js';
-import { dedupRedisFailoverTotal } from '../../shared/metrics/index.js';
+import { dedupFailoverTotal } from '../../shared/metrics/index.js';
 import { createLogger } from '../../shared/logger/index.js';
 
 const logger = createLogger();
@@ -30,7 +30,7 @@ export class RedisDeduplicationStore implements IDeduplicationStore {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn({ err, fingerprint }, 'Redis dedup check failed, failing open');
-      dedupRedisFailoverTotal.inc();
+      dedupFailoverTotal.inc();
       // Fail open: Redis down → treat every alert as new (noisy but safe).
       // The error rides the result so the wide event can record the failover.
       return { isNew: true, ttlSeconds, error: message };
