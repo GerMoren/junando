@@ -96,8 +96,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     aws ssm put-parameter --name /junando/loki-url --value "$LOKI_URL" --type SecureString --overwrite
   fi
 
-  # Redis URL
-  read -p "Redis URL (e.g., redis://redis:6379): " REDIS_URL
+  # Redis URL — optional. Dedup defaults to DynamoDB, whose table the CDK stack
+  # provisions and wires automatically. Only needed if you set DEDUP_STORE=redis.
+  read -p "Redis URL (optional, only for DEDUP_STORE=redis): " REDIS_URL
   if [ -n "$REDIS_URL" ]; then
     aws ssm put-parameter --name /junando/redis-url --value "$REDIS_URL" --type SecureString --overwrite
   fi

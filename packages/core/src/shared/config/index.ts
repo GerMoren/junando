@@ -69,6 +69,12 @@ async function loadSecretsFromSSM(): Promise<void> {
         process.env[key] = param.Value;
       }
     }
+
+    const missing = result.InvalidParameters ?? [];
+    if (missing.length > 0) {
+      // Paths only — the paths are not secrets, the values are.
+      createLogger().warn({ missingParameters: missing }, 'SSM parameters not found');
+    }
   } catch (err) {
     createLogger().error({ err }, 'Failed to load SSM parameters');
   }
@@ -91,7 +97,11 @@ const ConfigSchema = z
     // Teams field
     teamsWebhookUrl: z.string().url().optional(),
     lokiUrl: z.string().optional().transform((v) => v === '' ? undefined : v), // URL with embedded credentials — skip .url() which rejects user:pass@ format. Optional: containers may run without Loki; logger falls back to stdout. Empty string is coerced to undefined (env var unset vs empty are equivalent).
-    redisUrl: z.string().url(),
+    // Dedup store selector — defaults to 'dynamodb' (AWS free-tier default).
+    // Self-hosted Helm / compose targets set DEDUP_STORE=redis.
+    dedupStore: z.enum(['dynamodb', 'redis']).default('dynamodb'),
+    dedupTableName: z.string().min(1).optional(),
+    redisUrl: z.string().url().optional(), // was required; superRefine enforces it for redis
     sqsQueueUrl: z.string().url().optional().or(z.literal('')),
     dedupTtlSeconds: z.coerce.number().int().positive().default(300),
     clusterWindowMs: z.coerce.number().int().positive().default(120_000),
@@ -166,6 +176,20 @@ const ConfigSchema = z
         }
       }
     }
+    if (data.dedupStore === 'dynamodb' && !data.dedupTableName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dedupTableName'],
+        message: '[dedupStore: dynamodb] DEDUP_TABLE_NAME is required',
+      });
+    }
+    if (data.dedupStore === 'redis' && !data.redisUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['redisUrl'],
+        message: '[dedupStore: redis] REDIS_URL is required',
+      });
+    }
   });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -184,6 +208,8 @@ export async function loadConfig(): Promise<Config> {
     teamsWebhookUrl: process.env['TEAMS_WEBHOOK_URL'],
     lokiUrl: process.env['LOKI_URL'],
     redisUrl: process.env['REDIS_URL'],
+    dedupStore: process.env['DEDUP_STORE'],
+    dedupTableName: process.env['DEDUP_TABLE_NAME'],
     sqsQueueUrl: process.env['SQS_QUEUE_URL'],
     dedupTtlSeconds: process.env['DEDUP_TTL_SECONDS'],
     clusterWindowMs: process.env['CLUSTER_WINDOW_MS'],

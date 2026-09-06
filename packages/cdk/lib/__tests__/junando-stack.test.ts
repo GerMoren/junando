@@ -112,3 +112,69 @@ describe('JunandoStack staging configuration', () => {
     );
   });
 });
+
+describe('JunandoStack dedup table', () => {
+  function buildTemplate() {
+    const originalCwd = process.cwd();
+    process.chdir(path.resolve(import.meta.dirname, '../..'));
+
+    const app = new App();
+    const stack = new JunandoStack(app, 'JunandoStack-dedup', {
+      env: { account: '123456789012', region: 'us-east-1' },
+      nodeEnv: 'production',
+      ssmPrefix: DEFAULT_SSM_PREFIX,
+    });
+    const template = Template.fromStack(stack);
+    process.chdir(originalCwd);
+    return template;
+  }
+
+  it('creates exactly one PROVISIONED 25/25 table with no autoscaling', () => {
+    const template = buildTemplate();
+
+    template.hasResourceProperties('AWS::DynamoDB::Table', {
+      // CDK omits BillingMode from the template for PROVISIONED (the CFN
+      // default); ProvisionedThroughput's presence is the equivalent proof.
+      ProvisionedThroughput: { ReadCapacityUnits: 25, WriteCapacityUnits: 25 },
+      KeySchema: [{ AttributeName: 'fingerprint', KeyType: 'HASH' }],
+      TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true },
+    });
+    template.resourceCountIs('AWS::ApplicationAutoScaling::ScalableTarget', 0);
+    template.resourceCountIs('AWS::DynamoDB::Table', 1);
+  });
+
+  it('grants read/write only to the worker role, not the webhook role', () => {
+    const template = buildTemplate();
+
+    const functions = template.findResources('AWS::Lambda::Function');
+    const workerEntry = Object.values(functions).find(
+      (fn) => fn.Properties.FunctionName === DEFAULT_RESOURCE_NAMES.worker,
+    );
+    const workerRoleLogicalId = workerEntry?.Properties.Role['Fn::GetAtt'][0];
+    expect(workerRoleLogicalId).toBeTruthy();
+
+    const dedupPolicies = Object.values(template.findResources('AWS::IAM::Policy'))
+      .filter((policy) => JSON.stringify(policy).includes('dynamodb:PutItem'));
+    expect(dedupPolicies).toHaveLength(1);
+
+    const dedupPolicy = dedupPolicies[0];
+    if (!dedupPolicy) throw new Error('expected exactly one dedup policy');
+    const roleRefs = (dedupPolicy.Properties.Roles as unknown[]).map((role: any) => role.Ref);
+    expect(roleRefs).toContain(workerRoleLogicalId);
+  });
+
+  it('sets DEDUP_TABLE_NAME on the worker environment and not on the webhook environment', () => {
+    const template = buildTemplate();
+
+    const functions = Object.values(template.findResources('AWS::Lambda::Function'));
+    const workerEntry = functions.find(
+      (fn) => fn.Properties.FunctionName === DEFAULT_RESOURCE_NAMES.worker,
+    );
+    const webhookEntry = functions.find(
+      (fn) => fn.Properties.FunctionName === DEFAULT_RESOURCE_NAMES.webhook,
+    );
+
+    expect(workerEntry?.Properties.Environment.Variables.DEDUP_TABLE_NAME).toBeTruthy();
+    expect(webhookEntry?.Properties.Environment.Variables.DEDUP_TABLE_NAME).toBeUndefined();
+  });
+});

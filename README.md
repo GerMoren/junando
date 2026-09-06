@@ -156,7 +156,9 @@ Required environment variables:
 | `LLM_PROVIDER` | `gemini`, `claude`, or `openrouter` |
 | `LLM_API_KEY` | API key for the chosen LLM provider |
 | `LOKI_URL` | Loki endpoint for log correlation |
-| `REDIS_URL` | Redis for dedup TTL windows |
+| `DEDUP_STORE` | `dynamodb` (default, AWS free-tier) or `redis` |
+| `DEDUP_TABLE_NAME` | DynamoDB table name; required when `DEDUP_STORE=dynamodb` |
+| `REDIS_URL` | Redis for dedup TTL windows; required when `DEDUP_STORE=redis` |
 | `SLACK_BOT_TOKEN` | Slack bot token (if using Slack notifier) |
 | `SLACK_CHANNEL` | Target Slack channel |
 | `TEAMS_WEBHOOK_URL` | Teams webhook URL (if using Teams notifier) |

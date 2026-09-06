@@ -40,6 +40,7 @@ export {
   InMemoryDeduplicationStore,
   RedisDeduplicationStore,
 } from './infrastructure/dedup/redis-dedup.adapter.js';
+export { DynamoDBDeduplicationStore } from './infrastructure/dedup/dynamodb-dedup.adapter.js';
 export { InMemoryIndexer, OpenSearchIndexer } from './infrastructure/indexer/opensearch.adapter.js';
 export type {
   OpenSearchHttpFetcher,

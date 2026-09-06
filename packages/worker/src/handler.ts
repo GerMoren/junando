@@ -1,4 +1,5 @@
 import {
+  DynamoDBDeduplicationStore,
   LokiTraceRepository,
   NormalizedAlertSchema,
   ProcessIncidentUseCase,
@@ -12,6 +13,7 @@ import {
   flushLoki,
   startSqsLagPoller,
 } from '@junando/core';
+import type { IDeduplicationStore } from '@junando/core';
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, SQSEvent } from 'aws-lambda';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
@@ -53,9 +55,18 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   reinitLogger({ level: config.logLevel }); // swap in Loki transport now that LOKI_URL is set
   logger = createLogger(config.logLevel);
 
-  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+  let dedup: IDeduplicationStore;
+  if (config.dedupStore === 'dynamodb') {
+    dedup = new DynamoDBDeduplicationStore(config.dedupTableName ?? '');
+  } else {
+    const redis = new Redis(config.redisUrl ?? '', { lazyConnect: true });
+    dedup = new RedisDeduplicationStore(redis);
+  }
+  logger.info(
+    { dedupStore: config.dedupStore, dedupTableName: config.dedupTableName },
+    'Dedup store initialised',
+  );
 
-  const dedup = new RedisDeduplicationStore(redis);
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
   const notifier = createNotifier(config);

@@ -38,7 +38,7 @@ async function main() {
   const config = await loadConfig();
   reinitLogger({ level: config.logLevel });
 
-  const redis = new Redis(config.redisUrl, { lazyConnect: true });
+  const redis = new Redis(config.redisUrl ?? 'redis://localhost:6379', { lazyConnect: true });
   try {
     await redis.connect();
     logger.info("Redis connected");

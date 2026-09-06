@@ -9,10 +9,15 @@ const mockSend = vi.hoisted(() => vi.fn());
 const mockSSMClient = {
   send: mockSend,
 };
+const mockWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@aws-sdk/client-ssm', () => ({
   SSMClient: vi.fn(function() { return mockSSMClient; }),
   GetParametersCommand: vi.fn(),
+}));
+
+vi.mock('../../logger/index.js', () => ({
+  createLogger: vi.fn(() => ({ warn: mockWarn, error: vi.fn(), info: vi.fn() })),
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +38,7 @@ const validConfig = {
   CLUSTER_WINDOW_MS: '60000',
   LOG_LEVEL: 'debug',
   NODE_ENV: 'production',
+  DEDUP_TABLE_NAME: 'junando-dedup',
 };
 
 function setEnv(vars: Partial<typeof validConfig>) {
@@ -55,6 +61,7 @@ function clearEnv() {
   delete process.env.RULES_CONFIG_PATH;
   delete process.env.ROLLBACK_ACTION_ENABLED;
   delete process.env.ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS;
+  delete process.env.DEDUP_STORE;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,6 +71,7 @@ function clearEnv() {
 describe('Config — loadConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockWarn.mockClear();
     clearEnv();
   });
 
@@ -344,6 +352,7 @@ describe('Config — loadConfig', () => {
 
       // Only set SSM_PREFIX, the rest come from SSM
       process.env.SSM_PREFIX = '/junando';
+      process.env.DEDUP_TABLE_NAME = 'junando-dedup';
       delete process.env.LLM_PROVIDER;
       delete process.env.LLM_API_KEY;
       delete process.env.SLACK_BOT_TOKEN;
@@ -379,6 +388,7 @@ describe('Config — loadConfig', () => {
       });
 
       process.env.SSM_PREFIX = '/junando';
+      process.env.DEDUP_TABLE_NAME = 'junando-dedup';
 
       // Set env vars that SSM should override
       process.env.LLM_PROVIDER = 'gemini';
@@ -433,6 +443,56 @@ describe('Config — loadConfig', () => {
 
       // Should fail because llm-api-key is empty string from SSM
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+    });
+
+    it('warns exactly once naming the InvalidParameters paths', async () => {
+      mockSend.mockResolvedValueOnce({
+        Parameters: [
+          { Name: '/junando/llm-provider', Value: 'gemini' },
+          { Name: '/junando/llm-api-key', Value: 'sk-distinctive-value-abc' },
+        ],
+        InvalidParameters: ['/junando/redis-url', '/junando/teams-webhook-url'],
+      });
+
+      setEnv(validConfig);
+      process.env.SSM_PREFIX = '/junando';
+
+      await loadConfig();
+
+      expect(mockWarn).toHaveBeenCalledTimes(1);
+      const payload = mockWarn.mock.calls[0]?.[0];
+      expect(payload.missingParameters).toEqual([
+        '/junando/redis-url',
+        '/junando/teams-webhook-url',
+      ]);
+      expect(JSON.stringify(mockWarn.mock.calls)).not.toContain('sk-distinctive-value-abc');
+    });
+
+    it('applies returned Parameters even when InvalidParameters is also present', async () => {
+      mockSend.mockResolvedValueOnce({
+        Parameters: [{ Name: '/junando/llm-provider', Value: 'claude' }],
+        InvalidParameters: ['/junando/redis-url'],
+      });
+
+      setEnv(validConfig);
+      process.env.SSM_PREFIX = '/junando';
+
+      const config = await loadConfig();
+
+      expect(config.llmProvider).toBe('claude');
+    });
+
+    it('does not warn when InvalidParameters is absent', async () => {
+      mockSend.mockResolvedValueOnce({
+        Parameters: [{ Name: '/junando/llm-provider', Value: 'gemini' }],
+      });
+
+      setEnv(validConfig);
+      process.env.SSM_PREFIX = '/junando';
+
+      await loadConfig();
+
+      expect(mockWarn).not.toHaveBeenCalled();
     });
   });
 
@@ -726,6 +786,34 @@ describe('Config — loadConfig', () => {
       process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = '';
       const config = await loadConfig();
       expect(config.rollbackActionAllowedSlackUserIds).toBeUndefined();
+    });
+  });
+
+  // ── dedupStore selector ─────────────────────────────────────────────────
+
+  describe('dedupStore validation', () => {
+    it('defaults to dynamodb when DEDUP_STORE is unset', async () => {
+      setEnv({ ...validConfig });
+      const config = await loadConfig();
+      expect(config.dedupStore).toBe('dynamodb');
+    });
+
+    it('rejects dynamodb selector without DEDUP_TABLE_NAME', async () => {
+      setEnv({ ...validConfig, DEDUP_TABLE_NAME: undefined });
+      await expect(loadConfig()).rejects.toThrow(/dedupTableName/);
+    });
+
+    it('rejects redis selector without REDIS_URL', async () => {
+      setEnv({ ...validConfig, REDIS_URL: undefined });
+      process.env['DEDUP_STORE'] = 'redis';
+      await expect(loadConfig()).rejects.toThrow(/redisUrl/);
+    });
+
+    it('succeeds for redis selector when REDIS_URL is present and DEDUP_TABLE_NAME is absent', async () => {
+      setEnv({ ...validConfig, DEDUP_TABLE_NAME: undefined });
+      process.env['DEDUP_STORE'] = 'redis';
+      const config = await loadConfig();
+      expect(config.dedupStore).toBe('redis');
     });
   });
 });
