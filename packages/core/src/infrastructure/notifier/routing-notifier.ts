@@ -4,6 +4,7 @@ import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
 import type { RuleAction } from '../../domain/entities/rule.js';
 import { RuleActionType } from '../../domain/entities/rule.js';
 import type { ChannelRegistry } from '../rules/channel-registry.js';
+import { createLogger } from '../../shared/logger/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RoutingNotifier — wraps multiple INotifier instances via ChannelRegistry.
@@ -15,6 +16,8 @@ import type { ChannelRegistry } from '../rules/channel-registry.js';
 // Tag actions are metadata-only (no notification side effect).
 // Suppress actions are handled by the caller (use case).
 // ─────────────────────────────────────────────────────────────────────────────
+
+const logger = createLogger();
 
 type ActionDispatchHandler = (
   action: RuleAction,
@@ -66,17 +69,7 @@ export class RoutingNotifier implements INotifier {
     private readonly defaultNotifier: INotifier,
   ) {}
 
-  /**
-   * Implements INotifier.send.
-   *
-   * When `channel` is provided, resolves it against the registry and delivers
-   * there — this is the path the use case uses to apply a Route action.
-   * When omitted, delivers via the default notifier (backward-compatible with
-   * call sites that don't use rule actions).
-   *
-   * The returned NotifyResult comes from the notifier that actually delivered,
-   * so the wide event reports the channel used rather than the one requested.
-   */
+  /** Routes to `channel` when given, else to the default notifier. */
   async send(
     cluster: AlertCluster,
     analysis: LLMAnalysis | null,
@@ -164,19 +157,17 @@ export class RoutingNotifier implements INotifier {
   }
 
   /**
-   * Resolve a channel name to its notifier, falling back to the default when
-   * the channel is not registered.
-   *
-   * Only channel resolution is guarded here. A delivery failure propagates to
-   * the caller: the use case marks the notification failed and rethrows so the
-   * message is retried via SQS, which a silent fallback would defeat.
+   * Guards channel resolution only — a delivery failure must propagate so the
+   * use case can let SQS retry it.
    */
   private resolveOrDefault(channel: string): INotifier {
-    try {
+    if (this.registry.has(channel)) {
       return this.registry.resolve(channel);
-    } catch {
-      // ChannelRegistry.resolve throws if channel unknown and no default set.
-      return this.defaultNotifier;
     }
+    logger.warn(
+      { requestedChannel: channel, deliveredTo: 'default' },
+      'Route channel not registered — delivering to the default channel',
+    );
+    return this.defaultNotifier;
   }
 }

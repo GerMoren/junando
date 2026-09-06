@@ -112,10 +112,10 @@ describe('createNotifier with rules config (WIR-03)', () => {
 
 // ── Unresolvable channel reporting ────────────────────────────────────────────
 //
-// Rule actions reference channels by logical name (slack-sre, pagerduty-critical).
-// Nothing in the YAML maps those names to a concrete notifier, so every one of
-// them resolves to the default. Surfacing that at startup keeps the operator
-// from discovering it during an incident.
+// Nothing in the rules YAML maps a logical channel name to a notifier, so every
+// routed channel resolves to the default. Reported at startup so the operator
+// isn't surprised mid-incident. Fail-fast lands with #303, once channels can
+// actually be defined.
 
 describe('createNotifier — unresolvable route channels', () => {
   const rulesYamlPath = `${__dirname}/../../../../rules.example.yaml`;
@@ -126,12 +126,7 @@ describe('createNotifier — unresolvable route channels', () => {
 
     // Channels declared across both phases of rules.example.yaml.
     expect(unresolved).toEqual(
-      expect.arrayContaining([
-        'slack-sre',
-        'slack-dev-team',
-        'slack-oncall',
-        'pagerduty-critical',
-      ]),
+      expect.arrayContaining(['slack-sre', 'slack-dev-team', 'slack-oncall']),
     );
   });
 

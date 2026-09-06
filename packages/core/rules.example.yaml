@@ -93,7 +93,7 @@ post-llm:
         requiresRollback: true
       actions:
         - type: escalate
-          channel: pagerduty-critical
+          channel: slack-oncall
         - type: tag
           key: incident-class
           value: rollback-required
