@@ -37,6 +37,10 @@ function makeAnalysis(overrides: Partial<LLMAnalysis> = {}): LLMAnalysis {
 
 const VALID_WEBHOOK = 'https://prod.example.powerautomate.com/invoke?api-version=1';
 
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 describe('TeamsNotifier', () => {
   const mockFetch = vi.fn();
   let notifier: TeamsNotifier;
@@ -59,7 +63,7 @@ describe('TeamsNotifier', () => {
     await notifier.send(makeCluster(), makeAnalysis());
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [, options] = mockFetch.mock.calls[0];
+    const [, options] = mockFetch.mock.calls[0]!;
 
     expect(options.method).toBe('POST');
     expect(options.headers['Content-Type']).toBe('application/json');
@@ -80,7 +84,7 @@ describe('TeamsNotifier', () => {
 
     await notifier.send(cluster, analysis);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     const card = body.attachments[0].content;
 
     expect(card.$schema).toBe('http://adaptivecards.io/schemas/adaptive-card.json');
@@ -94,7 +98,7 @@ describe('TeamsNotifier', () => {
     // FactSet
     const factSet = card.body[1];
     expect(factSet.type).toBe('FactSet');
-    const factTitles = factSet.facts.map((f: any) => f.title);
+    const factTitles = factSet.facts.map((f: { title: string }) => f.title);
     expect(factTitles).toContain('Service');
     expect(factTitles).toContain('Alerts');
     expect(factTitles).toContain('Endpoint');
@@ -118,7 +122,7 @@ describe('TeamsNotifier', () => {
 
     await notifier.send(makeCluster(), null);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     const card = body.attachments[0].content;
 
     // Title includes "no AI diagnosis"
@@ -127,7 +131,7 @@ describe('TeamsNotifier', () => {
     // Service and alert count present
     const factSet = card.body[1];
     expect(factSet.type).toBe('FactSet');
-    const factTitles = factSet.facts.map((f: any) => f.title);
+    const factTitles = factSet.facts.map((f: { title: string }) => f.title);
     expect(factTitles).toContain('Service');
     expect(factTitles).toContain('Alerts');
 
@@ -162,14 +166,14 @@ describe('TeamsNotifier', () => {
 
   it('throws TeamsNotifierError with status and host on HTTP 400 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 400, text: async () => 'Bad Request' });
-    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    const err = asError(await notifier.send(makeCluster(), makeAnalysis()).catch(asError));
     expect(err).toBeInstanceOf(TeamsNotifierError);
     expect(err.message).toMatch(/Teams webhook error 400 \(host: prod\.example\.powerautomate\.com\)/);
   });
 
   it('throws TeamsNotifierError with status and host on HTTP 500 (TNT-05)', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 500, text: async () => 'Internal Server Error' });
-    const err = await notifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    const err = asError(await notifier.send(makeCluster(), makeAnalysis()).catch(asError));
     expect(err).toBeInstanceOf(TeamsNotifierError);
     expect(err.message).toMatch(/Teams webhook error 500 \(host: prod\.example\.powerautomate\.com\)/);
   });
@@ -184,7 +188,7 @@ describe('TeamsNotifier', () => {
     mockFetch.mockResolvedValue({ ok: false, status: 502, text: async () => leakyBody });
 
     const leakyNotifier = new TeamsNotifier(webhookWithSecret);
-    const err = await leakyNotifier.send(makeCluster(), makeAnalysis()).catch((e) => e as Error);
+    const err = asError(await leakyNotifier.send(makeCluster(), makeAnalysis()).catch(asError));
 
     expect(err).toBeInstanceOf(TeamsNotifierError);
     // No part of the body — verbatim URL, sig token, or arbitrary marker — leaks.
@@ -203,7 +207,7 @@ describe('TeamsNotifier', () => {
     const cluster = makeCluster({ serviceName: '<script>alert(1)</script>checkout' });
     await notifier.send(cluster, makeAnalysis());
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     const rawBody = JSON.stringify(body);
     expect(rawBody).not.toContain('<script>');
     expect(rawBody).toContain('checkout');
@@ -215,7 +219,7 @@ describe('TeamsNotifier', () => {
     const analysis = makeAnalysis({ probable_cause: '**bold** and _italic_' });
     await notifier.send(makeCluster(), analysis);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     const rawBody = JSON.stringify(body);
     // After sanitization, raw ** and __ should be escaped
     expect(rawBody).not.toContain('**bold**');
@@ -243,9 +247,9 @@ describe('TeamsNotifier', () => {
     const notifierFast = new TeamsNotifier(VALID_WEBHOOK, 100);
 
     // Start the send; advance timers to trigger abort; then await resolution
-    const sendPromise = notifierFast.send(makeCluster(), makeAnalysis()).catch((err) => err as TeamsNotifierError);
+    const sendPromise = notifierFast.send(makeCluster(), makeAnalysis()).catch(asError);
     await vi.advanceTimersByTimeAsync(150);
-    const result = await sendPromise;
+    const result = asError(await sendPromise);
 
     expect(result).toBeInstanceOf(TeamsNotifierError);
     expect(result.message).toContain('100ms');
@@ -284,9 +288,9 @@ describe('TeamsNotifier', () => {
 
     const sendPromise = notifierFast
       .send(makeCluster(), makeAnalysis())
-      .catch((err) => err as Error);
+      .catch(asError);
     await vi.advanceTimersByTimeAsync(100);
-    const result = await sendPromise;
+    const result = asError(await sendPromise);
 
     expect(result).toBeInstanceOf(TeamsNotifierError);
     expect(result.message).toContain('50ms');

@@ -20,6 +20,7 @@ import { MockNotifier } from './helpers/mock-notifier.js';
 import { silentLogger } from './helpers/silent-logger.js';
 import type { ITraceRepository } from '../../domain/ports/index.js';
 import type { NormalizedAlert } from '../../domain/entities/alert.js';
+import { AlertType } from '../../shared/constants.js';
 import { parseRuleConfig } from '../../infrastructure/rules/yaml-rule-loader.js';
 import { RuleEngine } from '../../infrastructure/rules/rule-engine.js';
 import { suppressedClusters } from '../../shared/metrics/index.js';
@@ -79,7 +80,7 @@ function makeAlert(overrides: Partial<NormalizedAlert> = {}): NormalizedAlert {
     alertName: 'TestAlert',
     status: 'firing',
     serviceName: 'test-service',
-    alertType: 'http_500',
+    alertType: AlertType.Error,
     endpointPath: '/api/test',
     startsAt: '2026-06-09T12:00:00.000Z',
     labels: {},
@@ -121,7 +122,7 @@ function buildHarness(options?: { rulesYaml?: string }) {
     notifier,
     logger: silentLogger,
     dedupTtlSeconds: 300,
-    ruleEngine,
+    ...(ruleEngine !== undefined && { ruleEngine }),
   });
 
   return { useCase, notifier, dedup, llm, ruleEngine };
@@ -137,7 +138,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       const { useCase, notifier, llm } = buildHarness({ rulesYaml });
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'staging', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'staging', alertType: AlertType.Error }),
       ];
 
       await useCase.execute(alerts, 'corr-suppress-1');
@@ -155,7 +156,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       const currentValue = (await suppressedClusters.get()).values[0]?.value ?? 0;
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'staging', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'staging', alertType: AlertType.Error }),
       ];
 
       await useCase.execute(alerts, 'corr-suppress-2');
@@ -168,7 +169,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       const { useCase, notifier, llm } = buildHarness({ rulesYaml });
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'checkout-api', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'checkout-api', alertType: AlertType.Error }),
       ];
 
       await useCase.execute(alerts, 'corr-pass-through-1');
@@ -184,8 +185,8 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       const { useCase, notifier, llm } = buildHarness({ rulesYaml });
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'staging', alertType: 'http_500' }),       // suppressed
-        makeAlert({ serviceName: 'checkout-api', alertType: 'http_500' }),  // pass-through
+        makeAlert({ serviceName: 'staging', alertType: AlertType.Error }),       // suppressed
+        makeAlert({ serviceName: 'checkout-api', alertType: AlertType.Error }),  // pass-through
       ];
 
       await useCase.execute(alerts, 'corr-mixed-batch');
@@ -220,7 +221,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
 
       // http_500 maps to severity 'critical' via ALERT_TYPE_LABELS
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'payments-api', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'payments-api', alertType: AlertType.Error }),
       ];
 
       await useCase.execute(alerts, 'corr-route-1');
@@ -234,7 +235,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       const { useCase, notifier } = buildHarness({ rulesYaml });
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'orders-api', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'orders-api', alertType: AlertType.Error }),
       ];
 
       await useCase.execute(alerts, 'corr-route-2');
@@ -256,7 +257,7 @@ describe('E2E: Business Rules Engine — PRE-LLM', () => {
       // 50+ alerts → alertCount >= 50 → matches escalate-high-volume
       const alerts = makeAlertBatch(50, {
         serviceName: 'orders-api',
-        alertType: 'latency_spike',
+        alertType: AlertType.Warning,
       });
 
       await useCase.execute(alerts, 'corr-escalate-pre-1');
@@ -282,7 +283,7 @@ describe('E2E: Business Rules Engine — POST-LLM', () => {
 
       // MockLLMProvider returns urgency_level: 'high'
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'checkout-api', alertType: 'latency_spike' }),
+        makeAlert({ serviceName: 'checkout-api', alertType: AlertType.Warning }),
       ];
 
       await useCase.execute(alerts, 'corr-esc-post-1');
@@ -304,7 +305,7 @@ describe('E2E: Business Rules Engine — POST-LLM', () => {
       const { useCase } = buildHarness({ rulesYaml });
 
       const alerts: NormalizedAlert[] = [
-        makeAlert({ serviceName: 'boring-api', alertType: 'http_500' }),
+        makeAlert({ serviceName: 'boring-api', alertType: AlertType.Error }),
       ];
 
       // Should not throw
@@ -322,7 +323,7 @@ describe('E2E: Business Rules Engine — No Rules (pass-through)', () => {
     const { useCase, notifier, llm } = buildHarness();
 
     const alerts: NormalizedAlert[] = [
-      makeAlert({ serviceName: 'any-service', alertType: 'http_500' }),
+      makeAlert({ serviceName: 'any-service', alertType: AlertType.Error }),
     ];
 
     await useCase.execute(alerts, 'corr-no-rules-1');
@@ -344,7 +345,7 @@ describe('E2E: Suppressed cluster visibility', () => {
     const { useCase } = buildHarness({ rulesYaml });
 
     const alerts: NormalizedAlert[] = [
-      makeAlert({ serviceName: 'staging', alertType: 'http_500' }),
+      makeAlert({ serviceName: 'staging', alertType: AlertType.Error }),
     ];
 
     await useCase.execute(alerts, 'corr-visibility-1');
@@ -354,7 +355,7 @@ describe('E2E: Suppressed cluster visibility', () => {
     // The suppressedClusters metric should have been incremented
     // Verify by checking that the metric values exist with the expected rule_id label
     const hasSuppressRuleId = after.values.some(
-      (v: { labels: Record<string, string>; value: number }) =>
+      (v) =>
         v.labels.rule_id === 'suppress-staging',
     );
 
@@ -365,7 +366,7 @@ describe('E2E: Suppressed cluster visibility', () => {
     const { useCase, notifier } = buildHarness({ rulesYaml });
 
     const alerts: NormalizedAlert[] = [
-      makeAlert({ serviceName: 'staging', alertType: 'http_500' }),
+      makeAlert({ serviceName: 'staging', alertType: AlertType.Error }),
     ];
 
     await useCase.execute(alerts, 'corr-visibility-2');

@@ -58,7 +58,7 @@ describe('SlackNotifier', () => {
     await notifier.send(cluster, analysis);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, options] = mockFetch.mock.calls[0];
+    const [url, options] = mockFetch.mock.calls[0]!;
 
     expect(url).toBe('https://slack.com/api/chat.postMessage');
     expect(options.method).toBe('POST');
@@ -109,7 +109,7 @@ describe('SlackNotifier', () => {
 
     await notifier.send(cluster, analysis);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
     const actions = body.blocks[5]; // Actions is at index 5
 
     expect(actions.elements).toHaveLength(2);
@@ -136,7 +136,7 @@ describe('SlackNotifier', () => {
 
     await notifier.send(cluster, null);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
 
     // Header should indicate no AI diagnosis
     expect(body.blocks[0].text.text).toContain('no AI diagnosis');
@@ -160,8 +160,8 @@ describe('SlackNotifier', () => {
 
     await notifier.send(cluster, analysis);
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    const endpointField = body.blocks[1].fields.find((f: any) => f.text.includes('Endpoint'));
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
+    const endpointField = body.blocks[1].fields.find((f: { text: string }) => f.text.includes('Endpoint'));
 
     // Backticks should be stripped
     expect(endpointField.text).not.toContain('`');
@@ -317,7 +317,7 @@ describe('ConsoleNotifier — structured NotifyResult', () => {
     await notifier.send(cluster, null);
 
     expect(notifier.sent).toHaveLength(1);
-    expect(notifier.sent[0].cluster).toBe(cluster);
-    expect(notifier.sent[0].analysis).toBeNull();
+    expect(notifier.sent[0]!.cluster).toBe(cluster);
+    expect(notifier.sent[0]!.analysis).toBeNull();
   });
 });

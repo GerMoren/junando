@@ -60,34 +60,34 @@ describe('parseRuleConfig', () => {
     expect(preLlm.rules).toHaveLength(2);
 
     // First pre-llm rule: suppress-noise
-    const rule1 = preLlm.rules[0];
+    const rule1 = preLlm.rules[0]!;
     expect(rule1.id).toBe('suppress-noise');
     expect(rule1.name).toBe('Suppress known noise');
     expect(rule1.condition.serviceName).toBe('legacy-api');
     expect(rule1.condition.alertType).toBe(AlertType.Error);
     expect(rule1.actions).toHaveLength(1);
-    expect(rule1.actions[0].type).toBe(RuleActionType.Suppress);
+    expect(rule1.actions[0]!.type).toBe(RuleActionType.Suppress);
 
     // Second pre-llm rule: route-critical (multiple actions)
-    const rule2 = preLlm.rules[1];
+    const rule2 = preLlm.rules[1]!;
     expect(rule2.id).toBe('route-critical');
     expect(rule2.condition.severity).toBe(SeverityLevel.Critical);
     expect(rule2.condition.alertCount).toEqual({ min: 5 });
     expect(rule2.actions).toHaveLength(2);
-    expect(rule2.actions[0]).toEqual({ type: RuleActionType.Route, channel: 'slack-sre' });
-    expect(rule2.actions[1]).toEqual({ type: RuleActionType.Escalate, channel: 'pagerduty-critical' });
+    expect(rule2.actions[0]!).toEqual({ type: RuleActionType.Route, channel: 'slack-sre' });
+    expect(rule2.actions[1]!).toEqual({ type: RuleActionType.Escalate, channel: 'pagerduty-critical' });
 
     // Post-llm section
     const postLlm = config[RuleEvaluationPhase.PostLlm];
     expect(postLlm.rules).toHaveLength(1);
 
-    const rule3 = postLlm.rules[0];
+    const rule3 = postLlm.rules[0]!;
     expect(rule3.id).toBe('escalate-rollback');
     expect(rule3.condition.urgencyLevel).toBe('critical');
     expect(rule3.condition.requiresRollback).toBe(true);
     expect(rule3.actions).toHaveLength(2);
-    expect(rule3.actions[0]).toEqual({ type: RuleActionType.Escalate, channel: 'pagerduty-critical' });
-    expect(rule3.actions[1]).toEqual({ type: RuleActionType.Tag, key: 'incident-class', value: 'rollback-required' });
+    expect(rule3.actions[0]!).toEqual({ type: RuleActionType.Escalate, channel: 'pagerduty-critical' });
+    expect(rule3.actions[1]!).toEqual({ type: RuleActionType.Tag, key: 'incident-class', value: 'rollback-required' });
   });
 
   it('rejects YAML with an unknown action type', () => {
@@ -153,7 +153,7 @@ post-llm:
   rules: []
 `;
     const config = parseRuleConfig(labelYaml);
-    const rule = config[RuleEvaluationPhase.PreLlm].rules[0];
+    const rule = config[RuleEvaluationPhase.PreLlm].rules[0]!;
     expect(rule.condition.labels).toEqual({ environment: 'staging', team: 'payments' });
   });
 
@@ -174,7 +174,7 @@ post-llm:
   rules: []
 `;
     const config = parseRuleConfig(rangeYaml);
-    const rule = config[RuleEvaluationPhase.PreLlm].rules[0];
+    const rule = config[RuleEvaluationPhase.PreLlm].rules[0]!;
     expect(rule.condition.alertCount).toEqual({ min: 10, max: 500 });
     expect(rule.condition.latencyP99Ms).toEqual({ min: 200 });
   });
@@ -195,7 +195,7 @@ post-llm:
   rules: []
 `;
     const config = parseRuleConfig(partialYaml);
-    const rule = config[RuleEvaluationPhase.PreLlm].rules[0];
+    const rule = config[RuleEvaluationPhase.PreLlm].rules[0]!;
     expect(rule.condition.alertCount).toEqual({ max: 50 });
     expect(rule.condition.latencyP99Ms).toEqual({ min: 100 });
   });
@@ -213,7 +213,7 @@ post-llm:
   rules: []
 `;
     const config = parseRuleConfig(endpointYaml);
-    const rule = config[RuleEvaluationPhase.PreLlm].rules[0];
+    const rule = config[RuleEvaluationPhase.PreLlm].rules[0]!;
     expect(rule.condition.endpointPath).toBe('/api/payments');
   });
 
@@ -234,7 +234,7 @@ post-llm:
           value: multi-service
 `;
     const config = parseRuleConfig(impactedYaml);
-    const rule = config[RuleEvaluationPhase.PostLlm].rules[0];
+    const rule = config[RuleEvaluationPhase.PostLlm].rules[0]!;
     expect(rule.condition.impactedServices).toEqual(['payments-api', 'inventory-api']);
   });
 });

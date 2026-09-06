@@ -12,7 +12,7 @@ const mockSSMClient = {
 const mockWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@aws-sdk/client-ssm', () => ({
-  SSMClient: vi.fn(function() { return mockSSMClient; }),
+  SSMClient: vi.fn(function () { return mockSSMClient; }),
   GetParametersCommand: vi.fn(),
 }));
 
@@ -41,7 +41,11 @@ const validConfig = {
   DEDUP_TABLE_NAME: 'junando-dedup',
 };
 
-function setEnv(vars: Partial<typeof validConfig>) {
+type TestEnv = {
+  [Key in keyof typeof validConfig]?: (typeof validConfig)[Key] | undefined;
+} & Record<string, string | undefined>;
+
+function setEnv(vars: TestEnv) {
   Object.entries(vars).forEach(([k, v]) => {
     if (v === undefined) {
       delete process.env[k];
@@ -202,8 +206,8 @@ describe('Config — loadConfig', () => {
     });
 
     it('succeeds when LOKI_URL is absent (optional)', async () => {
-      const env = { ...validConfig };
-      delete (env as any).LOKI_URL;
+      const env: TestEnv = { ...validConfig };
+      delete env.LOKI_URL;
       setEnv(env);
       const config = await loadConfig();
       expect(config.lokiUrl).toBeUndefined();
@@ -564,7 +568,8 @@ describe('Config — loadConfig', () => {
       try {
         await loadConfig();
         expect.fail('should have thrown');
-      } catch (err: any) {
+      } catch (err) {
+        if (!(err instanceof Error)) throw err;
         expect(err.message).toContain('llmProvider');
         expect(err.message).toContain('llmApiKey');
       }
@@ -694,7 +699,8 @@ describe('Config — loadConfig', () => {
       try {
         await loadConfig();
         expect.fail('should have thrown');
-      } catch (err: any) {
+      } catch (err) {
+        if (!(err instanceof Error)) throw err;
         expect(err.message).toContain('TEAMS_WEBHOOK_URL');
         expect(err.message).toContain('teams');
       }

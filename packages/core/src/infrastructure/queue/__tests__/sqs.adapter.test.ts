@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NormalizedAlert } from '../../../domain/entities/alert.js';
 import { AlertType } from '../../../shared/constants.js';
 
@@ -18,7 +18,7 @@ const registry = vi.hoisted((): MockRegistry => {
 });
 
 vi.mock('@aws-sdk/client-sqs', () => ({
-  SQSClient: vi.fn(function() {
+  SQSClient: vi.fn(function () {
     registry.constructorCalls++;
     return { send: registry.send };
   }),

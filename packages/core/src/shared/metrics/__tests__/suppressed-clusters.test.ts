@@ -18,7 +18,7 @@ describe('suppressedClusters metric', () => {
   });
 
   it('has "rule_id" in labelNames for per-rule tracking', () => {
-    expect(suppressedClusters.labelNames).toContain('rule_id');
+    expect((suppressedClusters as any).labelNames).toContain('rule_id');
   });
 
   it('inc() without labels increments the default counter', async () => {

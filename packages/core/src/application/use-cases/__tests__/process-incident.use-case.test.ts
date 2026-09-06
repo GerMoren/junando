@@ -29,6 +29,7 @@ import { ROLLBACK_ACTION_ID, SLACK_API_URL } from '../../../shared/constants.js'
 
 function makeAlert(overrides: Partial<NormalizedAlert> = {}): NormalizedAlert {
   return {
+    fingerprint: 'test-fingerprint',
     alertName: 'HighErrorRate',
     serviceName: 'test-service',
     alertType: AlertType.Error,
@@ -485,7 +486,7 @@ describe('ProcessIncidentUseCase — IRuleEngine POST-LLM hooks', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-post' })], 'corr-post');
 
     expect(mockRuleEngine.evaluatePostLlm).toHaveBeenCalledOnce();
-    const [clusterArg, analysisArg] = vi.mocked(mockRuleEngine.evaluatePostLlm).mock.calls[0];
+    const [clusterArg, analysisArg] = vi.mocked(mockRuleEngine.evaluatePostLlm).mock.calls[0]!;
     expect(clusterArg.serviceName).toBe('svc-post');
     expect(analysisArg.urgency_level).toBe('high');
   });
@@ -602,7 +603,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-wide', traceId: 't-1' })], 'corr-wide');
 
     expect(deps.logger.info).toHaveBeenCalledTimes(1);
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event).toMatchObject({
       component: Component.UseCase,
       outcome: Outcome.Success,
@@ -681,7 +682,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
     await useCase.execute([makeAlert({ serviceName: 'staging' })], 'corr-supp');
 
     expect(deps.logger.info).toHaveBeenCalledTimes(1);
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event).toMatchObject({
       outcome: Outcome.Suppressed,
       rule: { matched: true, suppressed: true, matchedRuleId: 'suppress-staging' },
@@ -703,7 +704,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-degraded' })], 'corr-degraded');
 
     expect(deps.logger.info).toHaveBeenCalledTimes(1);
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event).toMatchObject({
       outcome: Outcome.Degraded,
       error: { message: 'LLM Down', name: 'Error' },
@@ -726,7 +727,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
           analyze: vi.fn().mockResolvedValue(
             makeLLMResult({
               analysis: null,
-              degradedReason: degradedReason as unknown as LLMResult['degradedReason'],
+              ...(degradedReason !== undefined && { degradedReason }),
               promptTokens: 0,
               completionTokens: 0,
             }),
@@ -741,7 +742,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
       );
 
       expect(deps.notifier.send).toHaveBeenCalledWith(expect.anything(), null, undefined);
-      const [event] = emittedEvents(deps.logger);
+      const event = emittedEvents(deps.logger)[0]!;
       expect(event).toMatchObject({
         outcome: Outcome.Degraded,
         llm: {
@@ -768,7 +769,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
     ).rejects.toThrow('Slack 500');
 
     expect(deps.logger.info).toHaveBeenCalledTimes(1);
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event).toMatchObject({
       outcome: Outcome.Error,
       notify: { outcome: NotifyOutcome.Failure },
@@ -859,7 +860,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
 
     await useCase.execute([makeAlert({ serviceName: 'svc-channels' })], 'corr-channels');
 
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event['notify']).toMatchObject({
       channels: ['slack-sre', 'slack-oncall', 'pagerduty-critical'],
       outcome: NotifyOutcome.Success,
@@ -882,7 +883,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
 
     await useCase.execute([makeAlert({ serviceName: 'svc-dedup-err' })], 'corr-dedup-err');
 
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event['dedup']).toMatchObject({
       isNew: true,
       ttlSeconds: 300,
@@ -920,7 +921,7 @@ describe('ProcessIncidentUseCase — wide events', () => {
 
     await useCase.execute(alerts, 'corr-trace-err');
 
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event['cluster']).toMatchObject({ alertCount: 2, spanCount: 1, traceErrors: 1 });
     expect(deps.logger.warn).not.toHaveBeenCalled();
   });
@@ -949,7 +950,7 @@ describe('ProcessIncidentUseCase — wide event sampling and redaction', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-sampled' })], 'corr-sampled');
 
     expect(deps.logger.info).toHaveBeenCalledTimes(1);
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     expect(event['outcome']).toBe(Outcome.Success);
   });
 
@@ -960,7 +961,7 @@ describe('ProcessIncidentUseCase — wide event sampling and redaction', () => {
 
     await useCase.execute([makeAlert({ serviceName: 'svc-redact' })], 'corr-redact');
 
-    const [event] = emittedEvents(deps.logger);
+    const event = emittedEvents(deps.logger)[0]!;
     // These would be '[REDACTED]' if the whitelist dropped them
     expect(event['component']).toBe(Component.UseCase);
     expect(event['outcome']).toBe(Outcome.Success);

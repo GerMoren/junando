@@ -4,7 +4,7 @@ import { llmInferenceDuration } from '../index.js';
 describe('metrics', () => {
   describe('llmInferenceDuration histogram', () => {
     it('includes "model" in labelNames', () => {
-      expect(llmInferenceDuration.labelNames).toContain('model');
+      expect((llmInferenceDuration as any).labelNames).toContain('model');
     });
   });
 });
