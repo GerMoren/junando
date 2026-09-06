@@ -98,13 +98,19 @@ function makeDeps(overrides: DepsOverrides = {}) {
     traces: overrides.traces ?? { findByTraceId: vi.fn().mockResolvedValue([]) },
     llm: overrides.llm ?? { analyze: vi.fn().mockResolvedValue(makeLLMResult()) },
     notifier: overrides.notifier ?? {
-      send: vi.fn().mockImplementation(
-        async (_cluster: unknown, _analysis: unknown, channel?: string): Promise<NotifyResult> => ({
-          outcome: NotifyOutcome.Success,
-          latencyMs: 5,
-          channels: [channel ?? 'default'],
-        }),
-      ),
+      send: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _cluster: unknown,
+            _analysis: unknown,
+            channel?: string,
+          ): Promise<NotifyResult> => ({
+            outcome: NotifyOutcome.Success,
+            latencyMs: 5,
+            channels: [channel ?? 'default'],
+          }),
+        ),
     },
     logger,
     dedupTtlSeconds: 300,
@@ -208,7 +214,10 @@ describe('ProcessIncidentUseCase — rollback vector closed end-to-end', () => {
     const deps = makeDeps({ llm, notifier });
     const useCase = new ProcessIncidentUseCase(deps);
 
-    await useCase.execute([makeAlert({ serviceName: 'svc-rollback-vector' })], 'corr-rollback-vector');
+    await useCase.execute(
+      [makeAlert({ serviceName: 'svc-rollback-vector' })],
+      'corr-rollback-vector',
+    );
 
     const slackCall = mockFetch.mock.calls.find(([url]) => url === SLACK_API_URL);
     expect(slackCall).toBeDefined();
@@ -226,12 +235,32 @@ describe('ProcessIncidentUseCase — rollback vector closed end-to-end', () => {
 
 describe('resolveOutcome', () => {
   it.each([
-    ['notifyError only', { notifyError: new Error('x'), llmError: null, llmDegradedReason: null }, Outcome.Error],
-    ['llmError only', { notifyError: null, llmError: new Error('x'), llmDegradedReason: null }, Outcome.Degraded],
-    ['llmDegradedReason only', { notifyError: null, llmError: null, llmDegradedReason: 'unparseable_response' }, Outcome.Degraded],
+    [
+      'notifyError only',
+      { notifyError: new Error('x'), llmError: null, llmDegradedReason: null },
+      Outcome.Error,
+    ],
+    [
+      'llmError only',
+      { notifyError: null, llmError: new Error('x'), llmDegradedReason: null },
+      Outcome.Degraded,
+    ],
+    [
+      'llmDegradedReason only',
+      { notifyError: null, llmError: null, llmDegradedReason: 'unparseable_response' },
+      Outcome.Degraded,
+    ],
     ['none', { notifyError: null, llmError: null, llmDegradedReason: null }, Outcome.Success],
-    ['notifyError wins over llmError', { notifyError: new Error('n'), llmError: new Error('l'), llmDegradedReason: null }, Outcome.Error],
-    ['llmError wins over llmDegradedReason', { notifyError: null, llmError: new Error('l'), llmDegradedReason: 'empty_response' }, Outcome.Degraded],
+    [
+      'notifyError wins over llmError',
+      { notifyError: new Error('n'), llmError: new Error('l'), llmDegradedReason: null },
+      Outcome.Error,
+    ],
+    [
+      'llmError wins over llmDegradedReason',
+      { notifyError: null, llmError: new Error('l'), llmDegradedReason: 'empty_response' },
+      Outcome.Degraded,
+    ],
   ])('%s → %s', (_label, signals, expected) => {
     expect(resolveOutcome(signals)).toBe(expected);
   });
@@ -303,7 +332,9 @@ describe('ProcessIncidentUseCase — dedup counter emission', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-dedup-new' })], 'corr-new');
 
     expect(dedupNewSpy).toHaveBeenCalledOnce();
-    expect(dedupNewSpy).toHaveBeenCalledWith(expect.objectContaining({ source: expect.any(String) }));
+    expect(dedupNewSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ source: expect.any(String) }),
+    );
     expect(dedupDuplicateSpy).not.toHaveBeenCalled();
   });
 
@@ -321,7 +352,9 @@ describe('ProcessIncidentUseCase — dedup counter emission', () => {
     await useCase.execute([makeAlert({ serviceName: 'svc-dedup-dup' })], 'corr-dup');
 
     expect(dedupDuplicateSpy).toHaveBeenCalledOnce();
-    expect(dedupDuplicateSpy).toHaveBeenCalledWith(expect.objectContaining({ source: expect.any(String) }));
+    expect(dedupDuplicateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ source: expect.any(String) }),
+    );
     expect(dedupNewSpy).not.toHaveBeenCalled();
   });
 
@@ -492,9 +525,7 @@ describe('ProcessIncidentUseCase — Rule action routing', () => {
   }
 
   it('PRE-LLM Route action — notification is sent to the correct channel', async () => {
-    const routeActions: RuleAction[] = [
-      { type: RuleActionType.Route, channel: 'slack-sre' },
-    ];
+    const routeActions: RuleAction[] = [{ type: RuleActionType.Route, channel: 'slack-sre' }];
     const mockRuleEngine: IRuleEngine = {
       evaluatePreLlm: vi.fn().mockReturnValue(makeResult({ actions: routeActions })),
       evaluatePostLlm: vi.fn().mockReturnValue(makeResult()),
@@ -685,6 +716,45 @@ describe('ProcessIncidentUseCase — wide events', () => {
     // stay mutually exclusive so dashboards can filter them apart.
     expect(JSON.stringify(event)).not.toContain('degradedReason');
   });
+
+  it.each(['timeout', 'circuit_breaker_open'] as const)(
+    'emits typed %s LLM degradation and notifies without an analysis',
+    async (degradedReason) => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      const deps = makeDeps({
+        llm: {
+          analyze: vi.fn().mockResolvedValue(
+            makeLLMResult({
+              analysis: null,
+              degradedReason: degradedReason as unknown as LLMResult['degradedReason'],
+              promptTokens: 0,
+              completionTokens: 0,
+            }),
+          ),
+        },
+      });
+      const useCase = new ProcessIncidentUseCase(deps);
+
+      await useCase.execute(
+        [makeAlert({ serviceName: `svc-${degradedReason}` })],
+        `corr-${degradedReason}`,
+      );
+
+      expect(deps.notifier.send).toHaveBeenCalledWith(expect.anything(), null, undefined);
+      const [event] = emittedEvents(deps.logger);
+      expect(event).toMatchObject({
+        outcome: Outcome.Degraded,
+        llm: {
+          provider: 'mock',
+          model: 'mock-model',
+          degradedReason,
+          tokens: 0,
+        },
+        notify: { outcome: NotifyOutcome.Success },
+      });
+      expect(event['error']).toBeUndefined();
+    },
+  );
 
   it('emits outcome=error with notify failure recorded, then rethrows for the queue retry', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
