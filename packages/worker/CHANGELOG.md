@@ -1,5 +1,12 @@
 # @junando/worker
 
+## 0.13.0
+
+### Patch Changes
+
+- Updated dependencies [c269950]
+  - @junando/core@0.13.0
+
 ## 0.12.3
 
 ### Patch Changes
