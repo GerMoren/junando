@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { FactoryRegistry } from '../../shared/factory-registry.js';
+import { createLogger } from '../../shared/logger/index.js';
 import type { Config } from '../../shared/config/index.js';
 import type { INotifier } from '../../domain/ports/index.js';
 import type { IRuleEngine } from '../../domain/ports/index.js';
@@ -14,6 +15,8 @@ import { RuleEngine } from '../rules/rule-engine.js';
 // createNotifier — single instantiation point, no switch/case.
 // Registry holds factories, resolve picks the right one.
 // ─────────────────────────────────────────────────────────────────────────────
+
+const logger = createLogger();
 
 function buildNotifierRegistry(config: Config): FactoryRegistry<INotifier> {
   const registry = new FactoryRegistry<INotifier>();
@@ -54,20 +57,60 @@ export function createNotifier(config: Config): INotifier {
   const defaultNotifier = registry.resolve(config.notifierType);
 
   if (!config.rulesConfigPath) {
-    console.info('[createNotifier] RULES_CONFIG_PATH not set — rule engine disabled, using default notifier');
+    logger.debug('RULES_CONFIG_PATH not set — rule engine disabled, using default notifier');
     return defaultNotifier;
   }
-
-  // Read and parse rules YAML
-  const yamlContent = readFileSync(config.rulesConfigPath, 'utf-8');
-  parseRuleConfig(yamlContent); // Validate — throws on invalid config
 
   // Create channel registry with default notifier as fallback
   const channelRegistry = new ChannelRegistry();
   channelRegistry.setDefault(defaultNotifier);
 
+  // Rule actions reference channels by logical name, and the YAML has no
+  // section mapping those names to a concrete notifier — so any channel a rule
+  // routes to resolves to the default. Report it at startup rather than letting
+  // the operator find out mid-incident.
+  const unresolved = collectUnresolvedChannels(config, channelRegistry);
+  if (unresolved.length > 0) {
+    logger.warn(
+      { channels: unresolved, rulesConfigPath: config.rulesConfigPath },
+      'Rules reference channels with no registered notifier — these will be delivered to the default channel',
+    );
+  }
+
   // Wrap with routing notifier for multi-channel dispatch
   return new RoutingNotifier(channelRegistry, defaultNotifier);
+}
+
+/**
+ * Collect the channel names referenced by Route/Escalate actions in the rules
+ * config that have no notifier registered, and would therefore fall back to the
+ * default channel.
+ *
+ * Returns an empty list when no rules config is set.
+ */
+export function collectUnresolvedChannels(
+  config: Config,
+  registry?: ChannelRegistry,
+): string[] {
+  if (!config.rulesConfigPath) {
+    return [];
+  }
+
+  const yamlContent = readFileSync(config.rulesConfigPath, 'utf-8');
+  const ruleConfig = parseRuleConfig(yamlContent); // Throws on invalid config
+
+  const referenced = new Set<string>();
+  for (const section of Object.values(ruleConfig)) {
+    for (const rule of section.rules) {
+      for (const action of rule.actions) {
+        if ('channel' in action) {
+          referenced.add(action.channel);
+        }
+      }
+    }
+  }
+
+  return [...referenced].filter((channel) => !registry?.has(channel));
 }
 
 /**

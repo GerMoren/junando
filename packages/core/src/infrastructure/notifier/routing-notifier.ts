@@ -67,11 +67,25 @@ export class RoutingNotifier implements INotifier {
   ) {}
 
   /**
-   * Implements INotifier.send — sends via default notifier.
-   * Backward-compatible with existing call sites that don't use rule actions.
+   * Implements INotifier.send.
+   *
+   * When `channel` is provided, resolves it against the registry and delivers
+   * there — this is the path the use case uses to apply a Route action.
+   * When omitted, delivers via the default notifier (backward-compatible with
+   * call sites that don't use rule actions).
+   *
+   * The returned NotifyResult comes from the notifier that actually delivered,
+   * so the wide event reports the channel used rather than the one requested.
    */
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<NotifyResult> {
-    return this.defaultNotifier.send(cluster, analysis);
+  async send(
+    cluster: AlertCluster,
+    analysis: LLMAnalysis | null,
+    channel?: string,
+  ): Promise<NotifyResult> {
+    if (channel === undefined) {
+      return this.defaultNotifier.send(cluster, analysis);
+    }
+    return this.resolveOrDefault(channel).send(cluster, analysis);
   }
 
   /**
@@ -146,13 +160,23 @@ export class RoutingNotifier implements INotifier {
     cluster: AlertCluster,
     analysis: LLMAnalysis | null,
   ): Promise<void> {
+    await this.resolveOrDefault(channel).send(cluster, analysis);
+  }
+
+  /**
+   * Resolve a channel name to its notifier, falling back to the default when
+   * the channel is not registered.
+   *
+   * Only channel resolution is guarded here. A delivery failure propagates to
+   * the caller: the use case marks the notification failed and rethrows so the
+   * message is retried via SQS, which a silent fallback would defeat.
+   */
+  private resolveOrDefault(channel: string): INotifier {
     try {
-      const notifier = this.registry.resolve(channel);
-      await notifier.send(cluster, analysis);
+      return this.registry.resolve(channel);
     } catch {
       // ChannelRegistry.resolve throws if channel unknown and no default set.
-      // Fall back to default notifier.
-      await this.defaultNotifier.send(cluster, analysis);
+      return this.defaultNotifier;
     }
   }
 }

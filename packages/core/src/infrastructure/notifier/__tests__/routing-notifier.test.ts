@@ -247,4 +247,66 @@ describe('RoutingNotifier', () => {
     // Escalate sends to pagerduty
     expect(pagerdutyNotifier.send).toHaveBeenCalledWith(baseCluster, baseAnalysis);
   });
+
+  // ── send() channel override — INotifier.send third parameter ──────────────
+  //
+  // The port declares send(cluster, analysis, channel?) and the use case passes
+  // a route channel through it. RoutingNotifier must honour that argument by
+  // resolving it against the registry, not silently delegate to the default.
+
+  it('send() routes to the registered notifier for the given channel', async () => {
+    const defaultNotifier = makeNotifier('default');
+    const criticalNotifier = makeNotifier('critical');
+    const registry = new ChannelRegistry();
+    registry.register('incidents-critical', criticalNotifier);
+
+    const router = new RoutingNotifier(registry, defaultNotifier);
+
+    await router.send(baseCluster, baseAnalysis, 'incidents-critical');
+
+    expect(criticalNotifier.send).toHaveBeenCalledWith(baseCluster, baseAnalysis);
+    expect(defaultNotifier.send).not.toHaveBeenCalled();
+  });
+
+  it('send() returns the NotifyResult of the channel notifier, not the default', async () => {
+    const defaultNotifier = makeNotifier('default');
+    const criticalNotifier = makeNotifier('critical');
+    const registry = new ChannelRegistry();
+    registry.register('incidents-critical', criticalNotifier);
+
+    const router = new RoutingNotifier(registry, defaultNotifier);
+
+    const result = await router.send(baseCluster, baseAnalysis, 'incidents-critical');
+
+    // The wide event reports result.channels, so this is what makes telemetry
+    // describe the channel actually notified rather than the default.
+    expect(result.channels).toEqual(['critical']);
+  });
+
+  it('send() falls back to the default notifier for an unregistered channel', async () => {
+    const defaultNotifier = makeNotifier('default');
+    const registry = new ChannelRegistry();
+    registry.setDefault(defaultNotifier);
+
+    const router = new RoutingNotifier(registry, defaultNotifier);
+
+    const result = await router.send(baseCluster, baseAnalysis, 'never-registered');
+
+    expect(defaultNotifier.send).toHaveBeenCalled();
+    expect(result.channels).toEqual(['default']);
+  });
+
+  it('send() uses the default notifier when no channel is given', async () => {
+    const defaultNotifier = makeNotifier('default');
+    const criticalNotifier = makeNotifier('critical');
+    const registry = new ChannelRegistry();
+    registry.register('incidents-critical', criticalNotifier);
+
+    const router = new RoutingNotifier(registry, defaultNotifier);
+
+    await router.send(baseCluster, baseAnalysis);
+
+    expect(defaultNotifier.send).toHaveBeenCalled();
+    expect(criticalNotifier.send).not.toHaveBeenCalled();
+  });
 });
