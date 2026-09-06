@@ -4,6 +4,7 @@ import type { INotifier, NotifyResult } from '../../domain/ports/index.js';
 import type { RuleAction } from '../../domain/entities/rule.js';
 import { RuleActionType } from '../../domain/entities/rule.js';
 import type { ChannelRegistry } from '../rules/channel-registry.js';
+import { createLogger } from '../../shared/logger/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RoutingNotifier — wraps multiple INotifier instances via ChannelRegistry.
@@ -15,6 +16,8 @@ import type { ChannelRegistry } from '../rules/channel-registry.js';
 // Tag actions are metadata-only (no notification side effect).
 // Suppress actions are handled by the caller (use case).
 // ─────────────────────────────────────────────────────────────────────────────
+
+const logger = createLogger();
 
 type ActionDispatchHandler = (
   action: RuleAction,
@@ -66,12 +69,16 @@ export class RoutingNotifier implements INotifier {
     private readonly defaultNotifier: INotifier,
   ) {}
 
-  /**
-   * Implements INotifier.send — sends via default notifier.
-   * Backward-compatible with existing call sites that don't use rule actions.
-   */
-  async send(cluster: AlertCluster, analysis: LLMAnalysis | null): Promise<NotifyResult> {
-    return this.defaultNotifier.send(cluster, analysis);
+  /** Routes to `channel` when given, else to the default notifier. */
+  async send(
+    cluster: AlertCluster,
+    analysis: LLMAnalysis | null,
+    channel?: string,
+  ): Promise<NotifyResult> {
+    if (channel === undefined) {
+      return this.defaultNotifier.send(cluster, analysis);
+    }
+    return this.resolveOrDefault(channel).send(cluster, analysis);
   }
 
   /**
@@ -146,13 +153,21 @@ export class RoutingNotifier implements INotifier {
     cluster: AlertCluster,
     analysis: LLMAnalysis | null,
   ): Promise<void> {
-    try {
-      const notifier = this.registry.resolve(channel);
-      await notifier.send(cluster, analysis);
-    } catch {
-      // ChannelRegistry.resolve throws if channel unknown and no default set.
-      // Fall back to default notifier.
-      await this.defaultNotifier.send(cluster, analysis);
+    await this.resolveOrDefault(channel).send(cluster, analysis);
+  }
+
+  /**
+   * Guards channel resolution only — a delivery failure must propagate so the
+   * use case can let SQS retry it.
+   */
+  private resolveOrDefault(channel: string): INotifier {
+    if (this.registry.has(channel)) {
+      return this.registry.resolve(channel);
     }
+    logger.warn(
+      { requestedChannel: channel, deliveredTo: 'default' },
+      'Route channel not registered — delivering to the default channel',
+    );
+    return this.defaultNotifier;
   }
 }

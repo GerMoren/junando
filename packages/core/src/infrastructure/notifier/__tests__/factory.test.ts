@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createNotifier } from '../factory.js';
+import { createNotifier, collectUnresolvedChannels } from '../factory.js';
 import { SlackNotifier } from '../slack.adapter.js';
 import { TeamsNotifier } from '../teams.adapter.js';
 import { RoutingNotifier } from '../routing-notifier.js';
@@ -107,5 +107,38 @@ describe('createNotifier with rules config (WIR-03)', () => {
     // For invalid content, we'd need a temp file — covered by yaml-rule-loader unit tests.
     const config = makeSlackConfig({ rulesConfigPath: '/nonexistent/rules.yaml' });
     expect(() => createNotifier(config)).toThrow();
+  });
+});
+
+// ── Unresolvable channel reporting ────────────────────────────────────────────
+//
+// Nothing in the rules YAML maps a logical channel name to a notifier, so every
+// routed channel resolves to the default. Reported at startup so the operator
+// isn't surprised mid-incident. Fail-fast lands with #303, once channels can
+// actually be defined.
+
+describe('createNotifier — unresolvable route channels', () => {
+  const rulesYamlPath = `${__dirname}/../../../../rules.example.yaml`;
+
+  it('reports every channel referenced by rules that has no registered notifier', () => {
+    const config = makeSlackConfig({ rulesConfigPath: rulesYamlPath });
+    const unresolved = collectUnresolvedChannels(config);
+
+    // Channels declared across both phases of rules.example.yaml.
+    expect(unresolved).toEqual(
+      expect.arrayContaining(['slack-sre', 'slack-dev-team', 'slack-oncall']),
+    );
+  });
+
+  it('deduplicates channels referenced by more than one rule', () => {
+    const config = makeSlackConfig({ rulesConfigPath: rulesYamlPath });
+    const unresolved = collectUnresolvedChannels(config);
+
+    // slack-oncall is referenced by both a pre-llm and a post-llm rule.
+    expect(unresolved.filter((c) => c === 'slack-oncall')).toHaveLength(1);
+  });
+
+  it('returns an empty list when no rules config is set', () => {
+    expect(collectUnresolvedChannels(makeSlackConfig())).toEqual([]);
   });
 });
