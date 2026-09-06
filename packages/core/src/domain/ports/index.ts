@@ -59,8 +59,11 @@ export interface ITraceRepository {
  * `unparseable_response` — non-empty raw text that neither JSON nor regex
  * stage could extract a usable analysis from.
  * `empty_response` — the provider returned an empty (or whitespace-only) string.
+ * `timeout` — a recognized protected Gemini execution or SDK/fetch timeout.
+ * `circuit_breaker_open` — Gemini was rejected because its circuit is open.
  */
-export type LlmDegradedReason = 'unparseable_response' | 'empty_response';
+export type LlmDegradedReason =
+  'unparseable_response' | 'empty_response' | 'timeout' | 'circuit_breaker_open';
 
 /**
  * Structured result of an LLM analysis call.
@@ -123,7 +126,11 @@ export interface INotifier {
    *   instead of their default. Backward-compatible — existing call sites
    *   work unchanged.
    */
-  send(cluster: AlertCluster, analysis: LLMAnalysis | null, channel?: string): Promise<NotifyResult>;
+  send(
+    cluster: AlertCluster,
+    analysis: LLMAnalysis | null,
+    channel?: string,
+  ): Promise<NotifyResult>;
 }
 
 /**
