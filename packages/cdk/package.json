@@ -9,7 +9,7 @@
     "synth": "cdk synth",
     "diff": "cdk diff",
     "deploy": "cdk deploy --all",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --project tsconfig.typecheck.json",
     "clean": "rm -rf dist cdk.out"
   },
   "dependencies": {
