@@ -1,12 +1,32 @@
 import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
-import { LLM_FALLBACK_DEFAULTS } from '../constants.js';
+import { LLM_FALLBACK_DEFAULTS, LLMProviderType } from '../constants.js';
 import { createLogger } from '../logger/index.js';
 
 function parseBooleanEnv(value: string | undefined): boolean | undefined {
   if (value === undefined || value === '') return undefined;
   const normalized = value.trim().toLowerCase();
   return normalized === 'true' || normalized === '1';
+}
+
+function llmApiKeyRequired(llmProvider: string | undefined, llmApiKey: string | undefined): boolean {
+  return llmProvider !== LLMProviderType.Bedrock && !llmApiKey;
+}
+
+/**
+ * Resolves the effective LLM_MODEL. An explicit LLM_MODEL always wins, for any
+ * provider. BEDROCK_DEFAULT_MODEL (set by the CDK stack from the deployment
+ * region — see junando-stack.ts) is used ONLY as a fallback when the provider
+ * is bedrock, so a Bedrock-specific value can never leak into another
+ * provider's model override.
+ */
+function resolveLlmModel(
+  llmProvider: string | undefined,
+  llmModel: string | undefined,
+  bedrockDefaultModel: string | undefined,
+): string | undefined {
+  if (llmModel) return llmModel;
+  return llmProvider === LLMProviderType.Bedrock ? bedrockDefaultModel : undefined;
 }
 
 function parseOptionalStringArray(value: string | undefined): string[] | undefined {
@@ -82,8 +102,8 @@ async function loadSecretsFromSSM(): Promise<void> {
 
 const ConfigSchema = z
   .object({
-    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
-    llmApiKey: z.string().min(1),
+    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen', 'bedrock']),
+    llmApiKey: z.string().min(1).optional(),
     llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
     // Notifier selector — defaults to 'slack' for backward compatibility
     notifierType: z.enum(['slack', 'teams']).default('slack'),
@@ -190,6 +210,13 @@ const ConfigSchema = z
         message: '[dedupStore: redis] REDIS_URL is required',
       });
     }
+    if (llmApiKeyRequired(data.llmProvider, data.llmApiKey)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['llmApiKey'],
+        message: `[llmProvider: ${data.llmProvider}] LLM_API_KEY is required`,
+      });
+    }
   });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -200,7 +227,11 @@ export async function loadConfig(): Promise<Config> {
   const result = ConfigSchema.safeParse({
     llmProvider: process.env['LLM_PROVIDER'],
     llmApiKey: process.env['LLM_API_KEY'],
-    llmModel: process.env['LLM_MODEL'],
+    llmModel: resolveLlmModel(
+      process.env['LLM_PROVIDER'],
+      process.env['LLM_MODEL'],
+      process.env['BEDROCK_DEFAULT_MODEL'],
+    ),
     notifierType: process.env['NOTIFIER_TYPE'],
     slackBotToken: process.env['SLACK_BOT_TOKEN'],
     slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
@@ -228,6 +259,20 @@ export async function loadConfig(): Promise<Config> {
     const errorMessages = result.error.issues.map(
       (issue) => `${issue.path.join('.')}: ${issue.message}`,
     );
+    // zod v4 skips superRefine entirely when base-schema parsing already aborted
+    // (e.g. an invalid llmProvider) — so the conditional llmApiKey check would be
+    // silently dropped from the combined error list. Re-check it against the raw
+    // env values so it still surfaces alongside other base-schema failures.
+    const rawLlmProvider = process.env['LLM_PROVIDER'];
+    const rawLlmApiKey = process.env['LLM_API_KEY'];
+    if (
+      !errorMessages.some((m) => m.startsWith('llmApiKey')) &&
+      llmApiKeyRequired(rawLlmProvider, rawLlmApiKey)
+    ) {
+      errorMessages.push(
+        `llmApiKey: [llmProvider: ${rawLlmProvider ?? '(unset)'}] LLM_API_KEY is required`,
+      );
+    }
     throw new Error(`Invalid configuration:\n  - ${errorMessages.join('\n  - ')}`);
   }
 

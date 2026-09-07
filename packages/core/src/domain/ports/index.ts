@@ -61,9 +61,15 @@ export interface ITraceRepository {
  * `empty_response` — the provider returned an empty (or whitespace-only) string.
  * `timeout` — a recognized protected Gemini execution or SDK/fetch timeout.
  * `circuit_breaker_open` — Gemini was rejected because its circuit is open.
+ * `provider_unavailable` — the provider returned a recognized transient
+ * infrastructure error (e.g. throttling, service unavailable).
  */
 export type LlmDegradedReason =
-  'unparseable_response' | 'empty_response' | 'timeout' | 'circuit_breaker_open';
+  | 'unparseable_response'
+  | 'empty_response'
+  | 'timeout'
+  | 'circuit_breaker_open'
+  | 'provider_unavailable';
 
 /**
  * Structured result of an LLM analysis call.

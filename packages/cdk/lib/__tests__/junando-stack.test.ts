@@ -44,16 +44,20 @@ function resourceProperties(template: Template) {
 describe('JunandoStack staging configuration', () => {
   it('propagates staging values and scopes both Lambda roles to the staging SSM prefix', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+    let template: Template;
+    try {
+      process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
-    const app = new App();
-    const stack = new JunandoStack(app, 'JunandoStack-staging', {
-      env: { account: '123456789012', region: 'us-east-1' },
-      nodeEnv: STAGING_NODE_ENV,
-      ssmPrefix: STAGING_SSM_PREFIX,
-    });
-    const template = Template.fromStack(stack);
-    process.chdir(originalCwd);
+      const app = new App();
+      const stack = new JunandoStack(app, 'JunandoStack-staging', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        nodeEnv: STAGING_NODE_ENV,
+        ssmPrefix: STAGING_SSM_PREFIX,
+      });
+      template = Template.fromStack(stack);
+    } finally {
+      process.chdir(originalCwd);
+    }
 
     const functions = Object.values(template.findResources('AWS::Lambda::Function'));
     expect(functions).toHaveLength(2);
@@ -73,16 +77,20 @@ describe('JunandoStack staging configuration', () => {
 
   it('preserves the default SSM prefix resource ARN', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+    let template: Template;
+    try {
+      process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
-    const app = new App();
-    const stack = new JunandoStack(app, 'JunandoStack-default', {
-      env: { account: '123456789012', region: 'us-east-1' },
-      nodeEnv: 'production',
-      ssmPrefix: DEFAULT_SSM_PREFIX,
-    });
-    const template = Template.fromStack(stack);
-    process.chdir(originalCwd);
+      const app = new App();
+      const stack = new JunandoStack(app, 'JunandoStack-default', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        nodeEnv: 'production',
+        ssmPrefix: DEFAULT_SSM_PREFIX,
+      });
+      template = Template.fromStack(stack);
+    } finally {
+      process.chdir(originalCwd);
+    }
 
     const ssmPolicies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
       JSON.stringify(policy).includes(DEFAULT_SSM_RESOURCE),
@@ -101,17 +109,21 @@ describe('JunandoStack staging configuration', () => {
 
   it('uses isolated physical names for the pilot without changing construct IDs', () => {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+    let template: Template;
+    try {
+      process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
-    const app = new App();
-    const stack = new JunandoStack(app, 'JunandoStack-pilot', {
-      env: { account: '123456789012', region: 'us-east-1' },
-      nodeEnv: 'staging',
-      ssmPrefix: '/junando-pilot',
-      resourceNamePrefix: 'junando-pilot',
-    });
-    const template = Template.fromStack(stack);
-    process.chdir(originalCwd);
+      const app = new App();
+      const stack = new JunandoStack(app, 'JunandoStack-pilot', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        nodeEnv: 'staging',
+        ssmPrefix: '/junando-pilot',
+        resourceNamePrefix: 'junando-pilot',
+      });
+      template = Template.fromStack(stack);
+    } finally {
+      process.chdir(originalCwd);
+    }
 
     expect(resourceProperties(template)).toEqual({
       functions: expect.arrayContaining([
@@ -133,17 +145,19 @@ describe('JunandoStack staging configuration', () => {
 describe('JunandoStack dedup table', () => {
   function buildTemplate() {
     const originalCwd = process.cwd();
-    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+    try {
+      process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
 
-    const app = new App();
-    const stack = new JunandoStack(app, 'JunandoStack-dedup', {
-      env: { account: '123456789012', region: 'us-east-1' },
-      nodeEnv: 'production',
-      ssmPrefix: DEFAULT_SSM_PREFIX,
-    });
-    const template = Template.fromStack(stack);
-    process.chdir(originalCwd);
-    return template;
+      const app = new App();
+      const stack = new JunandoStack(app, 'JunandoStack-dedup', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        nodeEnv: 'production',
+        ssmPrefix: DEFAULT_SSM_PREFIX,
+      });
+      return Template.fromStack(stack);
+    } finally {
+      process.chdir(originalCwd);
+    }
   }
 
   it('creates exactly one PROVISIONED 25/25 table with no autoscaling', () => {
@@ -196,5 +210,81 @@ describe('JunandoStack dedup table', () => {
 
     expect(workerEntry?.Properties.Environment.Variables.DEDUP_TABLE_NAME).toBeTruthy();
     expect(webhookEntry?.Properties.Environment.Variables.DEDUP_TABLE_NAME).toBeUndefined();
+  });
+});
+
+describe('JunandoStack Bedrock region mapping', () => {
+  function buildTemplate(region: string, bedrockFoundationModel?: string) {
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+
+      const app = new App();
+      const stack = new JunandoStack(app, `JunandoStack-bedrock-${region}`, {
+        env: { account: '123456789012', region },
+        nodeEnv: 'production',
+        ssmPrefix: DEFAULT_SSM_PREFIX,
+        ...(bedrockFoundationModel ? { bedrockFoundationModel } : {}),
+      });
+      return Template.fromStack(stack);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  }
+
+  function workerEnv(template: Template) {
+    const functions = Object.values(template.findResources('AWS::Lambda::Function'));
+    const workerEntry = functions.find(
+      (fn) => fn.Properties.FunctionName === DEFAULT_RESOURCE_NAMES.worker,
+    );
+    return workerEntry?.Properties.Environment.Variables as Record<string, unknown>;
+  }
+
+  function bedrockPolicy(template: Template) {
+    const policies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
+      JSON.stringify(policy).includes('bedrock:InvokeModel'),
+    );
+    expect(policies).toHaveLength(1);
+    return policies[0];
+  }
+
+  it('resolves BEDROCK_DEFAULT_MODEL to eu.amazon.nova-lite-v1:0 for eu-west-1', () => {
+    const template = buildTemplate('eu-west-1');
+    expect(workerEnv(template)?.['BEDROCK_DEFAULT_MODEL']).toBe('eu.amazon.nova-lite-v1:0');
+
+    const policy = bedrockPolicy(template);
+    const json = JSON.stringify(policy);
+    expect(json).toContain('eu.amazon.nova-lite-v1:0');
+    expect(json).not.toContain('us.amazon.nova-lite-v1:0');
+  });
+
+  it('resolves BEDROCK_DEFAULT_MODEL to us.amazon.nova-lite-v1:0 for us-east-1', () => {
+    const template = buildTemplate('us-east-1');
+    expect(workerEnv(template)?.['BEDROCK_DEFAULT_MODEL']).toBe('us.amazon.nova-lite-v1:0');
+
+    const policy = bedrockPolicy(template);
+    expect(JSON.stringify(policy)).toContain('us.amazon.nova-lite-v1:0');
+  });
+
+  it('overrides the foundation model via bedrockFoundationModel, keeping BEDROCK_DEFAULT_MODEL and the IAM ARN in sync', () => {
+    const template = buildTemplate('us-east-1', 'amazon.nova-pro-v1:0');
+
+    expect(workerEnv(template)?.['BEDROCK_DEFAULT_MODEL']).toBe('us.amazon.nova-pro-v1:0');
+
+    const json = JSON.stringify(bedrockPolicy(template));
+    expect(json).toContain('us.amazon.nova-pro-v1:0'); // inference-profile ARN
+    expect(json).toContain('::foundation-model/amazon.nova-pro-v1:0'); // foundation-model ARN, unprefixed
+    expect(json).not.toContain('nova-lite');
+  });
+
+  it('synths successfully for an unmapped region, with no Bedrock env var or IAM policy', () => {
+    const template = buildTemplate('sa-east-1');
+
+    expect(workerEnv(template)?.['BEDROCK_DEFAULT_MODEL']).toBeUndefined();
+
+    const policies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
+      JSON.stringify(policy).includes('bedrock:InvokeModel'),
+    );
+    expect(policies).toHaveLength(0);
   });
 });

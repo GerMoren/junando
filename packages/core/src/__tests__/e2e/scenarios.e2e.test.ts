@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { ProcessIncidentUseCase } from '../../application/use-cases/process-incident.use-case.js';
 import { normalizePayload } from '../../application/dtos/normalize-payload.js';
 import { InMemoryDeduplicationStore } from '../../infrastructure/dedup/redis-dedup.adapter.js';
-import { MockLLMProvider } from '../../infrastructure/llm/llm.adapter.js';
+import { MockLLMProvider } from '../../infrastructure/llm/mock.provider.js';
 import { MockNotifier } from './helpers/mock-notifier.js';
 import { silentLogger } from './helpers/silent-logger.js';
 import { latencySpikePayload } from './fixtures/latency-spike.fixture.js';

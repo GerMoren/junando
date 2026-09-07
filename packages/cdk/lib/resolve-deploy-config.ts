@@ -9,13 +9,25 @@ export interface DeployConfigInputs {
   contextNodeEnv?: string | undefined;
   envSsmPrefix?: string | undefined;
   contextSsmPrefix?: string | undefined;
+  envBedrockFoundationModel?: string | undefined;
+  contextBedrockFoundationModel?: string | undefined;
 }
 
 export interface DeployConfig {
   nodeEnv: string;
   ssmPrefix: string;
   resourceNamePrefix: string;
+  /**
+   * Bedrock foundation model ID, WITHOUT a region prefix (e.g. 'amazon.nova-lite-v1:0').
+   * The stack derives both LLM_MODEL and the IAM grant's resource ARNs from this
+   * one value, so an operator overriding the model never has to keep two places
+   * in sync — override BEDROCK_FOUNDATION_MODEL (or the 'bedrockFoundationModel'
+   * CDK context) and both follow.
+   */
+  bedrockFoundationModel: string;
 }
+
+export const DEFAULT_BEDROCK_FOUNDATION_MODEL = 'amazon.nova-lite-v1:0';
 
 export enum DeployEnvironment {
   Production = 'production',
@@ -56,5 +68,9 @@ export function resolveDeployConfig(inputs: DeployConfigInputs): DeployConfig {
         ? defaults.ssmPrefix
         : inputs.contextSsmPrefix ?? defaults.ssmPrefix),
     resourceNamePrefix: resolveResourceNamePrefix(inputs.awsEnv),
+    bedrockFoundationModel:
+      inputs.envBedrockFoundationModel ??
+      inputs.contextBedrockFoundationModel ??
+      DEFAULT_BEDROCK_FOUNDATION_MODEL,
   };
 }

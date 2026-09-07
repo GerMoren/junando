@@ -2,12 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import type { LLMAnalysis } from '../../../domain/entities/incident.js';
 import { AlertType } from '../../../shared/constants.js';
-import {
-  MockLLMProvider,
-  OpenRouterProvider,
-  createLLMProvider,
-  OpenRouterResponseSchema,
-} from '../llm.adapter.js';
+import { MockLLMProvider } from '../mock.provider.js';
+import { OpenRouterProvider, OpenRouterResponseSchema } from '../openrouter.provider.js';
+import { createLLMProvider } from '../factory.js';
 
 // ── Logger mock ────────────────────────────────────────────────────────────
 const mockLogger = vi.hoisted(() => ({
@@ -327,13 +324,13 @@ describe('OpenRouterProvider', () => {
 
 describe('createLLMProvider', () => {
   it('creates a GeminiProvider from LLMProviderType.Gemini', async () => {
-    const { GeminiProvider } = await import('../llm.adapter.js');
+    const { GeminiProvider } = await import('../gemini.provider.js');
     const provider = createLLMProvider('gemini', 'key-abc');
     expect(provider).toBeInstanceOf(GeminiProvider);
   });
 
   it('creates a ClaudeProvider from LLMProviderType.Claude', async () => {
-    const { ClaudeProvider } = await import('../llm.adapter.js');
+    const { ClaudeProvider } = await import('../claude.provider.js');
     const provider = createLLMProvider('claude', 'key-abc');
     expect(provider).toBeInstanceOf(ClaudeProvider);
   });
@@ -1095,7 +1092,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
 
 describe('GeminiProvider — structured LLMResult', () => {
   it('returns provider, model, latencyMs and tokens from usageMetadata', async () => {
-    const { GeminiProvider } = await import('../llm.adapter.js');
+    const { GeminiProvider } = await import('../gemini.provider.js');
     const provider = new GeminiProvider('test-key');
 
     const result = await provider.analyze(makeCluster(), []);
@@ -1109,7 +1106,7 @@ describe('GeminiProvider — structured LLMResult', () => {
   });
 
   it('honors a custom model override', async () => {
-    const { GeminiProvider } = await import('../llm.adapter.js');
+    const { GeminiProvider } = await import('../gemini.provider.js');
     const provider = new GeminiProvider('test-key', 'gemini-2.5-pro');
 
     const result = await provider.analyze(makeCluster(), []);
@@ -1136,7 +1133,7 @@ describe('GeminiProvider — structured LLMResult', () => {
   ])(
     'maps %s to a zero-token degraded result without a raw fallback',
     async (_label, error, degradedReason) => {
-      const { GeminiProvider } = await import('../llm.adapter.js');
+      const { GeminiProvider } = await import('../gemini.provider.js');
       const provider = new GeminiProvider('test-key');
       const internals = provider as unknown as {
         breaker: { fire: ReturnType<typeof vi.fn> };
@@ -1161,7 +1158,7 @@ describe('GeminiProvider — structured LLMResult', () => {
     ['authentication-shaped', Object.assign(new Error('invalid key'), { status: 401 })],
     ['generic', new Error('connection reset')],
   ])('rethrows %s rejections without a raw fallback', async (_label, error) => {
-    const { GeminiProvider } = await import('../llm.adapter.js');
+    const { GeminiProvider } = await import('../gemini.provider.js');
     const provider = new GeminiProvider('test-key');
     const internals = provider as unknown as {
       breaker: { fire: ReturnType<typeof vi.fn> };
@@ -1177,7 +1174,7 @@ describe('GeminiProvider — structured LLMResult', () => {
 
 describe('ClaudeProvider — structured LLMResult', () => {
   it('returns provider, model, latencyMs and tokens from message usage', async () => {
-    const { ClaudeProvider } = await import('../llm.adapter.js');
+    const { ClaudeProvider } = await import('../claude.provider.js');
     const provider = new ClaudeProvider('test-key');
 
     const result = await provider.analyze(makeCluster(), []);

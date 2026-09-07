@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
     "@aws-sdk/client-dynamodb": "^3.1127.0",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
