@@ -5,6 +5,7 @@ import {
   ProcessIncidentUseCase,
   RedisDeduplicationStore,
   createNotifier,
+  createRuleEngine,
   metrics,
   createLLMProvider,
   createLogger,
@@ -70,6 +71,9 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
   const notifier = createNotifier(config);
+  // undefined when RULES_CONFIG_PATH is unset — ProcessIncidentUseCase treats
+  // that as pass-through (no rule evaluation), matching pre-existing behavior.
+  const ruleEngine = createRuleEngine(config);
 
   useCase = new ProcessIncidentUseCase({
     dedup,
@@ -79,6 +83,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
     logger,
     dedupTtlSeconds: config.dedupTtlSeconds,
     onClustersBuilt: (count) => metrics.alertClusters.set(count),
+    ...(ruleEngine ? { ruleEngine } : {}),
   });
 
   return useCase;

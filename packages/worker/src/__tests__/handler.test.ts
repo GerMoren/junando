@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { handler } from '../handler.js';
 import type { APIGatewayProxyEventV2, SQSEvent } from 'aws-lambda';
 import * as core from '@junando/core';
 import { AlertType } from '@junando/core';
+
+const RULES_FIXTURE_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'fixtures/rules.minimal.yaml',
+);
 
 // Hoist mocks so they are available when vi.mock factory runs
 const mockExecute = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -213,6 +220,43 @@ describe('Worker Handler', () => {
       expect.objectContaining({ dedupStore: 'redis' }),
       'Dedup store initialised',
     );
+  });
+
+  it('wires a real RuleEngine into ProcessIncidentUseCase when RULES_CONFIG_PATH is set', async () => {
+    mockLoadConfig.mockResolvedValueOnce({
+      ...baseConfig,
+      rulesConfigPath: RULES_FIXTURE_PATH,
+    });
+
+    await vi.resetModules();
+    const { handler: freshHandler } = await import('../handler.js');
+    const coreFresh = await import('@junando/core');
+
+    await freshHandler({ Records: [] } as unknown as SQSEvent);
+
+    const constructorArgs = (coreFresh.ProcessIncidentUseCase as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0]?.[0];
+    expect(constructorArgs.ruleEngine).toBeDefined();
+    // Proves it's a real, working RuleEngine parsed from the fixture YAML —
+    // not a stub — by exercising the suppress rule it declares.
+    const preResult = constructorArgs.ruleEngine.evaluatePreLlm({ serviceName: 'staging' });
+    expect(preResult).toEqual(
+      expect.objectContaining({ suppressed: true, matchedRuleId: 'suppress-staging' }),
+    );
+  });
+
+  it('constructs ProcessIncidentUseCase without a ruleEngine when RULES_CONFIG_PATH is unset', async () => {
+    mockLoadConfig.mockResolvedValueOnce({ ...baseConfig, rulesConfigPath: undefined });
+
+    await vi.resetModules();
+    const { handler: freshHandler } = await import('../handler.js');
+    const coreFresh = await import('@junando/core');
+
+    await freshHandler({ Records: [] } as unknown as SQSEvent);
+
+    const constructorArgs = (coreFresh.ProcessIncidentUseCase as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0]?.[0];
+    expect(constructorArgs.ruleEngine).toBeUndefined();
   });
 });
 
