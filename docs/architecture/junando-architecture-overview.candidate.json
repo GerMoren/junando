@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Junando — AWS Serverless Architecture",
+    "output": "docs/architecture/junando-architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "alertmanager", "type": "external", "label": "Alertmanager", "sublabel": "Prometheus alerts", "pos": [30, 300], "size": [130, 60] },
+    { "id": "webhook_lambda", "type": "backend", "label": "Webhook", "sublabel": "Lambda • Function URL", "pos": [230, 300], "size": [130, 62] },
+    { "id": "queue", "type": "messagebus", "label": "AlertQueue", "sublabel": "SQS FIFO", "pos": [430, 300], "size": [126, 60] },
+    { "id": "dlq", "type": "messagebus", "label": "AlertDLQ", "sublabel": "SQS FIFO • failed msgs", "pos": [430, 480], "size": [126, 60] },
+    { "id": "worker_lambda", "type": "backend", "label": "Worker", "sublabel": "Lambda • SQS trigger", "pos": [630, 300], "size": [130, 62] },
+    { "id": "ssm", "type": "security", "label": "Parameter Store", "sublabel": "SSM • provider secrets", "pos": [430, 100], "size": [140, 60] },
+    { "id": "dedup_table", "type": "database", "label": "DedupTable", "sublabel": "DynamoDB • fingerprint TTL", "pos": [880, 60], "size": [150, 62] },
+    { "id": "loki", "type": "external", "label": "Loki", "sublabel": "trace repository", "pos": [880, 300], "size": [130, 62] },
+    { "id": "llm", "type": "cloud", "label": "LLM Provider", "sublabel": "pluggable — see cards", "pos": [880, 560], "size": [150, 62] },
+    { "id": "notifier", "type": "external", "label": "Notifier", "sublabel": "Slack or Teams", "pos": [1120, 300], "size": [130, 60] },
+    { "id": "monitoring", "type": "external", "label": "Monitoring account", "sublabel": "Grafana • SigV4 scrape", "pos": [630, 480], "size": [150, 62] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "AWS account — junando stack", "wraps": ["webhook_lambda", "queue", "dlq", "worker_lambda", "ssm", "dedup_table"], "pad": 22 }
+  ],
+  "connections": [
+    { "from": "alertmanager", "to": "webhook_lambda", "label": "webhook POST", "variant": "emphasis" },
+    { "from": "webhook_lambda", "to": "queue", "label": "publish", "variant": "default" },
+    { "from": "queue", "to": "worker_lambda", "label": "SQS trigger", "variant": "emphasis" },
+    { "from": "queue", "to": "dlq", "label": "maxReceiveCount", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [493, 410] },
+    { "from": "webhook_lambda", "to": "ssm", "label": "read secrets", "variant": "dashed", "fromSide": "top", "toSide": "left" },
+    { "from": "worker_lambda", "to": "ssm", "label": "read secrets", "variant": "dashed", "fromSide": "top", "toSide": "bottom" },
+    { "from": "worker_lambda", "to": "dedup_table", "label": "dedup check", "variant": "default", "route": "orthogonal-v", "fromSide": "top", "toSide": "bottom" },
+    { "from": "worker_lambda", "to": "loki", "label": "fetch traces", "route": "straight" },
+    { "from": "worker_lambda", "to": "llm", "label": "analyze incident", "variant": "emphasis", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "top", "labelDy": -70 },
+    { "from": "worker_lambda", "to": "notifier", "label": "post + rollback action", "variant": "emphasis", "route": "orthogonal-h", "fromSide": "right", "toSide": "top", "via": [[775, 331], [775, 280], [1185, 280]], "labelSegment": 2 },
+    { "from": "monitoring", "to": "worker_lambda", "label": "GET /metrics (IAM SigV4)", "variant": "security", "fromSide": "top", "toSide": "bottom", "labelDx": 60 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Pipeline", "items": ["Alertmanager posts to a public webhook Function URL", "Alerts fan out via an SQS FIFO queue to the worker", "The worker correlates, dedups, and calls the LLM provider"] },
+    { "dot": "emerald", "title": "State & secrets", "items": ["DynamoDB backs fingerprint+TTL dedup by default (Redis is a supported alternative)", "SSM Parameter Store holds every provider credential — read at cold start", "The DLQ catches messages that exhaust SQS maxReceiveCount"] },
+    { "dot": "rose", "title": "External boundaries", "items": ["LLM provider is pluggable — Gemini, Claude, OpenRouter, Qwen, or Bedrock", "Notifications go to Slack or Teams, never both at once", "A separate monitoring account scrapes /metrics over an IAM-signed Function URL"] }
+  ]
+}
