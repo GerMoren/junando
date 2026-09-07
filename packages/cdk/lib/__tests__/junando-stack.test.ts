@@ -198,3 +198,70 @@ describe('JunandoStack dedup table', () => {
     expect(webhookEntry?.Properties.Environment.Variables.DEDUP_TABLE_NAME).toBeUndefined();
   });
 });
+
+describe('JunandoStack Bedrock region mapping', () => {
+  function buildTemplate(region: string) {
+    const originalCwd = process.cwd();
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+
+    const app = new App();
+    const stack = new JunandoStack(app, `JunandoStack-bedrock-${region}`, {
+      env: { account: '123456789012', region },
+      nodeEnv: 'production',
+      ssmPrefix: DEFAULT_SSM_PREFIX,
+    });
+    const template = Template.fromStack(stack);
+    process.chdir(originalCwd);
+    return template;
+  }
+
+  function workerEnv(template: Template) {
+    const functions = Object.values(template.findResources('AWS::Lambda::Function'));
+    const workerEntry = functions.find(
+      (fn) => fn.Properties.FunctionName === DEFAULT_RESOURCE_NAMES.worker,
+    );
+    return workerEntry?.Properties.Environment.Variables as Record<string, unknown>;
+  }
+
+  function bedrockPolicy(template: Template) {
+    const policies = Object.values(template.findResources('AWS::IAM::Policy')).filter((policy) =>
+      JSON.stringify(policy).includes('bedrock:InvokeModel'),
+    );
+    expect(policies).toHaveLength(1);
+    return policies[0];
+  }
+
+  it('resolves LLM_MODEL to eu.amazon.nova-lite-v1:0 for eu-west-1', () => {
+    const template = buildTemplate('eu-west-1');
+    expect(workerEnv(template)?.['LLM_MODEL']).toBe('eu.amazon.nova-lite-v1:0');
+
+    const policy = bedrockPolicy(template);
+    const json = JSON.stringify(policy);
+    expect(json).toContain('eu.amazon.nova-lite-v1:0');
+    expect(json).not.toContain('us.amazon.nova-lite-v1:0');
+  });
+
+  it('resolves LLM_MODEL to us.amazon.nova-lite-v1:0 for us-east-1', () => {
+    const template = buildTemplate('us-east-1');
+    expect(workerEnv(template)?.['LLM_MODEL']).toBe('us.amazon.nova-lite-v1:0');
+
+    const policy = bedrockPolicy(template);
+    expect(JSON.stringify(policy)).toContain('us.amazon.nova-lite-v1:0');
+  });
+
+  it('throws at synth time for an unmapped region, naming the region', () => {
+    const originalCwd = process.cwd();
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+
+    const app = new App();
+    expect(() => {
+      new JunandoStack(app, 'JunandoStack-bedrock-unmapped', {
+        env: { account: '123456789012', region: 'sa-east-1' },
+        nodeEnv: 'production',
+        ssmPrefix: DEFAULT_SSM_PREFIX,
+      });
+    }).toThrow(/sa-east-1/);
+
+    process.chdir(originalCwd);
+  });
+});

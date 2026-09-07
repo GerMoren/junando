@@ -29,11 +29,31 @@ function resourceName(prefix: string, suffix: string): string {
   return `${prefix}-${suffix}`;
 }
 
+/** Bedrock Nova model foundation name, without a region prefix. */
+const BEDROCK_NOVA_MODEL = 'amazon.nova-lite-v1:0';
+
+/**
+ * Resolves the Bedrock inference-profile region prefix for a deployment
+ * region. Unmapped regions fail synth loudly instead of silently falling
+ * back to 'us.' — an inference profile ARN pointing at the wrong region
+ * would fail at runtime, not at deploy time.
+ */
+function bedrockRegionPrefix(region: string): string {
+  if (region.startsWith('us-')) return 'us.';
+  if (region.startsWith('eu-')) return 'eu.';
+  if (region.startsWith('ap-')) return 'apac.';
+  throw new Error(`Unsupported region for Bedrock inference profile: "${region}"`);
+}
+
 export class JunandoStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: JunandoStackProps) {
     super(scope, id, props);
 
     const resourceNamePrefix = props.resourceNamePrefix ?? DEFAULT_RESOURCE_NAME_PREFIX;
+
+    // Fails synth loudly for an unmapped region — see bedrockRegionPrefix.
+    const bedrockPrefix = bedrockRegionPrefix(this.region);
+    const bedrockModel = `${bedrockPrefix}${BEDROCK_NOVA_MODEL}`;
 
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
     const coreLayer = new lambda.LayerVersion(this, 'JunandoCoreLayer', {
@@ -139,6 +159,9 @@ export class JunandoStack extends cdk.Stack {
         // DEDUP_STORE deliberately not set — the config default is 'dynamodb'.
         // An operator rolling back sets DEDUP_STORE=redis on the function.
         DEDUP_TABLE_NAME: dedupTable.tableName,
+        // Region-derived Bedrock model — must not fall through to the
+        // package's hardcoded 'us.' default when deployed outside us-*.
+        LLM_MODEL: bedrockModel,
       },
     });
 
@@ -163,6 +186,20 @@ export class JunandoStack extends cdk.Stack {
     );
     queue.grantConsumeMessages(workerFn);
     dedupTable.grantReadWriteData(workerFn);
+
+    // Grant Bedrock Converse access. No separate IAM action exists for
+    // Converse — bedrock:InvokeModel covers it. Two resource ARNs: the
+    // inference-profile (region+account scoped) and the regional
+    // foundation-model ARN (AWS-owned, no account segment).
+    workerFn.addToRolePolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${bedrockModel}`,
+          `arn:aws:bedrock:${this.region}::foundation-model/${BEDROCK_NOVA_MODEL}`,
+        ],
+      }),
+    );
 
     // ── Worker Function URL — /metrics scrape endpoint ──────────────────────
     // IAM auth only: never exposed to anonymous internet traffic. Callers must
