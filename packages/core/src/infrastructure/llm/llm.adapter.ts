@@ -579,7 +579,7 @@ const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, L
 
 export function createLLMProvider(
   provider: string,
-  apiKey: string,
+  apiKey: string | undefined,
   model?: string,
   options?: FallbackOptions,
 ): ILLMProvider {
@@ -588,5 +588,5 @@ export function createLLMProvider(
     const supported = Array.from(LLM_PROVIDER_REGISTRY.keys()).join(', ');
     throw new Error(`Unknown LLM_PROVIDER: "${provider}". Supported: ${supported}`);
   }
-  return factory(apiKey, model, options);
+  return factory(apiKey ?? '', model, options);
 }
