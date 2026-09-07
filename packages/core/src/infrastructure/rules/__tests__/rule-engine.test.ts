@@ -36,6 +36,7 @@ const baseAnalysis: LLMAnalysis = {
 
 function makeConfig(overrides?: Partial<ValidatedRuleConfiguration>): ValidatedRuleConfiguration {
   return {
+    channels: {},
     [RuleEvaluationPhase.PreLlm]: { rules: [] },
     [RuleEvaluationPhase.PostLlm]: { rules: [] },
     ...overrides,

@@ -1,0 +1,11 @@
+pre-llm:
+  rules:
+    - id: route-to-undefined-channel
+      condition:
+        serviceName: payments-api
+      actions:
+        - type: route
+          channel: slack-sre
+
+post-llm:
+  rules: []

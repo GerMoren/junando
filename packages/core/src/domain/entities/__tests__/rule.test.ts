@@ -231,6 +231,7 @@ describe('RuleSectionSchema', () => {
 describe('RuleConfigurationSchema — full YAML shape', () => {
   it('validates a complete configuration with pre-llm and post-llm sections', () => {
     const config: RuleConfiguration = {
+      channels: {},
       'pre-llm': {
         rules: [
           {

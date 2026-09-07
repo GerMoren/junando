@@ -1,0 +1,10 @@
+channels:
+  teams-security:
+    type: teams
+    webhookUrlEnv: TEAMS_SECURITY_WEBHOOK_URL_NOT_SET
+
+pre-llm:
+  rules: []
+
+post-llm:
+  rules: []

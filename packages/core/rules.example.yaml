@@ -31,7 +31,25 @@
 #   route            — PRE-LLM only. Override default notification channel.
 #   escalate         — PRE-LLM / POST-LLM. Additional notification to channel.
 #   tag              — POST-LLM only. Attach metadata to cluster for dashboards.
+#
+# Channels — maps the logical channel names used by route/escalate actions to
+# a concrete notifier. A rule referencing a channel with no entry here fails
+# fast at startup, rather than silently falling back to the default channel.
+#   type: slack — delivered via the shared SLACK_BOT_TOKEN; only `channel` (a
+#                 '#'-prefixed Slack channel name) is needed.
+#   type: teams — delivered to a per-channel webhook URL, resolved from the
+#                 env var named by `webhookUrlEnv` (never inline in this file).
 # ─────────────────────────────────────────────────────────────────────────────
+channels:
+  slack-sre:
+    type: slack
+    channel: '#sre-incidents'
+  slack-dev-team:
+    type: slack
+    channel: '#dev-team-alerts'
+  slack-oncall:
+    type: slack
+    channel: '#oncall'
 
 # ── PRE-LLM RULES — evaluated before LLM analysis ────────────────────────────
 pre-llm:
