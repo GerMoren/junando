@@ -32,6 +32,13 @@ function resourceName(prefix: string, suffix: string): string {
 /** Bedrock Nova model foundation name, without a region prefix. */
 const BEDROCK_NOVA_MODEL = 'amazon.nova-lite-v1:0';
 
+/** Maps a region's geo code (the segment before the first '-') to its Bedrock inference-profile prefix. */
+const BEDROCK_REGION_PREFIXES: Readonly<Record<string, string>> = {
+  us: 'us.',
+  eu: 'eu.',
+  ap: 'apac.',
+};
+
 /**
  * Resolves the Bedrock inference-profile region prefix for a deployment
  * region. Unmapped regions fail synth loudly instead of silently falling
@@ -39,10 +46,10 @@ const BEDROCK_NOVA_MODEL = 'amazon.nova-lite-v1:0';
  * would fail at runtime, not at deploy time.
  */
 function bedrockRegionPrefix(region: string): string {
-  if (region.startsWith('us-')) return 'us.';
-  if (region.startsWith('eu-')) return 'eu.';
-  if (region.startsWith('ap-')) return 'apac.';
-  throw new Error(`Unsupported region for Bedrock inference profile: "${region}"`);
+  const geo = region.split('-')[0] ?? '';
+  const prefix = BEDROCK_REGION_PREFIXES[geo];
+  if (!prefix) throw new Error(`Unsupported region for Bedrock inference profile: "${region}"`);
+  return prefix;
 }
 
 export class JunandoStack extends cdk.Stack {
@@ -139,7 +146,7 @@ export class JunandoStack extends cdk.Stack {
     // NOTE: APP_URL cannot be injected here — it would create a circular dependency
     // (WebhookLambda → FunctionUrl → WebhookLambda). After first deploy, set it manually:
     //   aws ssm put-parameter --name /junando/app-url --value <WebhookURL output> --type String --overwrite
-    // Until then, llm.adapter.ts falls back to 'https://junando.app' (cosmetic only — HTTP-Referer header)
+    // Until then, openrouter.provider.ts falls back to 'https://junando.app' (cosmetic only — HTTP-Referer header)
 
     // ── Lambda B — SQS Worker ────────────────────────────────────────────────
     const workerFn = new lambda.Function(this, 'WorkerLambda', {

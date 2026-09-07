@@ -19,7 +19,7 @@ import { AlertType } from '../../../shared/constants.js';
 import { RuleActionType } from '../../../domain/entities/rule.js';
 import type { RuleAction } from '../../../domain/entities/rule.js';
 import * as metricsModule from '../../../shared/metrics/index.js';
-import { OpenRouterProvider } from '../../../infrastructure/llm/llm.adapter.js';
+import { OpenRouterProvider } from '../../../infrastructure/llm/openrouter.provider.js';
 import { SlackNotifier } from '../../../infrastructure/notifier/slack.adapter.js';
 import { ROLLBACK_ACTION_ID, SLACK_API_URL } from '../../../shared/constants.js';
 

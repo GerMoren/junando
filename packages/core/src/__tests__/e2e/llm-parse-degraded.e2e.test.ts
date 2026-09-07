@@ -12,7 +12,7 @@ import pino from 'pino';
 import { ProcessIncidentUseCase } from '../../application/use-cases/process-incident.use-case.js';
 import { normalizePayload } from '../../application/dtos/normalize-payload.js';
 import { InMemoryDeduplicationStore } from '../../infrastructure/dedup/redis-dedup.adapter.js';
-import { OpenRouterProvider } from '../../infrastructure/llm/llm.adapter.js';
+import { OpenRouterProvider } from '../../infrastructure/llm/openrouter.provider.js';
 import { SlackNotifier } from '../../infrastructure/notifier/slack.adapter.js';
 import { ROLLBACK_ACTION_ID, SLACK_API_URL } from '../../shared/constants.js';
 import { MockNotifier } from './helpers/mock-notifier.js';

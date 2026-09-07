@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
 import { AlertType } from '../../../shared/constants.js';
-import { BedrockProvider } from '../llm.adapter.js';
+import { BedrockProvider } from '../bedrock.provider.js';
 
 // ── Logger mock ────────────────────────────────────────────────────────────
 // Must include `debug` — the module-level logger is shared file-wide and

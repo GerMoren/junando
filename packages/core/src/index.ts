@@ -48,12 +48,12 @@ export type {
   OpenSearchIndexerDeps,
   SignedHttpRequest,
 } from './infrastructure/indexer/opensearch.adapter.js';
-export {
-  ClaudeProvider,
-  createLLMProvider,
-  GeminiProvider,
-  MockLLMProvider,
-} from './infrastructure/llm/llm.adapter.js';
+export { BedrockProvider } from './infrastructure/llm/bedrock.provider.js';
+export { ClaudeProvider } from './infrastructure/llm/claude.provider.js';
+export { createLLMProvider } from './infrastructure/llm/factory.js';
+export { GeminiProvider } from './infrastructure/llm/gemini.provider.js';
+export { MockLLMProvider } from './infrastructure/llm/mock.provider.js';
+export { OpenRouterProvider } from './infrastructure/llm/openrouter.provider.js';
 export { createNotifier } from './infrastructure/notifier/factory.js';
 export { createRollbackActionHandler } from './infrastructure/rollback/factory.js';
 export { NoopRollbackActionHandler } from './infrastructure/rollback/noop-rollback-action.handler.js';
