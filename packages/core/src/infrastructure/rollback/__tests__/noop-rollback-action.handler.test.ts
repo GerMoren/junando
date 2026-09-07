@@ -63,6 +63,22 @@ describe('NoopRollbackActionHandler', () => {
     });
   });
 
+  it('logs probableCause when present, so the model\'s reasoning is recorded alongside the action (#305)', async () => {
+    const handler = new NoopRollbackActionHandler();
+    await handler.handle({
+      fingerprint: 'fp-abc',
+      serviceName: 'checkout-service',
+      endpointPath: '/api/orders',
+      alertType: AlertType.Error,
+      urgencyLevel: 'high' as const,
+      probableCause: 'Database connection pool exhaustion',
+      triggeredBy: { id: 'U123', username: 'alice', channel: 'slack' as const },
+    });
+
+    const [meta] = infoSpy.mock.calls[0] as [unknown, string];
+    expect(meta).toMatchObject({ probableCause: 'Database connection pool exhaustion' });
+  });
+
   it('never throws even when optional fields are missing', async () => {
     const handler = new NoopRollbackActionHandler();
     const result = await handler.handle({

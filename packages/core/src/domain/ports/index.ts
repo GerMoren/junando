@@ -194,6 +194,14 @@ export interface RollbackActionRequest {
   endpointPath: string;
   alertType: AlertType;
   urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
+  /**
+   * The LLM analysis's probable_cause, carried from the Slack button value
+   * (truncated — see slack.adapter.ts) so a rollback handler can record WHY
+   * the model recommended the action alongside the action itself, for
+   * post-incident review. Absent if the button was rendered before this
+   * field existed, or if parsing/validation dropped it.
+   */
+  probableCause?: string;
   triggeredBy: { id?: string; username?: string; channel: 'slack' | 'teams' };
   correlationId?: string;
   messageTs?: string;

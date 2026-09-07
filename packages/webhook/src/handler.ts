@@ -130,6 +130,8 @@ const RollbackButtonValueSchema = z.object({
   endpointPath: z.string().min(1),
   alertType: z.nativeEnum(AlertType),
   urgencyLevel: z.enum(URGENCY_LEVELS),
+  // Optional: absent on a button rendered before this field existed.
+  probableCause: z.string().optional(),
 });
 
 /**
@@ -142,6 +144,7 @@ function parseRollbackValue(value: string | undefined): {
   endpointPath: string;
   alertType: AlertType;
   urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
+  probableCause?: string | undefined;
 } | null {
   if (!value) return null;
   try {
@@ -169,6 +172,7 @@ function buildRollbackActionRequest(
     endpointPath: parsed.endpointPath,
     alertType: parsed.alertType as RollbackActionRequest['alertType'],
     urgencyLevel: parsed.urgencyLevel as NonNullable<RollbackActionRequest['urgencyLevel']>,
+    ...(parsed.probableCause !== undefined && { probableCause: parsed.probableCause }),
     triggeredBy: {
       ...(payload.user?.id !== undefined && { id: payload.user.id }),
       ...(payload.user?.username !== undefined && { username: payload.user.username }),

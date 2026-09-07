@@ -19,6 +19,7 @@ export class NoopRollbackActionHandler implements IRollbackActionHandler {
         endpointPath: request.endpointPath,
         alertType: request.alertType,
         urgencyLevel: request.urgencyLevel,
+        probableCause: request.probableCause,
         triggeredBy: request.triggeredBy,
         correlationId: request.correlationId,
         messageTs: request.messageTs,
