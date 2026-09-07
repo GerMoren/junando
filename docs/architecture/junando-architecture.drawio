@@ -44,8 +44,8 @@
           <mxGeometry x="1020" y="364" width="140" height="60" as="geometry" />
         </mxCell>
 
-        <mxCell id="llm" value="LLM Provider&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;pluggable — see notes&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
-          <mxGeometry x="1020" y="584" width="140" height="60" as="geometry" />
+        <mxCell id="llm" value="LLM Provider&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Bedrock shown; also Gemini/Claude/OpenRouter/Qwen&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1032" y="590" width="64" height="64" as="geometry" />
         </mxCell>
 
         <mxCell id="notifier" value="Notifier&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Slack or Teams&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
@@ -57,11 +57,11 @@
         </mxCell>
 
         <!-- Edges -->
-        <mxCell id="e1" value="webhook POST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="alertmanager" target="webhook">
+        <mxCell id="e1" value="webhook POST (sync HTTP)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="alertmanager" target="webhook">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
-        <mxCell id="e2" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7d8794;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="webhook" target="queue">
+        <mxCell id="e2" value="publish (async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7d8794;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="webhook" target="queue">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
 
