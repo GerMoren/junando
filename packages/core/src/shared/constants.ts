@@ -44,6 +44,7 @@ export enum LLMProviderType {
   Claude = 'claude',
   OpenRouter = 'openrouter',
   Qwen = 'qwen',
+  Bedrock = 'bedrock',
 }
 
 // ── HTTP / Timeout Constants ───────────────────────────────────────────────────
@@ -92,6 +93,7 @@ export const LLM_MODELS = Object.freeze({
   Gemini: 'gemini-2.0-flash',
   Claude: 'claude-haiku-4-5',
   OpenRouter: 'qwen/qwen-2.5-72b-instruct',
+  Bedrock: 'us.amazon.nova-lite-v1:0',
 });
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
