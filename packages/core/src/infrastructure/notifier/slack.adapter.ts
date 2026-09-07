@@ -17,6 +17,11 @@ function sanitizeEndpointPath(endpointPath: string | undefined): string {
   return endpointPath.replaceAll('`', '').slice(0, 200);
 }
 
+// Slack caps a button's `value` at 2000 chars total (it's opaque data, not
+// rendered — no markup-injection concern, just a length budget alongside the
+// button's other fields). Bounds the LLM's probable_cause so it fits.
+const ROLLBACK_PROBABLE_CAUSE_MAX_LEN = 500;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SlackNotifier — Infrastructure adapter.
 // Implements INotifier using Slack Block Kit.
@@ -130,6 +135,10 @@ export class SlackNotifier implements INotifier {
                       endpointPath: cluster.endpointPath,
                       alertType: cluster.alertType,
                       urgencyLevel: analysis.urgency_level,
+                      // Carried through to the rollback handler so the
+                      // model's stated reasoning is recorded alongside the
+                      // executed action, for post-incident review (#305).
+                      probableCause: analysis.probable_cause.slice(0, ROLLBACK_PROBABLE_CAUSE_MAX_LEN),
                     }),
                     confirm: {
                       title: { type: 'plain_text', text: 'Confirm rollback' },

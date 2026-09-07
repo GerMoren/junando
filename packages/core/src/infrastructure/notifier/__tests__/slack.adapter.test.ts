@@ -122,7 +122,29 @@ describe('SlackNotifier', () => {
       endpointPath: cluster.endpointPath,
       alertType: cluster.alertType,
       urgencyLevel: analysis.urgency_level,
+      probableCause: analysis.probable_cause,
     });
+  });
+
+  it('truncates a long probable_cause in the rollback button value to stay within Slack\'s value budget', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+
+    const cluster = makeCluster();
+    const longCause = 'x'.repeat(1000);
+    const analysis = makeAnalysis({ requires_rollback: true, probable_cause: longCause });
+
+    await notifier.send(cluster, analysis);
+
+    const body = JSON.parse(mockFetch.mock.calls[0]![1].body as string);
+    const actions = body.blocks[5];
+    const value = JSON.parse(actions.elements[1].value as string);
+
+    expect(value.probableCause).toHaveLength(500);
+    expect(value.probableCause).toBe(longCause.slice(0, 500));
   });
 
   it('sends fallback message when analysis is null', async () => {

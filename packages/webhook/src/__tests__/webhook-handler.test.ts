@@ -298,6 +298,7 @@ describe('Webhook Lambda Handler', () => {
               endpointPath: '/api/orders',
               alertType: 'http_500',
               urgencyLevel: 'high',
+              probableCause: 'Database connection pool exhaustion',
             }),
             type: 'button',
           },
@@ -321,6 +322,7 @@ describe('Webhook Lambda Handler', () => {
           endpointPath: string;
           alertType: string;
           urgencyLevel: string;
+          probableCause?: string;
           triggeredBy: { id?: string; username?: string; channel: string };
           messageTs?: string;
         },
@@ -330,6 +332,8 @@ describe('Webhook Lambda Handler', () => {
       expect(request.endpointPath).toBe('/api/orders');
       expect(request.alertType).toBe('http_500');
       expect(request.urgencyLevel).toBe('high');
+      // The LLM's reasoning travels with the action for post-incident review (#305).
+      expect(request.probableCause).toBe('Database connection pool exhaustion');
       expect(request.triggeredBy).toEqual({
         id: 'U12345',
         username: 'test-user',
