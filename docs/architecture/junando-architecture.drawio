@@ -1,0 +1,112 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Junando AWS Architecture" id="junando-arch">
+    <mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- AWS account boundary group -->
+        <mxCell id="boundary" value="AWS account — junando stack" style="outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=1;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=32;fontColor=#232F3E;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="50" width="720" height="670" as="geometry" />
+        </mxCell>
+
+        <!-- AWS-native service icons -->
+        <mxCell id="webhook" value="Webhook&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Lambda · Function URL&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1">
+          <mxGeometry x="308" y="362" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="worker" value="Worker&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Lambda · SQS trigger&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1">
+          <mxGeometry x="788" y="362" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="queue" value="AlertQueue&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;SQS FIFO&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" vertex="1" parent="1">
+          <mxGeometry x="548" y="362" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="dlq" value="AlertDLQ&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;SQS FIFO · failed msgs&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sqs;" vertex="1" parent="1">
+          <mxGeometry x="548" y="582" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ssm" value="Parameter Store&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;SSM · provider secrets&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.systems_manager;" vertex="1" parent="1">
+          <mxGeometry x="548" y="132" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="dedup" value="DedupTable&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;DynamoDB · fingerprint TTL&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#C925D1;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;" vertex="1" parent="1">
+          <mxGeometry x="868" y="132" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <!-- External / pluggable systems -->
+        <mxCell id="alertmanager" value="Alertmanager&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Prometheus alerts&lt;/font&gt;" style="image;sketch=0;html=1;aspect=fixed;image=img/lib/azure2/other/Prometheus.svg;imageBackground=none;imageBorder=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="72" y="378" width="56" height="56" as="geometry" />
+        </mxCell>
+
+        <mxCell id="loki" value="Loki&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;trace repository&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="364" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="llm" value="LLM Provider&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Bedrock shown; also Gemini/Claude/OpenRouter/Qwen&lt;/font&gt;" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#01A88D;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=1;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.bedrock;" vertex="1" parent="1">
+          <mxGeometry x="1032" y="590" width="64" height="64" as="geometry" />
+        </mxCell>
+
+        <mxCell id="notifier" value="Notifier&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Slack or Teams&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="364" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="monitoring" value="Monitoring account&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Grafana · SigV4 scrape&lt;/font&gt;" style="image;sketch=0;html=1;aspect=fixed;image=img/lib/azure2/other/Grafana.svg;imageBackground=none;imageBorder=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="792" y="590" width="56" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e1" value="webhook POST (sync HTTP)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="alertmanager" target="webhook">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" value="publish (async)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7d8794;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="webhook" target="queue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="SQS trigger" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="queue" target="worker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" value="maxReceiveCount" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#c07a1e;dashed=1;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="queue" target="dlq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" value="read secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7b5fd1;dashed=1;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=0;entryX=0;entryY=0.5;" edge="1" parent="1" source="webhook" target="ssm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" value="read secrets" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7b5fd1;dashed=1;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=0;entryX=1;entryY=0.5;" edge="1" parent="1" source="worker" target="ssm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" value="dedup check" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7d8794;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="worker" target="dedup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8" value="fetch traces" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#7d8794;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="worker" target="loki">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" value="analyze incident" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="worker" target="llm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e10" value="post + rollback action" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#1c8a6e;strokeWidth=2;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=0;entryX=0.5;entryY=0;" edge="1" parent="1" source="worker" target="notifier">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="820" y="108" />
+              <mxPoint x="1330" y="108" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e11" value="GET /metrics (IAM SigV4)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#c23a4c;dashed=1;endArrow=block;endFill=1;fontSize=10;fontColor=#5b6673;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="monitoring" target="worker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -188,6 +188,7 @@ Feedback welcome — open an issue or start a discussion.
 
 ## Documentation
 
+- [Architecture diagram](docs/architecture/junando-architecture.html) — AWS service topology with official AWS Architecture Icons ([interactive overview](docs/architecture/junando-architecture-overview.html) also available)
 - [Architecture deep dive](docs/architecture/system-deep-dive.md)
 - [NestJS integration](docs/integrations/nestjs.md)
 - [Wide events — canonical log lines](docs/WIDE-EVENTS.md)
