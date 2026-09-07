@@ -26,6 +26,12 @@ export enum RuleEvaluationPhase {
   PostLlm = 'post-llm',
 }
 
+/** Notifier backend a logical channel resolves to */
+export enum ChannelType {
+  Slack = 'slack',
+  Teams = 'teams',
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RuleCondition — what can be matched in a rule
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,17 +131,55 @@ export const RuleSectionSchema = z.object({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ChannelConfig — maps a logical channel name (referenced by route/escalate
+// actions) to the notifier backend that delivers to it.
+//
+// Slack: one bot token (SLACK_BOT_TOKEN) posts to many channels, so a channel
+// name is enough.
+// Teams: delivery is per-webhook-URL, so each channel needs its own URL —
+// resolved from an env var (`webhookUrlEnv`), never inline in the YAML.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SlackChannelConfig {
+  type: ChannelType.Slack;
+  channel: string;
+}
+
+export interface TeamsChannelConfig {
+  type: ChannelType.Teams;
+  webhookUrlEnv: string;
+}
+
+export type ChannelConfig = SlackChannelConfig | TeamsChannelConfig;
+
+const SLACK_CHANNEL_SCHEMA = z.object({
+  type: z.literal(ChannelType.Slack),
+  channel: z.string().startsWith('#'),
+});
+const TEAMS_CHANNEL_SCHEMA = z.object({
+  type: z.literal(ChannelType.Teams),
+  webhookUrlEnv: z.string().min(1),
+});
+
+export const ChannelConfigSchema = z.discriminatedUnion('type', [
+  SLACK_CHANNEL_SCHEMA,
+  TEAMS_CHANNEL_SCHEMA,
+]);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RuleConfiguration — full YAML shape
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface RuleConfiguration {
   [RuleEvaluationPhase.PreLlm]: RuleSection;
   [RuleEvaluationPhase.PostLlm]: RuleSection;
+  channels: Record<string, ChannelConfig>;
 }
 
 export const RuleConfigurationSchema = z.object({
   [RuleEvaluationPhase.PreLlm]: RuleSectionSchema,
   [RuleEvaluationPhase.PostLlm]: RuleSectionSchema,
+  channels: z.record(z.string(), ChannelConfigSchema).default({}),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,4 +190,5 @@ export type ValidatedRuleCondition = z.infer<typeof RuleConditionSchema>;
 export type ValidatedRuleAction = z.infer<typeof RuleActionSchema>;
 export type ValidatedRule = z.infer<typeof RuleSchema>;
 export type ValidatedRuleSection = z.infer<typeof RuleSectionSchema>;
+export type ValidatedChannelConfig = z.infer<typeof ChannelConfigSchema>;
 export type ValidatedRuleConfiguration = z.infer<typeof RuleConfigurationSchema>;

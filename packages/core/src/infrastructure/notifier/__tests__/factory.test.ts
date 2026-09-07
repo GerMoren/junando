@@ -115,35 +115,100 @@ describe('createNotifier with rules config (WIR-03)', () => {
   });
 });
 
-// ── Unresolvable channel reporting ────────────────────────────────────────────
+// ── Channels section — logical names resolve to a concrete notifier ───────
 //
-// Nothing in the rules YAML maps a logical channel name to a notifier, so every
-// routed channel resolves to the default. Reported at startup so the operator
-// isn't surprised mid-incident. Fail-fast lands with #303, once channels can
-// actually be defined.
+// A rule referencing a channel with no matching entry under `channels:` in
+// the rules YAML fails fast at startup, rather than silently falling back to
+// the default channel mid-incident (#303).
 
-describe('createNotifier — unresolvable route channels', () => {
-  const rulesYamlPath = `${__dirname}/../../../../rules.example.yaml`;
+describe('createNotifier — channels section', () => {
+  const fixturesDir = `${__dirname}/fixtures`;
 
-  it('reports every channel referenced by rules that has no registered notifier', () => {
-    const config = makeSlackConfig({ rulesConfigPath: rulesYamlPath });
-    const unresolved = collectUnresolvedChannels(config);
+  it('throws at startup when a rule references a channel with no "channels:" entry', () => {
+    const config = makeSlackConfig({
+      rulesConfigPath: `${fixturesDir}/undefined-channel.yaml`,
+    });
 
-    // Channels declared across both phases of rules.example.yaml.
-    expect(unresolved).toEqual(
-      expect.arrayContaining(['slack-sre', 'slack-dev-team', 'slack-oncall']),
+    expect(() => createNotifier(config)).toThrow(/undefined channels: slack-sre/);
+  });
+
+  it('resolves a rule-referenced channel defined under "channels:" and delivers to it', () => {
+    const config = makeSlackConfig({
+      rulesConfigPath: `${fixturesDir}/defined-channel.yaml`,
+    });
+
+    const notifier = createNotifier(config);
+    expect(notifier).toBeInstanceOf(RoutingNotifier);
+
+    // End-to-end proof: the registry resolves the rule's channel to a real,
+    // distinct SlackNotifier — not silently falling back to the default.
+    const channelRegistry = (
+      notifier as unknown as { registry: import('../../rules/channel-registry.js').ChannelRegistry }
+    ).registry;
+    const resolved = channelRegistry.resolve('slack-sre');
+    expect(resolved).toBeInstanceOf(SlackNotifier);
+  });
+
+  it('throws at startup when a slack channel is defined but SLACK_BOT_TOKEN is unset', () => {
+    // Default notifier is teams (valid) so only the slack *channel* entry fails.
+    const config = makeSlackConfig({
+      notifierType: 'teams',
+      slackBotToken: undefined,
+      teamsWebhookUrl: 'https://example.powerautomate.com/invoke?api-version=1',
+      rulesConfigPath: `${fixturesDir}/defined-channel.yaml`,
+    });
+
+    expect(() => createNotifier(config)).toThrow(
+      /Channel "slack-sre" \(type: slack\) requires SLACK_BOT_TOKEN/,
     );
   });
 
-  it('deduplicates channels referenced by more than one rule', () => {
-    const config = makeSlackConfig({ rulesConfigPath: rulesYamlPath });
+  it('throws at startup when a teams channel references an unset env var', () => {
+    delete process.env['TEAMS_SECURITY_WEBHOOK_URL_NOT_SET'];
+    const config = makeSlackConfig({
+      rulesConfigPath: `${fixturesDir}/teams-channel-missing-env.yaml`,
+    });
+
+    expect(() => createNotifier(config)).toThrow(
+      /Channel "teams-security" \(type: teams\) references env var "TEAMS_SECURITY_WEBHOOK_URL_NOT_SET"/,
+    );
+  });
+
+  it('resolves a teams channel from its env var and delivers to it', () => {
+    process.env['TEST_TEAMS_SECURITY_WEBHOOK_URL'] =
+      'https://example.powerautomate.com/invoke?api-version=1';
+    try {
+      const config = makeSlackConfig({
+        rulesConfigPath: `${fixturesDir}/teams-channel-defined.yaml`,
+      });
+
+      const notifier = createNotifier(config);
+      const channelRegistry = (
+        notifier as unknown as { registry: import('../../rules/channel-registry.js').ChannelRegistry }
+      ).registry;
+      expect(channelRegistry.resolve('teams-security')).toBeInstanceOf(TeamsNotifier);
+    } finally {
+      delete process.env['TEST_TEAMS_SECURITY_WEBHOOK_URL'];
+    }
+  });
+
+  it('reports every channel referenced by rules that has no matching "channels:" entry', () => {
+    const config = makeSlackConfig({
+      rulesConfigPath: `${fixturesDir}/undefined-channel.yaml`,
+    });
     const unresolved = collectUnresolvedChannels(config);
 
-    // slack-oncall is referenced by both a pre-llm and a post-llm rule.
-    expect(unresolved.filter((c) => c === 'slack-oncall')).toHaveLength(1);
+    expect(unresolved).toEqual(['slack-sre']);
   });
 
   it('returns an empty list when no rules config is set', () => {
     expect(collectUnresolvedChannels(makeSlackConfig())).toEqual([]);
+  });
+
+  it('rules.example.yaml — the shipped example — starts up without an undefined-channel error', () => {
+    const rulesYamlPath = `${__dirname}/../../../../rules.example.yaml`;
+    const config = makeSlackConfig({ rulesConfigPath: rulesYamlPath });
+
+    expect(() => createNotifier(config)).not.toThrow();
   });
 });

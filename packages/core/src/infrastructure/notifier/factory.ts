@@ -4,6 +4,8 @@ import { createLogger } from '../../shared/logger/index.js';
 import type { Config } from '../../shared/config/index.js';
 import type { INotifier } from '../../domain/ports/index.js';
 import type { IRuleEngine } from '../../domain/ports/index.js';
+import { ChannelType } from '../../domain/entities/rule.js';
+import type { ChannelConfig } from '../../domain/entities/rule.js';
 import { SlackNotifier } from './slack.adapter.js';
 import { TeamsNotifier } from './teams.adapter.js';
 import { RoutingNotifier } from './routing-notifier.js';
@@ -42,15 +44,62 @@ function buildNotifierRegistry(config: Config): FactoryRegistry<INotifier> {
 }
 
 /**
+ * Builds the notifier for a single named channel entry from the rules YAML's
+ * `channels:` section.
+ *
+ * @throws {Error} if the channel's backend cannot actually be reached (e.g.
+ *   `type: slack` with no SLACK_BOT_TOKEN configured, or `type: teams` whose
+ *   `webhookUrlEnv` is unset) — fails fast at startup rather than at delivery
+ *   time, mid-incident.
+ */
+function buildChannelNotifier(name: string, channelConfig: ChannelConfig, config: Config): INotifier {
+  if (channelConfig.type === ChannelType.Slack) {
+    if (!config.slackBotToken) {
+      throw new Error(
+        `Channel "${name}" (type: slack) requires SLACK_BOT_TOKEN to be set`,
+      );
+    }
+    return new SlackNotifier(config.slackBotToken, channelConfig.channel);
+  }
+
+  const webhookUrl = process.env[channelConfig.webhookUrlEnv];
+  if (!webhookUrl) {
+    throw new Error(
+      `Channel "${name}" (type: teams) references env var "${channelConfig.webhookUrlEnv}", which is not set`,
+    );
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(webhookUrl);
+  } catch {
+    throw new Error(`Channel "${name}": ${channelConfig.webhookUrlEnv} is not a valid URL`);
+  }
+  if (!parsedUrl.searchParams.has('api-version')) {
+    throw new Error(
+      `Channel "${name}": ${channelConfig.webhookUrlEnv} must include api-version= as a query parameter`,
+    );
+  }
+
+  return new TeamsNotifier(webhookUrl);
+}
+
+/**
  * Creates the notifier for the application.
  *
  * When `config.rulesConfigPath` is set:
  *   - Reads and validates the rules YAML config
- *   - Creates a ChannelRegistry with the default notifier as fallback
+ *   - Builds a ChannelRegistry from its `channels:` section, with the default
+ *     notifier as fallback
  *   - Wraps the default notifier with a RoutingNotifier for multi-channel dispatch
  *
  * When `config.rulesConfigPath` is NOT set:
  *   - Returns the default notifier directly (backward-compatible)
+ *
+ * @throws {Error} at startup if a rule's route/escalate action references a
+ *   channel with no matching entry under `channels:` — an operator must fix
+ *   the rules config rather than have the alert silently fall back to the
+ *   default channel mid-incident.
  */
 export function createNotifier(config: Config): INotifier {
   const registry = buildNotifierRegistry(config);
@@ -61,19 +110,22 @@ export function createNotifier(config: Config): INotifier {
     return defaultNotifier;
   }
 
-  // Create channel registry with default notifier as fallback
+  const yamlContent = readFileSync(config.rulesConfigPath, 'utf-8');
+  const ruleConfig = parseRuleConfig(yamlContent);
+
+  // Create channel registry with default notifier as fallback, then populate
+  // it from the rules YAML's `channels:` section.
   const channelRegistry = new ChannelRegistry();
   channelRegistry.setDefault(defaultNotifier);
+  for (const [name, channelConfig] of Object.entries(ruleConfig.channels)) {
+    channelRegistry.register(name, buildChannelNotifier(name, channelConfig, config));
+  }
 
-  // Rule actions reference channels by logical name, and the YAML has no
-  // section mapping those names to a concrete notifier — so any channel a rule
-  // routes to resolves to the default. Report it at startup rather than letting
-  // the operator find out mid-incident.
   const unresolved = collectUnresolvedChannels(config, channelRegistry);
   if (unresolved.length > 0) {
-    logger.warn(
-      { channels: unresolved, rulesConfigPath: config.rulesConfigPath },
-      'Rules reference channels with no registered notifier — these will be delivered to the default channel',
+    throw new Error(
+      `Rules reference undefined channels: ${unresolved.join(', ')}. Define them under ` +
+        `"channels:" in ${config.rulesConfigPath}, or remove the reference.`,
     );
   }
 
@@ -83,8 +135,9 @@ export function createNotifier(config: Config): INotifier {
 
 /**
  * Collect the channel names referenced by Route/Escalate actions in the rules
- * config that have no notifier registered, and would therefore fall back to the
- * default channel.
+ * config that have no notifier registered against `registry` — i.e. no
+ * matching entry under the rules YAML's `channels:` section. `createNotifier`
+ * treats a non-empty result as a fail-fast startup error.
  *
  * Returns an empty list when no rules config is set.
  */
@@ -100,7 +153,7 @@ export function collectUnresolvedChannels(
   const ruleConfig = parseRuleConfig(yamlContent); // Throws on invalid config
 
   const referenced = new Set<string>();
-  for (const section of Object.values(ruleConfig)) {
+  for (const section of [ruleConfig['pre-llm'], ruleConfig['post-llm']]) {
     for (const rule of section.rules) {
       for (const action of rule.actions) {
         if ('channel' in action) {
