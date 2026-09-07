@@ -9,6 +9,10 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
   return normalized === 'true' || normalized === '1';
 }
 
+function llmApiKeyRequired(llmProvider: string | undefined, llmApiKey: string | undefined): boolean {
+  return llmProvider !== 'bedrock' && !llmApiKey;
+}
+
 function parseOptionalStringArray(value: string | undefined): string[] | undefined {
   if (value === undefined || value === '') return undefined;
   return value
@@ -82,8 +86,8 @@ async function loadSecretsFromSSM(): Promise<void> {
 
 const ConfigSchema = z
   .object({
-    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen']),
-    llmApiKey: z.string().min(1),
+    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen', 'bedrock']),
+    llmApiKey: z.string().min(1).optional(),
     llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
     // Notifier selector — defaults to 'slack' for backward compatibility
     notifierType: z.enum(['slack', 'teams']).default('slack'),
@@ -190,6 +194,13 @@ const ConfigSchema = z
         message: '[dedupStore: redis] REDIS_URL is required',
       });
     }
+    if (llmApiKeyRequired(data.llmProvider, data.llmApiKey)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['llmApiKey'],
+        message: `[llmProvider: ${data.llmProvider}] LLM_API_KEY is required`,
+      });
+    }
   });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -228,6 +239,18 @@ export async function loadConfig(): Promise<Config> {
     const errorMessages = result.error.issues.map(
       (issue) => `${issue.path.join('.')}: ${issue.message}`,
     );
+    // zod v4 skips superRefine entirely when base-schema parsing already aborted
+    // (e.g. an invalid llmProvider) — so the conditional llmApiKey check would be
+    // silently dropped from the combined error list. Re-check it against the raw
+    // env values so it still surfaces alongside other base-schema failures.
+    const rawLlmProvider = process.env['LLM_PROVIDER'];
+    const rawLlmApiKey = process.env['LLM_API_KEY'];
+    if (
+      !errorMessages.some((m) => m.startsWith('llmApiKey')) &&
+      llmApiKeyRequired(rawLlmProvider, rawLlmApiKey)
+    ) {
+      errorMessages.push(`llmApiKey: [llmProvider: ${rawLlmProvider}] LLM_API_KEY is required`);
+    }
     throw new Error(`Invalid configuration:\n  - ${errorMessages.join('\n  - ')}`);
   }
 

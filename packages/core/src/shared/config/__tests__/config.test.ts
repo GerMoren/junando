@@ -86,7 +86,7 @@ describe('Config — loadConfig', () => {
   // ── Schema: llmProvider ──────────────────────────────────────────────────
 
   describe('llmProvider validation (enum)', () => {
-    for (const provider of ['gemini', 'claude', 'openrouter', 'qwen']) {
+    for (const provider of ['gemini', 'claude', 'openrouter', 'qwen', 'bedrock']) {
       it(`accepts "${provider}"`, async () => {
         setEnv({ ...validConfig, LLM_PROVIDER: provider });
         const config = await loadConfig();
@@ -792,6 +792,27 @@ describe('Config — loadConfig', () => {
       process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'] = '';
       const config = await loadConfig();
       expect(config.rollbackActionAllowedSlackUserIds).toBeUndefined();
+    });
+  });
+
+  // ── llmApiKey conditional requirement (bedrock) ──────────────────────────
+
+  describe('llmApiKey conditional requirement (bedrock)', () => {
+    it('rejects missing LLM_API_KEY for a non-bedrock provider, naming the provider', async () => {
+      setEnv({ ...validConfig, LLM_PROVIDER: 'gemini', LLM_API_KEY: undefined });
+      await expect(loadConfig()).rejects.toThrow(/\[llmProvider: gemini\] LLM_API_KEY is required/);
+    });
+
+    it('accepts LLM_PROVIDER=bedrock with no LLM_API_KEY', async () => {
+      setEnv({ ...validConfig, LLM_PROVIDER: 'bedrock', LLM_API_KEY: undefined });
+      const config = await loadConfig();
+      expect(config.llmProvider).toBe('bedrock');
+      expect(config.llmApiKey).toBeUndefined();
+    });
+
+    it('still rejects an empty-string LLM_API_KEY even for bedrock', async () => {
+      setEnv({ ...validConfig, LLM_PROVIDER: 'bedrock', LLM_API_KEY: '' });
+      await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
     });
   });
 
