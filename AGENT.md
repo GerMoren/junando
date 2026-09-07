@@ -223,7 +223,7 @@ Parse response with `LLMAnalysisSchema.parse()`. If parsing fails: send cluster 
 | Variable               | Description                                  |
 | ---------------------- | -------------------------------------------- |
 | `LLM_PROVIDER`         | `gemini` \| `claude` \| `openai`             |
-| `LLM_API_KEY`          | API key for the chosen provider              |
+| `LLM_API_KEY`          | API key for the chosen provider. Not required when `LLM_PROVIDER=bedrock` (uses IAM/role auth instead) |
 | `SLACK_BOT_TOKEN`      | Slack Bot Token (`xoxb-...`)                 |
 | `SLACK_SIGNING_SECRET` | For validating Slack interactivity callbacks |
 | `SLACK_CHANNEL`        | Target channel e.g. `#incidents`             |

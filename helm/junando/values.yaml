@@ -170,9 +170,9 @@ serviceAccount:
 # Default empty string → the key is present but blank.
 # Fill these in your environment-specific values override.
 secrets:
-  # LLM_PROVIDER: LLM backend to use (gemini | claude | openrouter | qwen).
+  # LLM_PROVIDER: LLM backend to use (gemini | claude | openrouter | qwen | bedrock).
   LLM_PROVIDER: ""
-  # LLM_API_KEY: API key for the selected LLM provider.
+  # LLM_API_KEY: API key for the selected LLM provider. Unused for bedrock (IAM/role auth instead).
   LLM_API_KEY: ""
   # LLM_MODEL: specific model identifier (optional; uses provider default if empty).
   LLM_MODEL: ""
