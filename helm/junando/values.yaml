@@ -175,6 +175,11 @@ secrets:
   # LLM_API_KEY: API key for the selected LLM provider. Unused for bedrock (IAM/role auth instead).
   LLM_API_KEY: ""
   # LLM_MODEL: specific model identifier (optional; uses provider default if empty).
+  # For bedrock: the package default (amazon.nova-lite-v1:0, US inference profile) is
+  # only correct in us-* regions. The region-to-prefix derivation (us./eu./apac.) is
+  # done by the CDK stack at deploy time and has no Helm equivalent — outside a us-*
+  # region you MUST set this explicitly with the matching geo-prefix, e.g.
+  # eu.amazon.nova-lite-v1:0.
   LLM_MODEL: ""
   # LLM_FALLBACK_MODELS: comma-separated fallback model list (optional).
   LLM_FALLBACK_MODELS: ""

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AlertCluster } from '../../../domain/entities/cluster.js';
-import { AlertType } from '../../../shared/constants.js';
+import { AlertType, HTTP_TIMEOUT_MS } from '../../../shared/constants.js';
 import { BedrockProvider } from '../bedrock.provider.js';
 
 // ── Logger mock ────────────────────────────────────────────────────────────
@@ -139,4 +139,53 @@ describe('BedrockProvider', () => {
       await expect(provider.analyze(makeCluster(), [])).rejects.toThrow(name);
     });
   }
+
+  it('aborts the request after HTTP_TIMEOUT_MS.LLM and maps it to degradedReason "timeout"', async () => {
+    vi.useFakeTimers();
+    try {
+      mockSend.mockImplementationOnce(
+        (_command: unknown, options: { abortSignal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            options.abortSignal.addEventListener('abort', () => {
+              const abortError = new Error('The operation was aborted');
+              abortError.name = 'AbortError';
+              reject(abortError);
+            });
+          }),
+      );
+
+      const provider = new BedrockProvider();
+      const resultPromise = provider.analyze(makeCluster(), []);
+      await vi.advanceTimersByTimeAsync(HTTP_TIMEOUT_MS.LLM);
+      const result = await resultPromise;
+
+      expect(result.degradedReason).toBe('timeout');
+      expect(result.analysis).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('finds the text block when a non-text block (e.g. reasoningContent) precedes it', async () => {
+    mockSend.mockResolvedValueOnce({
+      output: {
+        message: {
+          content: [{ reasoningContent: { text: 'thinking about the incident...' } }, { text: validAnalysisJson }],
+        },
+      },
+      usage: { inputTokens: 5, outputTokens: 8 },
+    });
+
+    const provider = new BedrockProvider();
+    const result = await provider.analyze(makeCluster(), []);
+
+    expect(result.analysis).toEqual({
+      probable_cause: 'Database connection pool exhaustion',
+      impacted_services: ['checkout-service'],
+      recommended_steps: ['Check pool size'],
+      urgency_level: 'high',
+      requires_rollback: false,
+    });
+    expect('degradedReason' in result).toBe(false);
+  });
 });

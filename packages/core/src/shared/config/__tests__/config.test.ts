@@ -66,6 +66,7 @@ function clearEnv() {
   delete process.env.ROLLBACK_ACTION_ENABLED;
   delete process.env.ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS;
   delete process.env.DEDUP_STORE;
+  delete process.env.BEDROCK_DEFAULT_MODEL;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -813,6 +814,47 @@ describe('Config — loadConfig', () => {
     it('still rejects an empty-string LLM_API_KEY even for bedrock', async () => {
       setEnv({ ...validConfig, LLM_PROVIDER: 'bedrock', LLM_API_KEY: '' });
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+    });
+  });
+
+  // ── llmModel resolution (BEDROCK_DEFAULT_MODEL fallback) ────────────────
+
+  describe('llmModel resolution', () => {
+    it('falls back to BEDROCK_DEFAULT_MODEL when LLM_PROVIDER=bedrock and LLM_MODEL is unset', async () => {
+      setEnv({
+        ...validConfig,
+        LLM_PROVIDER: 'bedrock',
+        LLM_API_KEY: undefined,
+        LLM_MODEL: undefined,
+      });
+      process.env.BEDROCK_DEFAULT_MODEL = 'eu.amazon.nova-lite-v1:0';
+
+      const config = await loadConfig();
+
+      expect(config.llmModel).toBe('eu.amazon.nova-lite-v1:0');
+    });
+
+    it('ignores BEDROCK_DEFAULT_MODEL for a non-bedrock provider', async () => {
+      setEnv({ ...validConfig, LLM_PROVIDER: 'gemini', LLM_MODEL: undefined });
+      process.env.BEDROCK_DEFAULT_MODEL = 'eu.amazon.nova-lite-v1:0';
+
+      const config = await loadConfig();
+
+      expect(config.llmModel).toBeUndefined();
+    });
+
+    it('prefers an explicit LLM_MODEL over BEDROCK_DEFAULT_MODEL, even for bedrock', async () => {
+      setEnv({
+        ...validConfig,
+        LLM_PROVIDER: 'bedrock',
+        LLM_API_KEY: undefined,
+        LLM_MODEL: 'us.amazon.nova-pro-v1:0',
+      });
+      process.env.BEDROCK_DEFAULT_MODEL = 'eu.amazon.nova-lite-v1:0';
+
+      const config = await loadConfig();
+
+      expect(config.llmModel).toBe('us.amazon.nova-pro-v1:0');
     });
   });
 

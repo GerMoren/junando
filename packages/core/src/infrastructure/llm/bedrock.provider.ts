@@ -1,7 +1,12 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { ILLMProvider, LLMResult, LlmDegradedReason } from '../../domain/ports/index.js';
-import { LLM_MAX_TOKENS, LLM_MODELS, LLMProviderType } from '../../shared/constants.js';
+import {
+  HTTP_TIMEOUT_MS,
+  LLM_MAX_TOKENS,
+  LLM_MODELS,
+  LLMProviderType,
+} from '../../shared/constants.js';
 import { buildUserPrompt, parseLlmText, SYSTEM_PROMPT } from './shared.js';
 
 /**
@@ -13,6 +18,8 @@ const BEDROCK_AVAILABILITY_ERRORS: ReadonlyMap<string, LlmDegradedReason> = new 
   ['ServiceUnavailableException', 'provider_unavailable'],
   ['InternalServerException', 'provider_unavailable'],
   ['ModelTimeoutException', 'timeout'],
+  // Our own request-timeout abort (see analyze()) — not a Bedrock-issued error.
+  ['AbortError', 'timeout'],
 ]);
 
 function classifyBedrockError(error: unknown): LlmDegradedReason | undefined {
@@ -39,6 +46,10 @@ export class BedrockProvider implements ILLMProvider {
 
   async analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult> {
     const startMs = Date.now();
+    // No circuit breaker (see class doc) — but an unbounded call could still
+    // hang until the Lambda's own timeout. Bound it explicitly instead.
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => abortController.abort(), HTTP_TIMEOUT_MS.LLM);
     try {
       const response = await this.getClient().send(
         new ConverseCommand({
@@ -47,9 +58,12 @@ export class BedrockProvider implements ILLMProvider {
           messages: [{ role: 'user', content: [{ text: buildUserPrompt(cluster, traces) }] }],
           inferenceConfig: { maxTokens: LLM_MAX_TOKENS },
         }),
+        { abortSignal: abortController.signal },
       );
 
-      const text = response.output?.message?.content?.[0]?.text ?? '';
+      // Bedrock may emit non-text content blocks (e.g. reasoningContent)
+      // ahead of the answer — search rather than assume index 0.
+      const text = response.output?.message?.content?.find((b) => b.text !== undefined)?.text ?? '';
       return {
         ...parseLlmText(text),
         provider: LLMProviderType.Bedrock,
@@ -70,6 +84,8 @@ export class BedrockProvider implements ILLMProvider {
         promptTokens: 0,
         completionTokens: 0,
       };
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   }
 }

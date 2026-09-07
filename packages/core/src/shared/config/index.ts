@@ -1,6 +1,6 @@
 import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
-import { LLM_FALLBACK_DEFAULTS } from '../constants.js';
+import { LLM_FALLBACK_DEFAULTS, LLMProviderType } from '../constants.js';
 import { createLogger } from '../logger/index.js';
 
 function parseBooleanEnv(value: string | undefined): boolean | undefined {
@@ -10,7 +10,23 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
 }
 
 function llmApiKeyRequired(llmProvider: string | undefined, llmApiKey: string | undefined): boolean {
-  return llmProvider !== 'bedrock' && !llmApiKey;
+  return llmProvider !== LLMProviderType.Bedrock && !llmApiKey;
+}
+
+/**
+ * Resolves the effective LLM_MODEL. An explicit LLM_MODEL always wins, for any
+ * provider. BEDROCK_DEFAULT_MODEL (set by the CDK stack from the deployment
+ * region — see junando-stack.ts) is used ONLY as a fallback when the provider
+ * is bedrock, so a Bedrock-specific value can never leak into another
+ * provider's model override.
+ */
+function resolveLlmModel(
+  llmProvider: string | undefined,
+  llmModel: string | undefined,
+  bedrockDefaultModel: string | undefined,
+): string | undefined {
+  if (llmModel) return llmModel;
+  return llmProvider === LLMProviderType.Bedrock ? bedrockDefaultModel : undefined;
 }
 
 function parseOptionalStringArray(value: string | undefined): string[] | undefined {
@@ -211,7 +227,11 @@ export async function loadConfig(): Promise<Config> {
   const result = ConfigSchema.safeParse({
     llmProvider: process.env['LLM_PROVIDER'],
     llmApiKey: process.env['LLM_API_KEY'],
-    llmModel: process.env['LLM_MODEL'],
+    llmModel: resolveLlmModel(
+      process.env['LLM_PROVIDER'],
+      process.env['LLM_MODEL'],
+      process.env['BEDROCK_DEFAULT_MODEL'],
+    ),
     notifierType: process.env['NOTIFIER_TYPE'],
     slackBotToken: process.env['SLACK_BOT_TOKEN'],
     slackSigningSecret: process.env['SLACK_SIGNING_SECRET'],
@@ -249,7 +269,9 @@ export async function loadConfig(): Promise<Config> {
       !errorMessages.some((m) => m.startsWith('llmApiKey')) &&
       llmApiKeyRequired(rawLlmProvider, rawLlmApiKey)
     ) {
-      errorMessages.push(`llmApiKey: [llmProvider: ${rawLlmProvider}] LLM_API_KEY is required`);
+      errorMessages.push(
+        `llmApiKey: [llmProvider: ${rawLlmProvider ?? '(unset)'}] LLM_API_KEY is required`,
+      );
     }
     throw new Error(`Invalid configuration:\n  - ${errorMessages.join('\n  - ')}`);
   }

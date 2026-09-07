@@ -25,8 +25,9 @@ export interface JunandoStackProps extends cdk.StackProps {
   /**
    * Bedrock foundation model ID, WITHOUT a region prefix (e.g. 'amazon.nova-lite-v1:0').
    * Resolved by bin/app.ts from BEDROCK_FOUNDATION_MODEL / CDK context, defaulting
-   * to Nova Lite. Both LLM_MODEL and the IAM grant's ARNs derive from this single
-   * value, so overriding the model can never leave the two out of sync.
+   * to Nova Lite. Both the worker's BEDROCK_DEFAULT_MODEL env var and the IAM
+   * grant's ARNs derive from this single value, so overriding the model can
+   * never leave the two out of sync.
    */
   bedrockFoundationModel?: string;
 }
@@ -46,15 +47,17 @@ const BEDROCK_REGION_PREFIXES: Readonly<Record<string, string>> = {
 
 /**
  * Resolves the Bedrock inference-profile region prefix for a deployment
- * region. Unmapped regions fail synth loudly instead of silently falling
- * back to 'us.' — an inference profile ARN pointing at the wrong region
- * would fail at runtime, not at deploy time.
+ * region, or undefined when the region has no mapped prefix.
+ *
+ * Deliberately does NOT throw: the deployment's LLM_PROVIDER is a runtime
+ * SSM value the stack cannot see at synth time, so a stack deployed to an
+ * unmapped region may still be a perfectly valid non-Bedrock deployment.
+ * Failing synth here would block every deployment to that region, Bedrock
+ * or not — the caller only sets up Bedrock support when this resolves.
  */
-function bedrockRegionPrefix(region: string): string {
+function bedrockRegionPrefix(region: string): string | undefined {
   const geo = region.split('-')[0] ?? '';
-  const prefix = BEDROCK_REGION_PREFIXES[geo];
-  if (!prefix) throw new Error(`Unsupported region for Bedrock inference profile: "${region}"`);
-  return prefix;
+  return BEDROCK_REGION_PREFIXES[geo];
 }
 
 export class JunandoStack extends cdk.Stack {
@@ -63,10 +66,12 @@ export class JunandoStack extends cdk.Stack {
 
     const resourceNamePrefix = props.resourceNamePrefix ?? DEFAULT_RESOURCE_NAME_PREFIX;
 
-    // Fails synth loudly for an unmapped region — see bedrockRegionPrefix.
+    // undefined when the deployment region has no mapped Bedrock prefix — see
+    // bedrockRegionPrefix. Bedrock env/IAM setup below is skipped entirely in
+    // that case, rather than blocking the whole stack's synth.
     const bedrockPrefix = bedrockRegionPrefix(this.region);
     const bedrockFoundationModel = props.bedrockFoundationModel ?? DEFAULT_BEDROCK_FOUNDATION_MODEL;
-    const bedrockModel = `${bedrockPrefix}${bedrockFoundationModel}`;
+    const bedrockModel = bedrockPrefix ? `${bedrockPrefix}${bedrockFoundationModel}` : undefined;
 
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
     const coreLayer = new lambda.LayerVersion(this, 'JunandoCoreLayer', {
@@ -172,9 +177,14 @@ export class JunandoStack extends cdk.Stack {
         // DEDUP_STORE deliberately not set — the config default is 'dynamodb'.
         // An operator rolling back sets DEDUP_STORE=redis on the function.
         DEDUP_TABLE_NAME: dedupTable.tableName,
-        // Region-derived Bedrock model — must not fall through to the
-        // package's hardcoded 'us.' default when deployed outside us-*.
-        LLM_MODEL: bedrockModel,
+        // Region-derived default, used ONLY when LLM_PROVIDER=bedrock and no
+        // explicit LLM_MODEL is set (see resolveLlmModel in @junando/core).
+        // Deliberately NOT named LLM_MODEL: that variable is a universal
+        // override for every provider, and this value is only valid for
+        // Bedrock — setting LLM_MODEL here would force it onto Gemini/Claude/
+        // OpenRouter too. Absent entirely when the region has no Bedrock
+        // mapping (bedrockModel is undefined).
+        ...(bedrockModel ? { BEDROCK_DEFAULT_MODEL: bedrockModel } : {}),
       },
     });
 
@@ -200,19 +210,27 @@ export class JunandoStack extends cdk.Stack {
     queue.grantConsumeMessages(workerFn);
     dedupTable.grantReadWriteData(workerFn);
 
-    // Grant Bedrock Converse access. No separate IAM action exists for
-    // Converse — bedrock:InvokeModel covers it. Two resource ARNs: the
-    // inference-profile (region+account scoped) and the regional
-    // foundation-model ARN (AWS-owned, no account segment).
-    workerFn.addToRolePolicy(
-      new cdk.aws_iam.PolicyStatement({
-        actions: ['bedrock:InvokeModel'],
-        resources: [
-          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${bedrockModel}`,
-          `arn:aws:bedrock:${this.region}::foundation-model/${bedrockFoundationModel}`,
-        ],
-      }),
-    );
+    // Grant Bedrock Converse access — only when the region has a mapped
+    // Bedrock prefix. No separate IAM action exists for Converse;
+    // bedrock:InvokeModel covers it. Two resource ARNs: the inference-profile
+    // (region+account scoped — a cross-region inference profile is itself a
+    // regional, account-owned resource) and the foundation-model ARN. The
+    // foundation-model ARN's region segment is a wildcard, NOT this.region:
+    // a 'us.'/'eu.'/'apac.' profile can route the actual inference call to
+    // any region in that geography, and AWS's own AccessDeniedException
+    // guidance requires InvokeModel on the foundation model in every
+    // destination region, not just the one the stack deploys to.
+    if (bedrockPrefix) {
+      workerFn.addToRolePolicy(
+        new cdk.aws_iam.PolicyStatement({
+          actions: ['bedrock:InvokeModel'],
+          resources: [
+            `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${bedrockModel}`,
+            `arn:aws:bedrock:*::foundation-model/${bedrockFoundationModel}`,
+          ],
+        }),
+      );
+    }
 
     // ── Worker Function URL — /metrics scrape endpoint ──────────────────────
     // IAM auth only: never exposed to anonymous internet traffic. Callers must
