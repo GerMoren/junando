@@ -36,8 +36,8 @@
         </mxCell>
 
         <!-- External / pluggable systems -->
-        <mxCell id="alertmanager" value="Alertmanager&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Prometheus alerts&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
-          <mxGeometry x="30" y="364" width="140" height="60" as="geometry" />
+        <mxCell id="alertmanager" value="Alertmanager&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Prometheus alerts&lt;/font&gt;" style="image;sketch=0;html=1;aspect=fixed;image=img/lib/azure2/other/Prometheus.svg;imageBackground=none;imageBorder=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="72" y="378" width="56" height="56" as="geometry" />
         </mxCell>
 
         <mxCell id="loki" value="Loki&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;trace repository&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
@@ -52,8 +52,8 @@
           <mxGeometry x="1260" y="364" width="140" height="60" as="geometry" />
         </mxCell>
 
-        <mxCell id="monitoring" value="Monitoring account&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Grafana · SigV4 scrape&lt;/font&gt;" style="rounded=1;arcSize=14;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#B7BEC7;fontSize=12;fontStyle=1;verticalAlign=middle;align=center;" vertex="1" parent="1">
-          <mxGeometry x="750" y="584" width="140" height="60" as="geometry" />
+        <mxCell id="monitoring" value="Monitoring account&lt;br&gt;&lt;font style=&quot;font-size:10px;color:#5b6673&quot;&gt;Grafana · SigV4 scrape&lt;/font&gt;" style="image;sketch=0;html=1;aspect=fixed;image=img/lib/azure2/other/Grafana.svg;imageBackground=none;imageBorder=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="792" y="590" width="56" height="44" as="geometry" />
         </mxCell>
 
         <!-- Edges -->
