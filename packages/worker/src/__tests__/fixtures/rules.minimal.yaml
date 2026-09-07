@@ -1,0 +1,10 @@
+pre-llm:
+  rules:
+    - id: suppress-staging
+      condition:
+        serviceName: staging
+      actions:
+        - type: suppress
+
+post-llm:
+  rules: []

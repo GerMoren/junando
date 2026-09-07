@@ -54,7 +54,7 @@ export { createLLMProvider } from './infrastructure/llm/factory.js';
 export { GeminiProvider } from './infrastructure/llm/gemini.provider.js';
 export { MockLLMProvider } from './infrastructure/llm/mock.provider.js';
 export { OpenRouterProvider } from './infrastructure/llm/openrouter.provider.js';
-export { createNotifier } from './infrastructure/notifier/factory.js';
+export { createNotifier, createRuleEngine } from './infrastructure/notifier/factory.js';
 export { createRollbackActionHandler } from './infrastructure/rollback/factory.js';
 export { NoopRollbackActionHandler } from './infrastructure/rollback/noop-rollback-action.handler.js';
 export { ConsoleNotifier, SlackNotifier } from './infrastructure/notifier/slack.adapter.js';
