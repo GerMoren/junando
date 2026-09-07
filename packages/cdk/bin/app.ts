@@ -7,12 +7,16 @@ import { resolveDeployConfig } from '../lib/resolve-deploy-config.js';
 const app = new cdk.App();
 const awsEnv = process.env['AWS_ENV'];
 
-const { nodeEnv, ssmPrefix, resourceNamePrefix } = resolveDeployConfig({
+const { nodeEnv, ssmPrefix, resourceNamePrefix, bedrockFoundationModel } = resolveDeployConfig({
   awsEnv,
   envNodeEnv: process.env['NODE_ENV'],
   contextNodeEnv: app.node.tryGetContext('nodeEnv') as string | undefined,
   envSsmPrefix: process.env['SSM_PREFIX'],
   contextSsmPrefix: app.node.tryGetContext('ssmPrefix') as string | undefined,
+  envBedrockFoundationModel: process.env['BEDROCK_FOUNDATION_MODEL'],
+  contextBedrockFoundationModel: app.node.tryGetContext('bedrockFoundationModel') as
+    | string
+    | undefined,
 });
 
 const stackId = awsEnv ? `JunandoStack-${awsEnv}` : 'JunandoStack';
@@ -26,4 +30,5 @@ new JunandoStack(app, stackId, {
   nodeEnv,
   ssmPrefix,
   resourceNamePrefix,
+  bedrockFoundationModel,
 });

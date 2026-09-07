@@ -6,6 +6,7 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { type Construct } from 'constructs';
 import * as path from 'node:path';
+import { DEFAULT_BEDROCK_FOUNDATION_MODEL } from './resolve-deploy-config.js';
 
 // CDK is run from packages/cdk, so paths are relative to there
 const assetPath = (pkg: string) => path.join(process.cwd(), '..', pkg, 'dist');
@@ -21,6 +22,13 @@ export interface JunandoStackProps extends cdk.StackProps {
   ssmPrefix: string;
   /** Prefix for physical resource names — resolved by bin/app.ts. */
   resourceNamePrefix?: string;
+  /**
+   * Bedrock foundation model ID, WITHOUT a region prefix (e.g. 'amazon.nova-lite-v1:0').
+   * Resolved by bin/app.ts from BEDROCK_FOUNDATION_MODEL / CDK context, defaulting
+   * to Nova Lite. Both LLM_MODEL and the IAM grant's ARNs derive from this single
+   * value, so overriding the model can never leave the two out of sync.
+   */
+  bedrockFoundationModel?: string;
 }
 
 const DEFAULT_RESOURCE_NAME_PREFIX = 'junando';
@@ -28,9 +36,6 @@ const DEFAULT_RESOURCE_NAME_PREFIX = 'junando';
 function resourceName(prefix: string, suffix: string): string {
   return `${prefix}-${suffix}`;
 }
-
-/** Bedrock Nova model foundation name, without a region prefix. */
-const BEDROCK_NOVA_MODEL = 'amazon.nova-lite-v1:0';
 
 /** Maps a region's geo code (the segment before the first '-') to its Bedrock inference-profile prefix. */
 const BEDROCK_REGION_PREFIXES: Readonly<Record<string, string>> = {
@@ -60,7 +65,8 @@ export class JunandoStack extends cdk.Stack {
 
     // Fails synth loudly for an unmapped region — see bedrockRegionPrefix.
     const bedrockPrefix = bedrockRegionPrefix(this.region);
-    const bedrockModel = `${bedrockPrefix}${BEDROCK_NOVA_MODEL}`;
+    const bedrockFoundationModel = props.bedrockFoundationModel ?? DEFAULT_BEDROCK_FOUNDATION_MODEL;
+    const bedrockModel = `${bedrockPrefix}${bedrockFoundationModel}`;
 
     // ── Lambda Layer for shared packages (@junando/core) ─────────────────────
     const coreLayer = new lambda.LayerVersion(this, 'JunandoCoreLayer', {
@@ -203,7 +209,7 @@ export class JunandoStack extends cdk.Stack {
         actions: ['bedrock:InvokeModel'],
         resources: [
           `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/${bedrockModel}`,
-          `arn:aws:bedrock:${this.region}::foundation-model/${BEDROCK_NOVA_MODEL}`,
+          `arn:aws:bedrock:${this.region}::foundation-model/${bedrockFoundationModel}`,
         ],
       }),
     );

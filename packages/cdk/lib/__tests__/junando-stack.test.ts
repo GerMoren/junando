@@ -249,6 +249,28 @@ describe('JunandoStack Bedrock region mapping', () => {
     expect(JSON.stringify(policy)).toContain('us.amazon.nova-lite-v1:0');
   });
 
+  it('overrides the foundation model via bedrockFoundationModel, keeping LLM_MODEL and the IAM ARN in sync', () => {
+    const originalCwd = process.cwd();
+    process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
+
+    const app = new App();
+    const stack = new JunandoStack(app, 'JunandoStack-bedrock-custom-model', {
+      env: { account: '123456789012', region: 'us-east-1' },
+      nodeEnv: 'production',
+      ssmPrefix: DEFAULT_SSM_PREFIX,
+      bedrockFoundationModel: 'amazon.nova-pro-v1:0',
+    });
+    const template = Template.fromStack(stack);
+    process.chdir(originalCwd);
+
+    expect(workerEnv(template)?.['LLM_MODEL']).toBe('us.amazon.nova-pro-v1:0');
+
+    const json = JSON.stringify(bedrockPolicy(template));
+    expect(json).toContain('us.amazon.nova-pro-v1:0'); // inference-profile ARN
+    expect(json).toContain('::foundation-model/amazon.nova-pro-v1:0'); // foundation-model ARN, unprefixed
+    expect(json).not.toContain('nova-lite');
+  });
+
   it('throws at synth time for an unmapped region, naming the region', () => {
     const originalCwd = process.cwd();
     process.chdir(path.resolve(process.cwd(), 'packages/cdk'));
