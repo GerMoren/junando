@@ -213,8 +213,6 @@ secrets:
   SQS_QUEUE_URL: ""
   # DEDUP_TTL_SECONDS: deduplication TTL in seconds (default 300).
   DEDUP_TTL_SECONDS: ""
-  # CLUSTER_WINDOW_MS: alert clustering window in milliseconds (default 120000).
-  CLUSTER_WINDOW_MS: ""
   # LOG_LEVEL: application log level (trace | debug | info | warn | error).
   LOG_LEVEL: ""
   # NODE_ENV: runtime environment (development | test | production).

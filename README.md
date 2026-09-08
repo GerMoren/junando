@@ -153,7 +153,7 @@ Required environment variables:
 
 | Variable | Purpose |
 |---|---|
-| `LLM_PROVIDER` | `gemini`, `claude`, or `openrouter` |
+| `LLM_PROVIDER` | `gemini`, `claude`, `openrouter`, `qwen`, or `bedrock` |
 | `LLM_API_KEY` | API key for the chosen LLM provider |
 | `LOKI_URL` | Loki endpoint for log correlation |
 | `DEDUP_STORE` | `dynamodb` (default, AWS free-tier) or `redis` |
@@ -180,7 +180,7 @@ It complements your existing stack. It does not replace it.
 
 ## Status
 
-Active development. Currently used in staging environments. The core pipeline (ingest → dedup → enrich → notify) is stable. The business rules engine (filter, route, escalate by policy) is on the roadmap at [#29](https://github.com/GerMoren/junando/issues/29).
+Active development. Currently used in staging environments. The core pipeline (ingest → dedup → enrich → notify) is stable, including the business rules engine (suppress, route, escalate, and tag by policy — see [`rules.example.yaml`](packages/core/rules.example.yaml)).
 
 Feedback welcome — open an issue or start a discussion.
 

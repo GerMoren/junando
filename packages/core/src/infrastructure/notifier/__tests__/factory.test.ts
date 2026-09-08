@@ -21,7 +21,6 @@ function makeSlackConfig(overrides: Partial<Config> = {}): Config {
     llmModel: overrides.llmModel,
     notifierType: overrides.notifierType ?? 'slack',
     dedupTtlSeconds: overrides.dedupTtlSeconds ?? 300,
-    clusterWindowMs: overrides.clusterWindowMs ?? 120_000,
     logLevel: overrides.logLevel ?? 'info',
     nodeEnv: overrides.nodeEnv ?? NodeEnvironment.Test,
     llmFallbackModels: overrides.llmFallbackModels ?? [],

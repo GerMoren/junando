@@ -124,7 +124,6 @@ const ConfigSchema = z
     redisUrl: z.string().url().optional(), // was required; superRefine enforces it for redis
     sqsQueueUrl: z.string().url().optional().or(z.literal('')),
     dedupTtlSeconds: z.coerce.number().int().positive().default(300),
-    clusterWindowMs: z.coerce.number().int().positive().default(120_000),
     logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
     nodeEnv: z.nativeEnum(NodeEnvironment).default(NodeEnvironment.Development),
     llmFallbackModels: z
@@ -243,7 +242,6 @@ export async function loadConfig(): Promise<Config> {
     dedupTableName: process.env['DEDUP_TABLE_NAME'],
     sqsQueueUrl: process.env['SQS_QUEUE_URL'],
     dedupTtlSeconds: process.env['DEDUP_TTL_SECONDS'],
-    clusterWindowMs: process.env['CLUSTER_WINDOW_MS'],
     logLevel: process.env['LOG_LEVEL'],
     nodeEnv: process.env['NODE_ENV'],
     llmFallbackModels: process.env['LLM_FALLBACK_MODELS'],
