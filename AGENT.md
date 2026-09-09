@@ -237,7 +237,6 @@ Parse response with `LLMAnalysisSchema.parse()`. If parsing fails: send cluster 
 | `LLM_MODEL`         | provider default | Override specific model           |
 | `SQS_QUEUE_URL`     | empty            | If empty → local mode (no SQS)    |
 | `DEDUP_TTL_SECONDS` | `300`            | Dedup window in seconds           |
-| `CLUSTER_WINDOW_MS` | `120000`         | Clustering window in ms           |
 | `LOG_LEVEL`         | `info`           | Pino log level                    |
 | `NODE_ENV`          | `development`    | Set to `production` in AWS Lambda |
 | `PORT`              | `4000`           | Local dev server port             |

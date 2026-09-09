@@ -45,7 +45,6 @@ function makeAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     redisUrl: undefined,
     sqsQueueUrl: 'https://sqs.test.amazonaws.com/test-queue',
     dedupTtlSeconds: 300,
-    clusterWindowMs: 120_000,
     logLevel: 'info',
     nodeEnv: 'test' as AppConfig['nodeEnv'],
     llmFallbackModels: [],

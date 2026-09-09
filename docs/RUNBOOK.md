@@ -385,5 +385,5 @@ Look for abrupt terminations (no graceful error log):
     --type SecureString --overwrite
   ```
 - **Loki trace fetch hanging**: Loki calls are designed to fail gracefully. If they are blocking longer than expected, verify the Loki endpoint is responsive (see Scenario 1). The worker will continue without traces once the Loki client times out.
-- **Cluster too large**: If a single SQS message contains an unusually large alert cluster, it may exceed the Lambda budget. Review the clustering window (`CLUSTER_WINDOW_MS`) and consider reducing it to shrink cluster size.
+- **Cluster too large**: `ClusteringService` groups purely by fingerprint — there is no time window. Cluster size is bounded by how many alerts land in a single SQS message body. If a single message contains an unusually large alert cluster, it may exceed the Lambda budget; reduce the number of alerts batched per webhook publish, not a clustering window (there isn't one).
 - **Redrive DLQ after fixing the root cause** (see Scenario 3 remediation).

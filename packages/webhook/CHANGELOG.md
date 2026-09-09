@@ -1,5 +1,13 @@
 # @junando/webhook
 
+## 0.16.2
+
+### Patch Changes
+
+- 1ee77ce: Remove `CLUSTER_WINDOW_MS`/`clusterWindowMs`. It was parsed into `Config` but never read anywhere — `ClusteringService.buildClusters` groups purely by fingerprint, with no time window. Documented-but-absent behavior is worse than no documentation, so the dead config field, its `.env.example`/Helm entries, and its tests are removed rather than left in place.
+- Updated dependencies [1ee77ce]
+  - @junando/core@0.16.2
+
 ## 0.16.1
 
 ### Patch Changes
