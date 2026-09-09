@@ -29,6 +29,7 @@ Junando does **not** replace your observability stack. It makes it usable during
 | **Observability** | Already using Prometheus, Loki, Grafana, CloudWatch, or similar |
 | **Alerting** | Alertmanager or equivalent — already firing alerts |
 | **Pain trigger** | Incidents that span multiple services and require cross-team coordination |
+| **Data sensitivity** | Fintech, healthcare, government-adjacent, or any org where incident data (logs, traces, error payloads) cannot leave their own cloud perimeter |
 
 ### Secondary ICPs (downstream beneficiaries)
 
@@ -38,6 +39,10 @@ Once the primary ICP is served well, the same product naturally extends to:
 - **(c) Startups building observability from scratch** — they adopt Junando as the "right way" from day one
 
 > **Strategic note:** We do **not** target startups first. They lack the pain (few services, few alerts, one person on-call). The pain is real and measurable in mid-sized orgs — that is where Junando earns adoption.
+
+### Distribution channel (not an ICP): AWS consulting partners / MSPs
+
+Consultancies and MSPs managing multiple client AWS accounts do not feel the pain themselves — their clients do, and their clients are the primary ICP above. Treat partners as a **channel**, not a customer segment: each deployment still needs to serve one real primary-ICP account, not become a bespoke integration before the product itself is proven. Steplix's own AWS Advanced Consulting Partner status is the concrete instance of this channel today.
 
 ### Who Junando is NOT for
 
@@ -92,12 +97,14 @@ These are symptoms of the root cause. Solving traceability solves them too.
 | Routes to Slack/Teams | ✅ | ✅ |
 | **Deduplicates intelligently** (fingerprint + clustering) | ⚠️ Basic | ✅ Domain-aware |
 | **Correlates across logs, traces, metrics** | ❌ | ✅ Built-in |
-| **LLM-based incident analysis** | ❌ | ✅ Pluggable (Claude, Gemini, OpenRouter) |
+| **LLM-based incident analysis** | ❌ | ✅ Pluggable (Gemini, Claude, OpenRouter, Qwen, Bedrock) |
 | **CorrelationId-driven traceability** | ❌ | ✅ End-to-end |
 | **Drop-in for existing stack** (Loki, Prom, CW) | ❌ Reinvents | ✅ Consumes what you have |
 | **Open architecture** (ports & adapters) | ❌ Vendor lock-in | ✅ Swap any component |
+| **Data stays inside your own AWS account** | ❌ SaaS sends your logs/traces to a third party | ✅ Serverless, deployed in your own account — via Bedrock, incident data never has to leave your AWS perimeter |
+| **Cost** | 💰💰💰 Per-seat/per-host SaaS pricing (Datadog, PagerDuty) | ✅ Serverless pay-per-use — sub-dollar-scale monthly cost is realistic for typical alert volume (see #298 for measured numbers) |
 
-The differentiator is **not** the LLM by itself. It is the **architecture**: a clean correlation layer that you can plug into any existing stack and that uses the LLM to remove cognitive load — without forcing you to rebuild observability from scratch.
+The differentiator is **not** the LLM by itself. It is the **architecture**: a clean correlation layer that you can plug into any existing stack, that removes cognitive load without forcing you to rebuild observability from scratch — and that runs entirely inside the customer's own AWS account at a fraction of SaaS pricing. For orgs where compliance blocks sending logs/traces to a third-party SaaS, "runs in your account" is not a nice-to-have, it is the adoption blocker being removed.
 
 ---
 
