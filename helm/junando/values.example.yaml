@@ -91,7 +91,6 @@ secrets:
   REDIS_URL: "redis://redis.example.com:6379"
   SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-alerts"
   DEDUP_TTL_SECONDS: "300"
-  CLUSTER_WINDOW_MS: "120000"
   LOG_LEVEL: "info"
   NODE_ENV: "production"
   JUNANDO_WEBHOOK_URL: "http://junando-webhook:4000/webhook"

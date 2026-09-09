@@ -35,7 +35,6 @@ const validConfig = {
   REDIS_URL: 'redis://localhost:6379',
   SQS_QUEUE_URL: 'https://sqs.us-east-1.amazonaws.com/123456789/test-queue',
   DEDUP_TTL_SECONDS: '600',
-  CLUSTER_WINDOW_MS: '60000',
   LOG_LEVEL: 'debug',
   NODE_ENV: 'production',
   DEDUP_TABLE_NAME: 'junando-dedup',
@@ -267,18 +266,6 @@ describe('Config — loadConfig', () => {
       setEnv({ ...validConfig, DEDUP_TTL_SECONDS: '120' });
       const config = await loadConfig();
       expect(config.dedupTtlSeconds).toBe(120);
-    });
-
-    it('uses default clusterWindowMs (120000)', async () => {
-      setEnv({ ...validConfig, CLUSTER_WINDOW_MS: undefined });
-      const config = await loadConfig();
-      expect(config.clusterWindowMs).toBe(120_000);
-    });
-
-    it('accepts custom clusterWindowMs', async () => {
-      setEnv({ ...validConfig, CLUSTER_WINDOW_MS: '60000' });
-      const config = await loadConfig();
-      expect(config.clusterWindowMs).toBe(60_000);
     });
 
     it('uses default logLevel (info)', async () => {
