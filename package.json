@@ -61,7 +61,7 @@
     "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-sqs": "^3.1127.0",
     "@aws-sdk/client-ssm": "^3.1127.0",
-    "@aws-sdk/credential-provider-node": "^3.972.82",
+    "@aws-sdk/credential-provider-node": "^3.972.83",
     "@smithy/protocol-http": "^5.6.2",
     "@smithy/signature-v4": "^5.7.3",
     "bottleneck": "^2.19.5",
