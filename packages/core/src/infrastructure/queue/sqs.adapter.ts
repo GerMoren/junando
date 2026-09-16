@@ -6,6 +6,11 @@ import { createLogger } from '../../shared/logger/index.js';
 import { Fingerprint } from '../../domain/value-objects/fingerprint.js';
 
 const logger = createLogger();
+const FIFO_QUEUE_SUFFIX = '.fifo';
+
+function isFifoQueueUrl(queueUrl: string): boolean {
+  return queueUrl.endsWith(FIFO_QUEUE_SUFFIX);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SQSAlertQueue — Infrastructure adapter.
@@ -40,8 +45,10 @@ export class SQSAlertQueue implements IAlertQueue {
       new SendMessageCommand({
         QueueUrl: this.queueUrl,
         MessageBody: params.messageBody,
-        MessageGroupId: params.messageGroupId,
-        MessageDeduplicationId: params.messageDeduplicationId,
+        ...(isFifoQueueUrl(this.queueUrl) && {
+          MessageGroupId: params.messageGroupId,
+          MessageDeduplicationId: params.messageDeduplicationId,
+        }),
       }),
     );
   }
