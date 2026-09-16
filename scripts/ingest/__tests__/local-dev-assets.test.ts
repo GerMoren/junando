@@ -46,7 +46,7 @@ describe("Work Unit 3 local-dev assets", () => {
 
     const bootstrap = readRepoFile("docker/localstack/init/10-create-sqs-queue.sh");
     expect(bootstrap).toContain("awslocal sqs create-queue");
-    expect(bootstrap).toContain("junando-cenco-phase-a");
+    expect(bootstrap).toContain("junando-alerts");
   });
 
   it("documents a local SQS runner command and bundles script-level ingest runtime files in the ingest image", () => {
