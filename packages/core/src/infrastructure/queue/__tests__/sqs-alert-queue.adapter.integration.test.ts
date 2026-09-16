@@ -5,8 +5,8 @@ import { SQSAlertQueue } from '../sqs.adapter.js';
 
 const LOCALSTACK_ENDPOINT = 'http://localhost:4566';
 const REGION = 'us-east-1';
-const STANDARD_QUEUE_NAME = 'junando-cenco-phase-a';
-const FIFO_QUEUE_NAME = 'junando-cenco-phase-a.fifo';
+const STANDARD_QUEUE_NAME = 'junando-alerts';
+const FIFO_QUEUE_NAME = 'junando-alerts.fifo';
 const client = new SQSClient({
   credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
   endpoint: LOCALSTACK_ENDPOINT,

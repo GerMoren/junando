@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-QUEUE_NAME='junando-cenco-phase-a'
-FIFO_QUEUE_NAME='junando-cenco-phase-a.fifo'
+QUEUE_NAME='junando-alerts'
+FIFO_QUEUE_NAME='junando-alerts.fifo'
 TABLE_NAME='junando-dedup'
 
 awslocal sqs create-queue --queue-name "$QUEUE_NAME" >/dev/null

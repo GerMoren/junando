@@ -9,8 +9,8 @@ The tests require:
 - **Redis** on `localhost:6379`
 - **LocalStack** on `localhost:4566` with `sqs` and `dynamodb` services enabled
 - The three resources below provisioned in LocalStack:
-  - SQS standard queue: `junando-cenco-phase-a`
-  - SQS FIFO queue: `junando-cenco-phase-a.fifo`
+  - SQS standard queue: `junando-alerts`
+  - SQS FIFO queue: `junando-alerts.fifo`
   - DynamoDB table: `junando-dedup` (partition key `fingerprint`, TTL attribute `expiresAt`)
 
 ## Local model (OrbStack / Docker)
