@@ -30,7 +30,7 @@
     "prepublishOnly": "pnpm clean && pnpm build && node scripts/verify-tarball.js"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "tsdown": "^0.23.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

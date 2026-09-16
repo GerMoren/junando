@@ -24,9 +24,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "@anthropic-ai/sdk": "^0.125.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1127.0",
-    "@aws-sdk/client-dynamodb": "^3.1127.0",
+    "@aws-sdk/client-dynamodb": "^3.1131.0",
     "@google/generative-ai": "^0.24.1",
     "@types/opossum": "^8.1.9",
     "ioredis": "^6.0.0",
@@ -37,7 +37,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "tsdown": "^0.23.0",
     "typescript": "^7.0.2"
   },
