@@ -15,8 +15,8 @@ importers:
         specifier: ^3.1131.0
         version: 3.1131.0
       '@aws-sdk/client-ssm':
-        specifier: ^3.1127.0
-        version: 3.1127.0
+        specifier: ^3.1131.0
+        version: 3.1131.0
       '@aws-sdk/credential-provider-node':
         specifier: ^3.972.83
         version: 3.972.83
@@ -268,8 +268,8 @@ importers:
         specifier: ^3.1131.0
         version: 3.1131.0
       '@aws-sdk/client-ssm':
-        specifier: ^3.1127.0
-        version: 3.1127.0
+        specifier: ^3.1131.0
+        version: 3.1131.0
       '@junando/core':
         specifier: workspace:*
         version: link:../core
@@ -465,8 +465,8 @@ packages:
     resolution: {integrity: sha512-vXKH0iLF+VR0mWg65LjGyA4C7h9vhodEL/Oxd/gZr5BH5eRZb1le2uVQVT7P8aFjA8FnoFW3LVV37ewSrFZAwg==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-ssm@3.1127.0':
-    resolution: {integrity: sha512-EVjNFjN68RiOv8vLEjkQ22g3PPFwI6JiuRhkWmD+xHVVmWlcgUr9DMueU6fRwql53CJu9Gl6h4EByzsyXKfgrw==}
+  '@aws-sdk/client-ssm@3.1131.0':
+    resolution: {integrity: sha512-WT5keqh6qdK+g6aQ4R15xmPcy/u1LiIZseiFJAyiRB37V16akc56zYx+ZjcMXKFJRG1o9srXHuJNe+ZTYGhrmA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.977.9':
@@ -3946,12 +3946,12 @@ snapshots:
       '@smithy/types': 4.18.0
       tslib: 2.8.1
 
-  '@aws-sdk/client-ssm@3.1127.0':
+  '@aws-sdk/client-ssm@3.1131.0':
     dependencies:
-      '@aws-sdk/core': 3.977.9
+      '@aws-sdk/core': 3.978.0
       '@aws-sdk/credential-provider-node': 3.972.83
       '@aws-sdk/types': 3.974.5
-      '@smithy/core': 3.33.3
+      '@smithy/core': 3.34.1
       '@smithy/fetch-http-handler': 5.8.0
       '@smithy/node-http-handler': 4.12.1
       '@smithy/types': 4.18.0
