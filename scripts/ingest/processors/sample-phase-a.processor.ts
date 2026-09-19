@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { NormalizedAlert, ProcessIncidentUseCase } from "../../../packages/core/src/index.js";
 import { AlertType } from "../../../packages/core/src/shared/constants.js";
 
-interface CencoPhaseAPayload {
+interface SamplePhaseAPayload {
   uploadId?: string;
   channel: string;
   application: string;
@@ -13,22 +13,22 @@ interface CencoPhaseAPayload {
   originFlow?: string;
 }
 
-export interface CencoPhaseAProcessorDeps {
+export interface SamplePhaseAProcessorDeps {
   processIncidentUseCase: Pick<ProcessIncidentUseCase, "execute">;
 }
 
-export function createCencoPhaseAProcessor(deps: CencoPhaseAProcessorDeps) {
+export function createSamplePhaseAProcessor(deps: SamplePhaseAProcessorDeps) {
   return async (message: Message): Promise<void> => {
-    const payload = decodeCencoPhaseAMessage(message);
-    const alerts = mapCencoPhaseAPayloadToAlerts(payload);
+    const payload = decodeSamplePhaseAMessage(message);
+    const alerts = mapSamplePhaseAPayloadToAlerts(payload);
     const correlationId = resolveCorrelationId(payload, message);
     await deps.processIncidentUseCase.execute(alerts, correlationId);
   };
 }
 
-export function decodeCencoPhaseAMessage(message: Message): CencoPhaseAPayload {
+export function decodeSamplePhaseAMessage(message: Message): SamplePhaseAPayload {
   if (!message.Body || message.Body.trim() === "") {
-    throw new Error("Invalid Cenco Phase A message JSON: missing SQS body");
+    throw new Error("Invalid Sample Phase A message JSON: missing SQS body");
   }
 
   let raw: unknown;
@@ -36,17 +36,17 @@ export function decodeCencoPhaseAMessage(message: Message): CencoPhaseAPayload {
     raw = JSON.parse(message.Body);
   } catch (err) {
     const details = err instanceof Error ? err.message : String(err);
-    throw new Error(`Invalid Cenco Phase A message JSON: ${details}`);
+    throw new Error(`Invalid Sample Phase A message JSON: ${details}`);
   }
 
-  if (!isCencoPhaseAPayload(raw)) {
-    throw new Error("Invalid Cenco Phase A message payload");
+  if (!isSamplePhaseAPayload(raw)) {
+    throw new Error("Invalid Sample Phase A message payload");
   }
 
   return raw;
 }
 
-export function mapCencoPhaseAPayloadToAlerts(payload: CencoPhaseAPayload): NormalizedAlert[] {
+export function mapSamplePhaseAPayloadToAlerts(payload: SamplePhaseAPayload): NormalizedAlert[] {
   const serviceName = payload.application.trim();
   const messageType = payload.messageType.trim().toLowerCase();
   const endpointPath = payload.originFlow?.trim() ?? "";
@@ -70,7 +70,7 @@ export function mapCencoPhaseAPayloadToAlerts(payload: CencoPhaseAPayload): Norm
     endpointPath,
     startsAt: new Date().toISOString(),
     labels: {
-      source: "cenco-phase-a",
+      source: "sample-phase-a",
       channel,
       application: serviceName,
       messageType,
@@ -85,7 +85,7 @@ export function mapCencoPhaseAPayloadToAlerts(payload: CencoPhaseAPayload): Norm
   return [alert];
 }
 
-function resolveCorrelationId(payload: CencoPhaseAPayload, message: Message): string {
+function resolveCorrelationId(payload: SamplePhaseAPayload, message: Message): string {
   return payload.uploadId?.trim() || message.MessageId || "generic";
 }
 
@@ -94,7 +94,7 @@ function mapMessageTypeToAlertType(messageType: string): AlertType {
 }
 
 function buildAlertName(application: string, messageType: string): string {
-  return `Cenco${toPascalCase(application)}${toPascalCase(messageType)}`;
+  return `Sample${toPascalCase(application)}${toPascalCase(messageType)}`;
 }
 
 function toPascalCase(value: string): string {
@@ -125,7 +125,7 @@ function computeFingerprint(input: {
   return createHash("sha256").update(seed).digest("hex");
 }
 
-function isCencoPhaseAPayload(value: unknown): value is CencoPhaseAPayload {
+function isSamplePhaseAPayload(value: unknown): value is SamplePhaseAPayload {
   if (!value || typeof value !== "object") {
     return false;
   }

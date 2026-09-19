@@ -11,7 +11,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Cenco traceability events from OpenSearch — searchable panel for CR, Calidad and business users.",
+  "description": "Sample traceability events from OpenSearch — searchable panel for CR, Calidad and business users.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -166,12 +166,12 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["cenco", "traceability", "opensearch"],
+  "tags": ["junando", "traceability", "opensearch"],
   "templating": {
     "list": [
       {
         "current": { "selected": false, "text": "", "value": "" },
-        "description": "Free-text Lucene query — e.g. uploadId:abc123 AND channel:CENCO",
+        "description": "Free-text Lucene query — e.g. uploadId:abc123 AND channel:SAMPLE",
         "hide": 0,
         "label": "Search query",
         "name": "query",
@@ -247,7 +247,7 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Cenco Traceability",
-  "uid": "cenco-traceability-v1",
+  "title": "Junando Traceability",
+  "uid": "junando-traceability-v1",
   "version": 1
 }

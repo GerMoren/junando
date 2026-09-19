@@ -42,7 +42,7 @@ We use two patterns and both are accepted:
 - `packages/core/src/infrastructure/dedup/__tests__/redis-dedup.adapter.test.ts`
 - `packages/core/src/infrastructure/notifier/__tests__/slack.adapter.test.ts`
 - `packages/ingest/src/polling/__tests__/ingest-runner.test.ts`
-- `scripts/ingest/processors/__tests__/cenco-phase-a.processor.test.ts`
+- `scripts/ingest/processors/__tests__/sample-phase-a.processor.test.ts`
 
 ### E2E
 

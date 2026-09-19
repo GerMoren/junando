@@ -49,7 +49,7 @@ services:
       - '../docs/dashboards/alert-volume.json:/var/lib/grafana/dashboards/alert-volume.json'
       - '../docs/dashboards/llm-performance.json:/var/lib/grafana/dashboards/llm-performance.json'
       - '../docs/dashboards/sqs-health.json:/var/lib/grafana/dashboards/sqs-health.json'
-      - '../docs/dashboards/cenco-traceability.json:/var/lib/grafana/dashboards/cenco-traceability.json'
+      - '../docs/dashboards/junando-traceability.json:/var/lib/grafana/dashboards/junando-traceability.json'
       - '../docs/dashboards/junando-slis.json:/var/lib/grafana/dashboards/junando-slis.json'
 
   opensearch:
