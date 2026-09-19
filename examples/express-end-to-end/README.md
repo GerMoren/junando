@@ -21,7 +21,7 @@ Total time to first Slack message: about 5 minutes including filling in credenti
 
 - Docker + Docker Compose
 - A Slack bot token (or a Microsoft Teams Power Automate webhook — see `.env.example`)
-- An LLM API key (Qwen, Claude, Gemini, or OpenRouter)
+- An LLM API key (Qwen, Claude, Gemini, or OpenRouter). Amazon Bedrock is also supported but needs AWS IAM credentials instead of an API key — see [DEPLOY.md](../../DEPLOY.md).
 
 That is it. You do not need to clone the Junando monorepo or build any package — the example uses the published `ghcr.io/germoren/junando-webhook:latest` image by default.
 

@@ -47,18 +47,18 @@ Your AWS credentials need these permissions:
 
 ### 1. Configure SSM Parameter Store Secrets
 
-Create these 10 SecureString parameters in AWS Systems Manager Parameter Store. The names below use the production prefix; use a pilot-only prefix such as `/junando-pilot/...` for the pilot.
+Create these SecureString parameters in AWS Systems Manager Parameter Store (`redis-url` only if `DEDUP_STORE=redis`; `llm-api-key` is skipped for the `bedrock` provider). The names below use the production prefix; use a pilot-only prefix such as `/junando-pilot/...` for the pilot.
 
 | Parameter                           | Description                                               | Example Value                                                   |
 | ----------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
-| `/junando/llm-provider`             | AI provider                                               | `openrouter`, `claude`, `gemini`, `qwen`                        |
-| `/junando/llm-api-key`              | API key for LLM                                           | `sk-or-...`                                                     |
+| `/junando/llm-provider`             | AI provider                                               | `openrouter`, `claude`, `gemini`, `qwen`, `bedrock`             |
+| `/junando/llm-api-key`              | API key for LLM (**not needed for `bedrock`** — it authenticates via the Lambda's IAM role instead) | `sk-or-...` |
 | `/junando/llm-model`                | Model override (optional but recommended)                 | `google/gemma-4-31b-it:free`                                    |
 | `/junando/slack-bot-token`          | Slack bot token                                           | `xoxb-...`                                                      |
 | `/junando/slack-signing-secret`     | Slack signing secret                                      | `your_signing_secret`                                           |
 | `/junando/slack-channel`            | Target Slack channel                                      | `#incidents`                                                    |
 | `/junando/loki-url`                 | Grafana Cloud Loki push URL **with embedded credentials** | `https://USER:TOKEN@logs-prod-XXX.grafana.net/loki/api/v1/push` |
-| `/junando/redis-url`                | Redis URL for dedup                                       | `redis://your-redis:6379`                                       |
+| `/junando/redis-url`                | Redis URL for dedup (**only needed if `DEDUP_STORE=redis`** — the default is DynamoDB, provisioned automatically by the CDK stack, no parameter required) | `redis://your-redis:6379` |
 | `/junando/llm-fallback-models`      | Comma-separated fallback model list (optional)            | `google/gemma-4-31b-it:free,mistralai/mistral-7b-instruct:free` |
 | `/junando/llm-fallback-timeout-ms`  | Wall-clock timeout ms for entire fallback chain (optional) | `60000`                                                        |
 
@@ -276,7 +276,7 @@ Alertmanager -> public webhook Function URL -> SQS queue -> worker Lambda
 - [ ] Node.js 24+, pnpm, Docker (for local preparation), and repository access are available.
 - [ ] The 10 required SSM parameters exist under the pilot `SSM_PREFIX` and are `SecureString` values.
 - [ ] LLM provider, model/quota, and API key are approved for staging use.
-- [ ] Redis is reachable from Lambda for deduplication.
+- [ ] Deduplication store is confirmed: DynamoDB (the default, provisioned automatically by the CDK stack — no extra setup) or, only if `DEDUP_STORE=redis` was explicitly chosen, Redis is reachable from Lambda.
 - [ ] Loki is reachable and its token has the required `logs:write` scope, or the pilot accepts reduced trace context.
 - [ ] Slack bot is installed and invited to the target channel, or Teams Power Automate webhook is ready with an `api-version=` query parameter.
 - [ ] Alertmanager can reach the public `WebhookURL` over HTTPS.
