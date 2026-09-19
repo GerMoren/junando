@@ -51,6 +51,7 @@ coverage/
 .windsurf/
 .pi/
 .pi-lens/
+.codegraph/
 artifacts/
 openspec/
 
