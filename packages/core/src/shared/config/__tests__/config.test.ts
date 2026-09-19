@@ -13,7 +13,7 @@ const mockWarn = vi.hoisted(() => vi.fn());
 
 vi.mock('@aws-sdk/client-ssm', () => ({
   SSMClient: vi.fn(function () { return mockSSMClient; }),
-  GetParametersCommand: vi.fn(),
+  GetParametersByPathCommand: vi.fn(),
 }));
 
 vi.mock('../../logger/index.js', () => ({
@@ -437,54 +437,26 @@ describe('Config — loadConfig', () => {
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
     });
 
-    it('warns exactly once naming the InvalidParameters paths', async () => {
-      mockSend.mockResolvedValueOnce({
-        Parameters: [
-          { Name: '/junando/llm-provider', Value: 'gemini' },
-          { Name: '/junando/llm-api-key', Value: 'sk-distinctive-value-abc' },
-        ],
-        InvalidParameters: ['/junando/redis-url', '/junando/teams-webhook-url'],
-      });
+    it('paginates through NextToken until exhausted', async () => {
+      mockSend
+        .mockResolvedValueOnce({
+          Parameters: [{ Name: '/junando/llm-provider', Value: 'claude' }],
+          NextToken: 'page-2',
+        })
+        .mockResolvedValueOnce({
+          Parameters: [{ Name: '/junando/llm-api-key', Value: 'sk-page-2' }],
+        });
 
       setEnv(validConfig);
       process.env.SSM_PREFIX = '/junando';
-
-      await loadConfig();
-
-      expect(mockWarn).toHaveBeenCalledTimes(1);
-      const payload = mockWarn.mock.calls[0]?.[0];
-      expect(payload.missingParameters).toEqual([
-        '/junando/redis-url',
-        '/junando/teams-webhook-url',
-      ]);
-      expect(JSON.stringify(mockWarn.mock.calls)).not.toContain('sk-distinctive-value-abc');
-    });
-
-    it('applies returned Parameters even when InvalidParameters is also present', async () => {
-      mockSend.mockResolvedValueOnce({
-        Parameters: [{ Name: '/junando/llm-provider', Value: 'claude' }],
-        InvalidParameters: ['/junando/redis-url'],
-      });
-
-      setEnv(validConfig);
-      process.env.SSM_PREFIX = '/junando';
+      delete process.env.LLM_PROVIDER;
+      delete process.env.LLM_API_KEY;
 
       const config = await loadConfig();
 
+      expect(mockSend).toHaveBeenCalledTimes(2);
       expect(config.llmProvider).toBe('claude');
-    });
-
-    it('does not warn when InvalidParameters is absent', async () => {
-      mockSend.mockResolvedValueOnce({
-        Parameters: [{ Name: '/junando/llm-provider', Value: 'gemini' }],
-      });
-
-      setEnv(validConfig);
-      process.env.SSM_PREFIX = '/junando';
-
-      await loadConfig();
-
-      expect(mockWarn).not.toHaveBeenCalled();
+      expect(config.llmApiKey).toBe('sk-page-2');
     });
   });
 

@@ -1,4 +1,4 @@
-import { GetParametersCommand, SSMClient } from '@aws-sdk/client-ssm';
+import { GetParametersByPathCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { z } from 'zod';
 import { LLM_FALLBACK_DEFAULTS, LLMProviderType } from '../constants.js';
 import { createLogger } from '../logger/index.js';
@@ -59,42 +59,29 @@ async function loadSecretsFromSSM(): Promise<void> {
   }
 
   const client = new SSMClient({});
-  const names = [
-    `${prefix}/llm-provider`,
-    `${prefix}/llm-api-key`,
-    `${prefix}/llm-model`,
-    `${prefix}/slack-bot-token`,
-    `${prefix}/slack-signing-secret`,
-    `${prefix}/slack-channel`,
-    `${prefix}/loki-url`,
-    `${prefix}/redis-url`,
-    `${prefix}/llm-fallback-models`,
-    `${prefix}/llm-fallback-timeout-ms`,
-    `${prefix}/rollback-action-enabled`,
-    `${prefix}/rollback-action-allowed-slack-user-ids`,
-  ];
 
   try {
-    const result = await client.send(
-      new GetParametersCommand({
-        Names: names,
-        WithDecryption: true,
-      }),
-    );
+    let nextToken: string | undefined;
+    do {
+      const result = await client.send(
+        new GetParametersByPathCommand({
+          Path: prefix,
+          Recursive: true,
+          WithDecryption: true,
+          NextToken: nextToken,
+        }),
+      );
 
-    for (const param of result.Parameters ?? []) {
-      if (param.Name && param.Value) {
-        // Convert /junando/llm-provider -> LLM_PROVIDER
-        const key = param.Name.replace(`${prefix}/`, '').replaceAll('-', '_').toUpperCase();
-        process.env[key] = param.Value;
+      for (const param of result.Parameters ?? []) {
+        if (param.Name && param.Value) {
+          // Convert /junando/llm-provider -> LLM_PROVIDER
+          const key = param.Name.replace(`${prefix}/`, '').replaceAll('-', '_').toUpperCase();
+          process.env[key] = param.Value;
+        }
       }
-    }
 
-    const missing = result.InvalidParameters ?? [];
-    if (missing.length > 0) {
-      // Paths only — the paths are not secrets, the values are.
-      createLogger().warn({ missingParameters: missing }, 'SSM parameters not found');
-    }
+      nextToken = result.NextToken;
+    } while (nextToken);
   } catch (err) {
     createLogger().error({ err }, 'Failed to load SSM parameters');
   }
