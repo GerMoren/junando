@@ -12,7 +12,7 @@ Teams who want to evaluate Junando with real alert traffic before committing to 
 ## What's Needed
 
 - An AWS account with permissions to deploy CDK stacks
-- Access to an LLM provider (OpenRouter, Gemini, Claude)
+- Access to an LLM provider (OpenRouter, Gemini, Claude, Qwen, or Amazon Bedrock)
 - A Slack workspace or Teams channel for notifications
 - Alertmanager or another webhook-compatible alert source
 
@@ -26,7 +26,7 @@ AWS_ENV=pilot NODE_ENV=staging SSM_PREFIX=/junando-pilot pnpm cdk deploy --all
 
 ## Status
 
-The core pipeline (ingest → dedup → enrich → notify) is stable. Business rules engine (filter, route, escalate by policy) is on the roadmap.
+The core pipeline (ingest → dedup → enrich → notify) is stable, including the business rules engine (suppress, route, escalate, and tag by policy — see `rules.example.yaml`).
 
 **Note**: Issue [#155](https://github.com/GerMoren/junando/issues/155) tracks the external team setup required to close the pilot loop. An external team is needed for closure.
 

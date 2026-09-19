@@ -84,7 +84,7 @@ For a full walkthrough: [`examples/express-end-to-end/README.md`](examples/expre
 
 ## Key design decisions
 
-**Bring your own LLM** — Gemini, Claude, OpenRouter, or anything with a compatible API. No vendor lock-in.
+**Bring your own LLM** — Gemini, Claude, OpenRouter, Qwen, Amazon Bedrock, or anything with a compatible API. No vendor lock-in.
 
 **Hexagonal architecture** — Alert sources (Loki, Prometheus, webhook, SQS) and notification targets (Slack, Teams) are ports. You can swap or add adapters without touching the core pipeline.
 
