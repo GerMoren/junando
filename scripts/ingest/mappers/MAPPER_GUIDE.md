@@ -120,4 +120,4 @@ ingest:
 
 ## Reference implementation
 
-See `ps-cencopim-ecosystem-error-manager` (or the issue linked in #35) for a real-world example of a mapper that handles the Cenco error-management SQS message schema.
+See the issue linked in #35 for a real-world example of a mapper that handles an error-management SQS message schema from an upstream system.

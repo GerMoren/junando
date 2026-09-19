@@ -58,7 +58,7 @@ const myMapper: IMessageMapper = {
   },
 }
 
-registerMapper(cencoMapper)
+registerMapper(myMapper)
 
 const subscriber = new SqsSubscriber({
   queueUrl: process.env.SQS_QUEUE_URL!,

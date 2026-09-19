@@ -5,7 +5,7 @@
 ingest:
   kind: sqs
   sqs:
-    queueUrl: https://sqs.us-east-1.amazonaws.com/123456789012/junando-cenco-phase-a
+    queueUrl: https://sqs.us-east-1.amazonaws.com/123456789012/junando-alerts
     waitTimeSeconds: 20
     visibilityTimeoutSeconds: 60
     batchSize: 10
@@ -13,4 +13,4 @@ ingest:
     # Optional local/dev override (for example LocalStack):
     # endpointUrl: http://localhost:4566
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1

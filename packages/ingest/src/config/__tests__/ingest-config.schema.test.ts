@@ -49,7 +49,7 @@ ingest:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
 ${overrides}
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1
 `.trim();
 }
 
@@ -222,7 +222,7 @@ ingest:
   sqs:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1
 `.trim();
     const config = loadIngestConfig(yaml);
 
@@ -257,11 +257,11 @@ ingest:
   sqs:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
   opensearch:
-    endpoint: "https://search-cenco.us-east-1.es.amazonaws.com"
-    indexName: "cenco-traceability"
+    endpoint: "https://search-junando.us-east-1.es.amazonaws.com"
+    indexName: "junando-traceability"
     region: "us-east-1"
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1
 `.trim();
     const config = loadIngestConfig(yaml);
 
@@ -271,8 +271,8 @@ ingest:
     }
 
     expect(config.ingest.opensearch).toEqual({
-      endpoint: 'https://search-cenco.us-east-1.es.amazonaws.com',
-      indexName: 'cenco-traceability',
+      endpoint: 'https://search-junando.us-east-1.es.amazonaws.com',
+      indexName: 'junando-traceability',
       region: 'us-east-1',
     });
   });
@@ -285,7 +285,7 @@ ingest:
   sqs:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1
 `.trim(),
     );
 
@@ -296,7 +296,7 @@ ingest:
   it('CFG-02-J: valid kind=sqs config includes the mapper.kind field', () => {
     const config = loadIngestConfig(minimalSqsYaml());
     if (config.ingest.kind !== 'sqs') throw new Error('Expected sqs config');
-    expect(config.ingest.mapper).toEqual({ kind: 'cenco-error-v1' });
+    expect(config.ingest.mapper).toEqual({ kind: 'sample-v1' });
   });
 
   it('CFG-02-I: opensearch block rejects an invalid endpoint URL', () => {
@@ -307,7 +307,7 @@ ingest:
     queueUrl: "https://sqs.us-east-1.amazonaws.com/123456789012/junando-errors"
   opensearch:
     endpoint: "not-a-url"
-    indexName: "cenco-traceability"
+    indexName: "junando-traceability"
     region: "us-east-1"
 `.trim();
     expect(() => loadIngestConfig(yaml)).toThrow(/endpoint/i);

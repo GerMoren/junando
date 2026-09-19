@@ -47,7 +47,7 @@ describe('OpenSearchIndexer', () => {
     const fetcher = makeFetcher();
     const indexer = new OpenSearchIndexer({
       endpoint: 'https://search.example.com',
-      indexName: 'cenco-traceability',
+      indexName: 'junando-traceability',
       region: 'us-east-1',
       fetcher,
     });
@@ -58,7 +58,7 @@ describe('OpenSearchIndexer', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     const request = (fetcher as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as SignedHttpRequest;
     expect(request.method).toBe('POST');
-    expect(request.url).toBe('https://search.example.com/cenco-traceability/_doc');
+    expect(request.url).toBe('https://search.example.com/junando-traceability/_doc');
     expect(request.headers['content-type']).toBe('application/json');
     expect(JSON.parse(request.body)).toEqual(doc);
   });
@@ -67,7 +67,7 @@ describe('OpenSearchIndexer', () => {
     const fetcher = makeFetcher();
     const indexer = new OpenSearchIndexer({
       endpoint: 'https://search.example.com/',
-      indexName: 'cenco-traceability',
+      indexName: 'junando-traceability',
       region: 'us-east-1',
       fetcher,
     });
@@ -75,14 +75,14 @@ describe('OpenSearchIndexer', () => {
     await indexer.index(makeDoc());
 
     const request = (fetcher as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as SignedHttpRequest;
-    expect(request.url).toBe('https://search.example.com/cenco-traceability/_doc');
+    expect(request.url).toBe('https://search.example.com/junando-traceability/_doc');
   });
 
   it('throws when the OpenSearch response status is not 2xx', async () => {
     const fetcher = makeFetcher({ status: 403, body: 'forbidden' });
     const indexer = new OpenSearchIndexer({
       endpoint: 'https://search.example.com',
-      indexName: 'cenco-traceability',
+      indexName: 'junando-traceability',
       region: 'us-east-1',
       fetcher,
     });

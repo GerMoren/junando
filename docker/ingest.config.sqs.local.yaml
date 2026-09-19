@@ -1,15 +1,15 @@
 # ingest.config.sqs.local.yaml
-# LocalStack-friendly SQS ingest config for Cenco Phase A local smoke runs.
+# LocalStack-friendly SQS ingest config for sample Phase A local smoke runs.
 # Queue bootstrap lives in docker/localstack/init/10-create-sqs-queue.sh.
 
 ingest:
   kind: sqs
   sqs:
-    queueUrl: http://localhost:4566/000000000000/junando-cenco-phase-a
+    queueUrl: http://localhost:4566/000000000000/junando-alerts
     endpointUrl: http://localhost:4566
     waitTimeSeconds: 20
     visibilityTimeoutSeconds: 60
     batchSize: 10
     maxInFlight: 10
   mapper:
-    kind: cenco-error-v1
+    kind: sample-v1

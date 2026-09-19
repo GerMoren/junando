@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Message } from "@aws-sdk/client-sqs";
-import { createCencoPhaseAProcessor } from "../cenco-phase-a.processor.js";
+import { createSamplePhaseAProcessor } from "../sample-phase-a.processor.js";
 
 function makeMessage(body: unknown, overrides: Partial<Message> = {}): Message {
   return {
@@ -11,10 +11,10 @@ function makeMessage(body: unknown, overrides: Partial<Message> = {}): Message {
   };
 }
 
-describe("createCencoPhaseAProcessor", () => {
-  it("decodes a Cenco message, maps it to alerts, and calls ProcessIncidentUseCase.execute", async () => {
+describe("createSamplePhaseAProcessor", () => {
+  it("decodes a Sample message, maps it to alerts, and calls ProcessIncidentUseCase.execute", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 
@@ -36,13 +36,13 @@ describe("createCencoPhaseAProcessor", () => {
     expect(correlationId).toBe("upload-abc");
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({
-      alertName: "CencoImporterError",
+      alertName: "SampleImporterError",
       status: "firing",
       serviceName: "importer",
       alertType: "http_500",
       endpointPath: "catalog-sync",
       labels: {
-        source: "cenco-phase-a",
+        source: "sample-phase-a",
         channel: "easy",
         application: "importer",
         messageType: "error",
@@ -60,20 +60,20 @@ describe("createCencoPhaseAProcessor", () => {
 
   it("throws when the SQS body is malformed JSON", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 
     await expect(
       processMessage({ MessageId: "bad-json", Body: "{not-json" } as Message),
-    ).rejects.toThrow(/invalid cenco phase a message json/i);
+    ).rejects.toThrow(/invalid sample phase a message json/i);
 
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("throws when the SQS body is empty or whitespace", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 
@@ -84,9 +84,9 @@ describe("createCencoPhaseAProcessor", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
-  it("throws when the parsed JSON does not match the expected Cenco payload shape", async () => {
+  it("throws when the parsed JSON does not match the expected Sample payload shape", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 
@@ -99,14 +99,14 @@ describe("createCencoPhaseAProcessor", () => {
           message: "broken payload",
         }),
       ),
-    ).rejects.toThrow(/invalid cenco phase a message payload/i);
+    ).rejects.toThrow(/invalid sample phase a message payload/i);
 
     expect(execute).not.toHaveBeenCalled();
   });
 
   it("falls back to SQS MessageId when uploadId is missing", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 
@@ -127,12 +127,12 @@ describe("createCencoPhaseAProcessor", () => {
 
     expect(correlationId).toBe("sqs-msg-999");
     expect(alerts[0]).toMatchObject({
-      alertName: "CencoPimWarn",
+      alertName: "SamplePimWarn",
       serviceName: "pim",
       alertType: "latency_spike",
       endpointPath: "",
       labels: {
-        source: "cenco-phase-a",
+        source: "sample-phase-a",
         channel: "paris",
         application: "pim",
         messageType: "warn",
@@ -145,7 +145,7 @@ describe("createCencoPhaseAProcessor", () => {
 
   it('falls back to "generic" when both uploadId and MessageId are missing', async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
-    const processMessage = createCencoPhaseAProcessor({
+    const processMessage = createSamplePhaseAProcessor({
       processIncidentUseCase: { execute },
     });
 

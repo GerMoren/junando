@@ -19,7 +19,7 @@ datasources:
     url: http://opensearch:9200
     isDefault: false
     jsonData:
-      database: cenco-traceability
+      database: junando-traceability
       flavor: opensearch
       version: 2.13.0
       timeField: '@timestamp'

@@ -1,6 +1,6 @@
-# Cenco Cutover: Replace CronJob with Junando Ingest
+# Cutover: Replace CronJob with Junando Ingest
 
-Junando becomes the production consumer of the Cenco error-manager SQS queue,
+Junando becomes the production consumer of the legacy error-manager SQS queue,
 replacing the CronJob that generates CSVs and sends email notifications.
 The platform code (SQS subscriber, mapper registry, processors, OpenSearch indexer)
 is already merged to `main`. This runbook guides any on-call engineer through
@@ -18,13 +18,13 @@ top-to-bottom without reading any other section.
    (pin to a SHA digest for go-live stability).
 3. Mount the production config:
    `INGEST_CONFIG_PATH=/etc/junando/ingest.config.yaml`
-   using `docker/ingest.config.cenco-prod.example.yaml` as the template
+   using `docker/ingest.config.sqs-prod.example.yaml` as the template
    (replace every `<PLACEHOLDER>` token with real values).
 4. Deploy / scale the Junando ingest Deployment or Task.
 5. Confirm the startup log shows:
-   `"junando ingest running in sqs mode, mapper=cenco-error-v1"` — no `fatal` lines.
-6. Send one real or synthetic Cenco SQS message.
-7. Run the **OpenSearch validation query** — confirm document count ≥ 1 in `cenco-traceability`.
+   `"junando ingest running in sqs mode, mapper=sample-v1"` — no `fatal` lines.
+6. Send one real or synthetic sample SQS message.
+7. Run the **OpenSearch validation query** — confirm document count ≥ 1 in `junando-traceability`.
 8. Watch the **SQS metric**: `NumberOfMessagesDeleted` rising in CloudWatch.
 9. Monitor for ≥ 48 h of clean data — then proceed to **CronJob decommission**.
 10. On any failure at any step → go to **Rollback**.
@@ -40,7 +40,7 @@ not ready; do not proceed until the issue is resolved.
 
   ```bash
   aws sqs get-queue-attributes \
-    --queue-url https://sqs.<REGION>.amazonaws.com/<ACCOUNT_ID>/cenco-error-manager \
+    --queue-url https://sqs.<REGION>.amazonaws.com/<ACCOUNT_ID>/sample-error-manager \
     --attribute-names All
   ```
 
@@ -54,7 +54,7 @@ not ready; do not proceed until the issue is resolved.
   aws iam simulate-principal-policy \
     --policy-source-arn <ROLE_ARN> \
     --action-names sqs:ReceiveMessage sqs:DeleteMessage sqs:ChangeMessageVisibility \
-    --resource-arns arn:aws:sqs:<REGION>:<ACCOUNT_ID>:cenco-error-manager
+    --resource-arns arn:aws:sqs:<REGION>:<ACCOUNT_ID>:sample-error-manager
   ```
 
   Expected: `EvalDecisionType: allowed` for all three actions.
@@ -67,10 +67,10 @@ not ready; do not proceed until the issue is resolved.
 
   Expected: JSON cluster info response (HTTP 200).
 
-- [ ] **`cenco-error-v1` mapper is registered in the deployed image.**
-      Confirm via the startup log line containing `mapperKind=cenco-error-v1`,
+- [ ] **`sample-v1` mapper is registered in the deployed image.**
+      Confirm via the startup log line containing `mapperKind=sample-v1`,
       or by inspecting the image manifest for the side-effect import.
-      If you see `"Mapper not registered: \"cenco-error-v1\""` in the log, the
+      If you see `"Mapper not registered: \"sample-v1\""` in the log, the
       mapper side-effect import is missing from the image — halt the deployment.
 
 - [ ] **`INGEST_CONFIG_PATH` secret/ConfigMap is mounted and fully substituted.**
@@ -96,7 +96,7 @@ kubectl rollout status deployment/junando-ingest
 
 - **Image**: use a pinned SHA digest for go-live (avoids tag mutability risk).
   Example: `ghcr.io/germoren/junando-ingest:main@sha256:<digest>`
-- **Config**: derived from `docker/ingest.config.cenco-prod.example.yaml` with all
+- **Config**: derived from `docker/ingest.config.sqs-prod.example.yaml` with all
   placeholders substituted, mounted at `INGEST_CONFIG_PATH=/etc/junando/ingest.config.yaml`.
 
 ### Step 2 — Confirm startup log
@@ -104,7 +104,7 @@ kubectl rollout status deployment/junando-ingest
 Within 30 seconds of the pod becoming Ready, confirm the log contains:
 
 ```
-"junando ingest running in sqs mode, mapper=cenco-error-v1"
+"junando ingest running in sqs mode, mapper=sample-v1"
 ```
 
 ```bash
@@ -118,8 +118,8 @@ kubectl logs -l app=junando-ingest --tail=20
 
 ### Step 3 — Validate first message indexed
 
-Send one real or synthetic Cenco SQS message to the queue, then run the
-**Validation queries** below to confirm it is indexed in `cenco-traceability`.
+Send one real or synthetic sample SQS message to the queue, then run the
+**Validation queries** below to confirm it is indexed in `junando-traceability`.
 Allow up to `visibilityTimeoutSeconds` (60 s) for processing.
 
 ---
@@ -130,7 +130,7 @@ Allow up to `visibilityTimeoutSeconds` (60 s) for processing.
 
 ```bash
 curl -s -X GET \
-  "https://<OPENSEARCH_DOMAIN_ENDPOINT>/cenco-traceability/_count" \
+  "https://<OPENSEARCH_DOMAIN_ENDPOINT>/junando-traceability/_count" \
   --aws-sigv4 "aws:amz:<REGION>:es" \
   --user "<AWS_ACCESS_KEY_ID>:<AWS_SECRET_ACCESS_KEY>" \
   | jq '.count'
@@ -138,12 +138,12 @@ curl -s -X GET \
 ```
 
 Alternatively, use the OpenSearch Dashboards console:
-`GET /cenco-traceability/_count`
+`GET /junando-traceability/_count`
 
 ### SQS metric — confirm queue draining
 
 - **CloudWatch metric**: `AWS/SQS` → `NumberOfMessagesDeleted` on queue
-  `cenco-error-manager` — should be **rising** after deployment.
+  `sample-error-manager` — should be **rising** after deployment.
 - **Drain indicator**: `ApproximateNumberOfMessagesNotVisible` returning to `0`
   after each processing cycle.
 - **Alert threshold**: 0 deleted messages in a 5-minute window after the first
@@ -163,10 +163,10 @@ Alternatively, use the OpenSearch Dashboards console:
 
   Confirm pods are gone: `kubectl get pods -l app=junando-ingest`
 
-- [ ] Re-enable or un-suspend the Cenco CronJob:
+- [ ] Re-enable or un-suspend the legacy CronJob:
 
   ```bash
-  kubectl patch cronjob cenco-error-manager \
+  kubectl patch cronjob sample-error-manager \
     -p '{"spec":{"suspend":false}}'
   ```
 
@@ -186,17 +186,17 @@ Alternatively, use the OpenSearch Dashboards console:
 > uninterrupted clean data have been confirmed. If fewer than 48 h have elapsed
 > since go-live, **STOP** — come back when the gate criterion is met.
 
-- [ ] **Confirm ≥ 48 h of clean data in `cenco-traceability`.**
+- [ ] **Confirm ≥ 48 h of clean data in `junando-traceability`.**
       Verify via OpenSearch `_count` or Dashboards that documents have been indexed
       continuously, with no gaps, for the past 48 h.
-      Also confirm the DLQ (`cenco-error-manager-dlq`) shows
+      Also confirm the DLQ (`sample-error-manager-dlq`) shows
       `ApproximateNumberOfMessagesNotVisible = 0` throughout the period.
 
-- [ ] **Delete CronJob manifests from the Cenco repo.**
-      Open a PR in the Cenco repository removing the `cenco-error-manager` CronJob
-      and any associated resources. Request review from TI Cenco.
+- [ ] **Delete CronJob manifests from the legacy repository.**
+      Open a PR in the legacy repository removing the `sample-error-manager` CronJob
+      and any associated resources. Request review from the legacy system owner.
 
-- [ ] **Confirm decommission with the TI Cenco stakeholder.**
+- [ ] **Confirm decommission with the legacy system stakeholder.**
       Get explicit sign-off before merging the removal PR.
 
 - [ ] **Close issue #36** once the CronJob is removed from production.
