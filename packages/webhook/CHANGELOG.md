@@ -1,5 +1,19 @@
 # @junando/webhook
 
+## 0.16.5
+
+### Patch Changes
+
+- Updated dependencies [9c24aab]
+  - @junando/core@0.16.5
+
+## 0.16.4
+
+### Patch Changes
+
+- Updated dependencies [cb670ec]
+  - @junando/core@0.16.4
+
 ## 0.16.3
 
 ### Patch Changes
