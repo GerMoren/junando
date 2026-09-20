@@ -13,6 +13,12 @@ export default defineConfig({
       customCss: ['./src/styles/custom.css'],
       sidebar: [
         {
+          label: 'Architecture',
+          items: [
+            { label: 'Architecture', slug: 'architecture' },
+          ],
+        },
+        {
           label: 'Getting Started',
           items: [
             { label: 'Getting Started', slug: 'getting-started' },
