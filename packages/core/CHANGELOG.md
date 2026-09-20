@@ -1,5 +1,15 @@
 # @junando/core
 
+## 0.17.0
+
+### Minor Changes
+
+- 48bb74c: Add `VercelGatewayProvider` — a new `ILLMProvider` implementation for [Vercel AI Gateway](https://vercel.com/ai-gateway)'s OpenAI-compatible endpoint. Set `LLM_PROVIDER=vercel-gateway` and `LLM_MODEL` to any Gateway model string (e.g. `anthropic/claude-3-5-haiku`, `alibaba/qwen-3-14b`) to use it. Unlike the other providers, there's no default model — Vercel AI Gateway's catalog is too broad for one sensible default, so `LLM_MODEL` is required.
+
+### Patch Changes
+
+- 48bb74c: Add the "Acknowledge" button to the Slack fallback message (sent when LLM analysis is unavailable). Acknowledging an incident doesn't depend on an AI diagnosis, so on-call teams shouldn't lose that interactivity right when the LLM degrades and manual investigation is most needed. "Trigger Rollback" is still correctly omitted in this path, since it requires the LLM's `requires_rollback` verdict.
+
 ## 0.16.5
 
 ### Patch Changes
