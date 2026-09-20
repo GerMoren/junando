@@ -11,6 +11,7 @@ export type {
   DedupSection,
   RuleSection,
   LlmSection,
+  TriageSection,
   NotifySection,
   RollbackSection,
   ErrorSection,

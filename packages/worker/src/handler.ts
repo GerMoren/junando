@@ -8,6 +8,7 @@ import {
   createRuleEngine,
   metrics,
   createLLMProvider,
+  createTriageProvider,
   createLogger,
   reinitLogger,
   loadConfig,
@@ -70,6 +71,13 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
 
   const traces = new LokiTraceRepository(config.lokiUrl ?? '');
   const llm = createLLMProvider(config.llmProvider, config.llmApiKey, config.llmModel);
+  const triage = config.triageEnabled
+    ? createTriageProvider(
+        config.triageProvider ?? 'vercel-gateway',
+        config.triageApiKey ?? '',
+        config.triageModel ?? '',
+      )
+    : undefined;
   const notifier = createNotifier(config);
   // undefined when RULES_CONFIG_PATH is unset — ProcessIncidentUseCase treats
   // that as pass-through (no rule evaluation), matching pre-existing behavior.
@@ -84,6 +92,7 @@ async function getUseCase(): Promise<ProcessIncidentUseCase> {
     dedupTtlSeconds: config.dedupTtlSeconds,
     onClustersBuilt: (count) => metrics.alertClusters.set(count),
     ...(ruleEngine ? { ruleEngine } : {}),
+    ...(triage ? { triage } : {}),
   });
 
   return useCase;

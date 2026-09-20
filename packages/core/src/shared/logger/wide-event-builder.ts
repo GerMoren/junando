@@ -51,6 +51,10 @@ export interface LlmSection {
   tokens: number;
 }
 
+export interface TriageSection {
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
 export interface NotifySection {
   channels: string[];
   outcome: string;
@@ -81,6 +85,7 @@ export interface WideEvent {
   dedup?: DedupSection;
   rule?: RuleSection;
   llm?: LlmSection;
+  triage?: TriageSection;
   notify?: NotifySection;
   rollback?: RollbackSection;
   durationMs?: number;

@@ -127,9 +127,42 @@ aws ssm put-parameter \
   --value "60000" \
   --type SecureString \
   --overwrite
+
+# Optional: cheap triage classification before the full LLM analysis (off by default)
+aws ssm put-parameter \
+  --name /junando/triage-enabled \
+  --value "true" \
+  --type SecureString \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /junando/triage-provider \
+  --value "vercel-gateway" \
+  --type SecureString \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /junando/triage-model \
+  --value "anthropic/claude-3-5-haiku" \
+  --type SecureString \
+  --overwrite
+
+aws ssm put-parameter \
+  --name /junando/triage-api-key \
+  --value "<vercel-ai-gateway-key>" \
+  --type SecureString \
+  --overwrite
 ```
 
 > **Note**: The worker Lambda has permission to read only `/junando/*` parameters.
+
+> **Optional triage step**: When `TRIAGE_ENABLED=true`, the worker classifies each incident's severity with a cheap classification call before running the full analysis. Incidents scored `low` skip the expensive LLM call and still notify Slack/Teams, just without an AI diagnosis. This is a niche cost-optimization feature — off by default, and the `triage-*` parameters above are only required when it is enabled.
+>
+> **Two `TRIAGE_PROVIDER` options:**
+> - `jev` (recommended) — TypeSafe AI's Jev, via Vercel AI Gateway's dedicated Evaluation API (`POST /v1/evaluate`), a purpose-built decision/scoring model rather than a chat LLM. Confirmed live: fast (~150ms), accurate, and — while Jev remains in its promotional window — zero marginal cost. No `TRIAGE_MODEL` needed; it's the only model this path uses.
+> - `vercel-gateway` — asks any chat-completions model in the Gateway's catalog for a single severity word; requires `TRIAGE_MODEL`. **Pick a plain instruction-following model, not a reasoning/"thinking" model.** Confirmed live: `alibaba/qwen-3-14b` burns its entire token budget on an internal reasoning preamble and never emits the actual severity word — every call silently fell back to `medium` (fail-open, but defeats the point of triaging). `meta/llama-3.1-8b` works correctly.
+>
+> Run `pnpm run test:triage:live -- --count 20` (add `TRIAGE_MODEL=... TRIAGE_PROVIDER=vercel-gateway` to test that path instead) against a candidate before enabling this in production.
 
 For the pilot, the Lambda roles must be able to read the equivalent `SSM_PREFIX` namespace (for example, `/junando-pilot/*`). Confirm this in the synthesized/deployed IAM policy before the pilot.
 

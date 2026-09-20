@@ -19,12 +19,15 @@ export type {
   IRollbackActionHandler,
   IRuleEngine,
   ITraceRepository,
+  ITriageProvider,
   LlmDegradedReason,
   LLMResult,
   NotifyResult,
   RollbackActionRequest,
   RollbackActionResult,
   RuleActionResult,
+  TriageResult,
+  TriageSeverity,
 } from './domain/ports/index.js';
 export { NotifyOutcome } from './domain/ports/index.js';
 
@@ -55,6 +58,9 @@ export { GeminiProvider } from './infrastructure/llm/gemini.provider.js';
 export { MockLLMProvider } from './infrastructure/llm/mock.provider.js';
 export { OpenRouterProvider } from './infrastructure/llm/openrouter.provider.js';
 export { VercelGatewayProvider } from './infrastructure/llm/vercel-gateway.provider.js';
+export { VercelGatewayTriageProvider } from './infrastructure/triage/vercel-gateway-triage.provider.js';
+export { JevTriageProvider } from './infrastructure/triage/jev-triage.provider.js';
+export { createTriageProvider } from './infrastructure/triage/factory.js';
 export { createNotifier, createRuleEngine } from './infrastructure/notifier/factory.js';
 export { createRollbackActionHandler } from './infrastructure/rollback/factory.js';
 export { NoopRollbackActionHandler } from './infrastructure/rollback/noop-rollback-action.handler.js';

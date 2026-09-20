@@ -127,6 +127,14 @@ const ConfigSchema = z
       .string()
       .optional()
       .transform((v) => (v === '' ? undefined : v)),
+    // Optional cheap triage classification step, run before the full LLM
+    // analysis to skip low-severity incidents (still notifies, just without
+    // an AI diagnosis). Off by default — superRefine enforces the other
+    // fields only when enabled.
+    triageEnabled: z.boolean().default(false),
+    triageProvider: z.enum(['vercel-gateway', 'jev']).optional(),
+    triageModel: z.string().optional(),
+    triageApiKey: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.notifierType === 'slack') {
@@ -203,6 +211,30 @@ const ConfigSchema = z
         message: `[llmProvider: ${data.llmProvider}] LLM_API_KEY is required`,
       });
     }
+    if (data.triageEnabled) {
+      if (!data.triageProvider) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['triageProvider'],
+          message: '[triageEnabled: true] TRIAGE_PROVIDER is required',
+        });
+      }
+      // jev is a single fixed model (typesafe-ai/jev) — no TRIAGE_MODEL needed.
+      if (data.triageProvider !== 'jev' && !data.triageModel) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['triageModel'],
+          message: '[triageEnabled: true] TRIAGE_MODEL is required unless TRIAGE_PROVIDER=jev',
+        });
+      }
+      if (!data.triageApiKey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['triageApiKey'],
+          message: '[triageEnabled: true] TRIAGE_API_KEY is required',
+        });
+      }
+    }
   });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -238,6 +270,10 @@ export async function loadConfig(): Promise<Config> {
     rollbackActionAllowedSlackUserIds: parseOptionalStringArray(
       process.env['ROLLBACK_ACTION_ALLOWED_SLACK_USER_IDS'],
     ),
+    triageEnabled: parseBooleanEnv(process.env['TRIAGE_ENABLED']) ?? false,
+    triageProvider: process.env['TRIAGE_PROVIDER'],
+    triageModel: process.env['TRIAGE_MODEL'],
+    triageApiKey: process.env['TRIAGE_API_KEY'],
   });
 
   if (!result.success) {

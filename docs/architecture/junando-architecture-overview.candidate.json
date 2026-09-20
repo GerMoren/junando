@@ -16,6 +16,7 @@
     { "id": "dedup_table", "type": "database", "label": "DedupTable", "sublabel": "DynamoDB • fingerprint TTL", "pos": [880, 60], "size": [150, 62] },
     { "id": "loki", "type": "external", "label": "Loki", "sublabel": "trace repository", "pos": [880, 300], "size": [130, 62] },
     { "id": "llm", "type": "cloud", "label": "LLM Provider", "sublabel": "pluggable — see cards", "pos": [880, 560], "size": [150, 62] },
+    { "id": "triage", "type": "cloud", "label": "Triage", "sublabel": "optional severity check", "pos": [1130, 460], "size": [150, 60] },
     { "id": "notifier", "type": "external", "label": "Notifier", "sublabel": "Slack or Teams", "pos": [1120, 300], "size": [130, 60] },
     { "id": "monitoring", "type": "external", "label": "Monitoring account", "sublabel": "Grafana • SigV4 scrape", "pos": [630, 480], "size": [150, 62] }
   ],
@@ -32,12 +33,13 @@
     { "from": "worker_lambda", "to": "dedup_table", "label": "dedup check", "variant": "default", "route": "orthogonal-v", "fromSide": "top", "toSide": "bottom" },
     { "from": "worker_lambda", "to": "loki", "label": "fetch traces", "route": "straight" },
     { "from": "worker_lambda", "to": "llm", "label": "analyze incident", "variant": "emphasis", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "top", "labelDy": -70 },
+    { "from": "worker_lambda", "to": "triage", "label": "optional: skip LLM if low severity", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[695, 400], [1050, 400], [1050, 650], [1205, 650]], "labelSegment": 3 },
     { "from": "worker_lambda", "to": "notifier", "label": "post + rollback action", "variant": "emphasis", "route": "orthogonal-h", "fromSide": "right", "toSide": "top", "via": [[775, 331], [775, 280], [1185, 280]], "labelSegment": 2 },
     { "from": "monitoring", "to": "worker_lambda", "label": "GET /metrics (IAM SigV4)", "variant": "security", "fromSide": "top", "toSide": "bottom", "labelDx": 60 }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Pipeline", "items": ["Alertmanager posts to a public webhook Function URL", "Alerts fan out via an SQS FIFO queue to the worker", "The worker correlates, dedups, and calls the LLM provider"] },
+    { "dot": "cyan", "title": "Pipeline", "items": ["Alertmanager posts to a public webhook Function URL", "Alerts fan out via an SQS FIFO queue to the worker", "The worker correlates, dedups, and calls the LLM provider (optional triage can skip it)"] },
     { "dot": "emerald", "title": "State & secrets", "items": ["DynamoDB backs fingerprint+TTL dedup by default (Redis is a supported alternative)", "SSM Parameter Store holds every provider credential — read at cold start", "The DLQ catches messages that exhaust SQS maxReceiveCount"] },
-    { "dot": "rose", "title": "External boundaries", "items": ["LLM provider is pluggable — Gemini, Claude, OpenRouter, Qwen, or Bedrock", "Notifications go to Slack or Teams, never both at once", "A separate monitoring account scrapes /metrics over an IAM-signed Function URL"] }
+    { "dot": "rose", "title": "External boundaries", "items": ["LLM provider: Gemini, Claude, OpenRouter, Qwen, Bedrock, or Vercel AI Gateway — only Bedrock keeps data inside the AWS account", "Notifications go to Slack or Teams, never both at once", "A separate monitoring account scrapes /metrics over an IAM-signed Function URL"] }
   ]
 }

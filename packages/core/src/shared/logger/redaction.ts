@@ -35,6 +35,7 @@ const SAFE_FIELDS: ReadonlySet<string> = new Set([
   'dedup',
   'rule',
   'llm',
+  'triage',
   'notify',
   'rollback',
   'durationMs',

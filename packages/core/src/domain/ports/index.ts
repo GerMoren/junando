@@ -63,13 +63,16 @@ export interface ITraceRepository {
  * `circuit_breaker_open` — Gemini was rejected because its circuit is open.
  * `provider_unavailable` — the provider returned a recognized transient
  * infrastructure error (e.g. throttling, service unavailable).
+ * `triage_low_severity` — the cheap triage classifier scored this incident
+ * as low severity; the full LLM analysis was skipped to save cost.
  */
 export type LlmDegradedReason =
   | 'unparseable_response'
   | 'empty_response'
   | 'timeout'
   | 'circuit_breaker_open'
-  | 'provider_unavailable';
+  | 'provider_unavailable'
+  | 'triage_low_severity';
 
 /**
  * Structured result of an LLM analysis call.
@@ -94,6 +97,28 @@ export interface LLMResult {
  */
 export interface ILLMProvider {
   analyze(cluster: AlertCluster, traces: Record<string, unknown>[]): Promise<LLMResult>;
+}
+
+/**
+ * Severity classification returned by a cheap triage step, run before the
+ * full LLM analysis to decide whether the expensive call is worth making.
+ */
+export type TriageSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Structured result of a triage classification.
+ */
+export interface TriageResult {
+  severity: TriageSeverity;
+}
+
+/**
+ * Triage provider.
+ * Classifies an incident cluster's severity cheaply, before the full LLM
+ * analysis. Implementations: VercelGatewayTriageProvider
+ */
+export interface ITriageProvider {
+  classify(cluster: AlertCluster): Promise<TriageResult>;
 }
 
 /**

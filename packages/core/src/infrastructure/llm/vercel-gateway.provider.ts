@@ -1,14 +1,12 @@
 import { z } from 'zod';
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { ILLMProvider, LLMResult } from '../../domain/ports/index.js';
-import { LLM_MAX_TOKENS, LLMProviderType } from '../../shared/constants.js';
+import { LLM_MAX_TOKENS, LLMProviderType, VERCEL_AI_GATEWAY_URL } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
 import { llmInferenceDuration, llmInferenceTotal } from '../../shared/metrics/index.js';
 import { buildUserPrompt, parseLlmText, SYSTEM_PROMPT } from './shared.js';
 
 const logger = createLogger();
-
-const VERCEL_AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
 
 /**
  * Schema for Vercel AI Gateway's OpenAI-compatible response validation.
