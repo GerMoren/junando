@@ -84,7 +84,7 @@ For a full walkthrough: [`examples/express-end-to-end/README.md`](examples/expre
 
 ## Key design decisions
 
-**Bring your own LLM** — Gemini, Claude, OpenRouter, Qwen, Amazon Bedrock, or anything with a compatible API. No vendor lock-in.
+**Bring your own LLM** — Gemini, Claude, OpenRouter, Qwen, Amazon Bedrock, Vercel AI Gateway (any model in its catalog), or anything with a compatible API. No vendor lock-in.
 
 **Hexagonal architecture** — Alert sources (Loki, Prometheus, webhook, SQS) and notification targets (Slack, Teams) are ports. You can swap or add adapters without touching the core pipeline.
 
@@ -153,8 +153,9 @@ Required environment variables:
 
 | Variable | Purpose |
 |---|---|
-| `LLM_PROVIDER` | `gemini`, `claude`, `openrouter`, `qwen`, or `bedrock` |
-| `LLM_API_KEY` | API key for the chosen LLM provider |
+| `LLM_PROVIDER` | `gemini`, `claude`, `openrouter`, `qwen`, `bedrock`, or `vercel-gateway` |
+| `LLM_API_KEY` | API key for the chosen LLM provider (not needed for `bedrock`, which authenticates via IAM) |
+| `LLM_MODEL` | Model override — required for `vercel-gateway` (e.g. `anthropic/claude-3-5-haiku`), optional elsewhere |
 | `LOKI_URL` | Loki endpoint for log correlation |
 | `DEDUP_STORE` | `dynamodb` (default, AWS free-tier) or `redis` |
 | `DEDUP_TABLE_NAME` | DynamoDB table name; required when `DEDUP_STORE=dynamodb` |
@@ -162,6 +163,8 @@ Required environment variables:
 | `SLACK_BOT_TOKEN` | Slack bot token (if using Slack notifier) |
 | `SLACK_CHANNEL` | Target Slack channel |
 | `TEAMS_WEBHOOK_URL` | Teams webhook URL (if using Teams notifier) |
+| `TRIAGE_ENABLED` | Optional. `true` to run a cheap severity classifier before the full LLM call, skipping it (and its cost) for low-severity incidents. Off by default. |
+| `TRIAGE_PROVIDER`, `TRIAGE_MODEL`, `TRIAGE_API_KEY` | Required together when `TRIAGE_ENABLED=true`. Only `vercel-gateway` is supported today. |
 
 See [`.env.example`](.env.example) for the full template.
 

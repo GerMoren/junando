@@ -97,6 +97,10 @@ export const LLM_MODELS = Object.freeze({
   Bedrock: 'us.amazon.nova-lite-v1:0',
 });
 
+// ── Vercel AI Gateway ──────────────────────────────────────────────────────────
+// Shared by VercelGatewayProvider (llm/) and VercelGatewayTriageProvider (triage/).
+export const VERCEL_AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
+
 // ── Slack ─────────────────────────────────────────────────────────────────────
 export const SLACK_API_URL = 'https://slack.com/api/chat.postMessage';
 export const ROLLBACK_ACTION_ID = 'trigger_rollback';

@@ -157,6 +157,8 @@ aws ssm put-parameter \
 > **Note**: The worker Lambda has permission to read only `/junando/*` parameters.
 
 > **Optional triage step**: When `TRIAGE_ENABLED=true`, the worker classifies each incident's severity with a cheap LLM call (via Vercel AI Gateway) before running the full analysis. Incidents scored `low` skip the expensive LLM call and still notify Slack/Teams, just without an AI diagnosis. This is a niche cost-optimization feature — off by default, and the four `triage-*` parameters above are only required when it is enabled.
+>
+> **Pick a plain instruction-following model for `TRIAGE_MODEL`, not a reasoning/"thinking" model.** Confirmed live: `alibaba/qwen-3-14b` burns its entire token budget on an internal reasoning preamble and never emits the actual severity word, even at 32 tokens — every call silently fell back to `medium` (fail-open, but defeats the point of triaging). `meta/llama-3.1-8b` works correctly and is fast (~400-800ms) and cheap. Run `pnpm run test:triage:live -- --count 20 --delay-ms 3000` against a candidate model before enabling this in production.
 
 For the pilot, the Lambda roles must be able to read the equivalent `SSM_PREFIX` namespace (for example, `/junando-pilot/*`). Confirm this in the synthesized/deployed IAM policy before the pilot.
 

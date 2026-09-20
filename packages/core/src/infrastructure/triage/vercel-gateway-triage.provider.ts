@@ -1,14 +1,21 @@
 import type { AlertCluster } from '../../domain/entities/cluster.js';
 import type { ITriageProvider, TriageResult, TriageSeverity } from '../../domain/ports/index.js';
+import { VERCEL_AI_GATEWAY_URL } from '../../shared/constants.js';
 import { createLogger } from '../../shared/logger/index.js';
 
 const logger = createLogger();
 
-const VERCEL_AI_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
-
 const TRIAGE_SYSTEM_PROMPT = 'You are a strict severity classifier. Respond with exactly one word.';
 
-const TRIAGE_MAX_TOKENS = 5;
+// 5 tokens is enough for a plain instruction-following model, but reasoning
+// models (e.g. qwen3's "thinking" variants) emit a reasoning preamble first
+// and get truncated (finish_reason: "length") before writing the actual
+// word — confirmed live against alibaba/qwen-3-14b via Vercel AI Gateway,
+// which always produced an empty `content` under the old 5-token budget.
+// 32 gives a small reasoning model enough room to finish a short preamble
+// and still land on the label; pick a non-reasoning model for triage where
+// possible, since latency/cost both suffer otherwise.
+const TRIAGE_MAX_TOKENS = 32;
 
 const VALID_SEVERITIES: ReadonlySet<TriageSeverity> = new Set([
   'low',

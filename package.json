@@ -23,6 +23,7 @@
     "setup:local": "docker compose -f docker/docker-compose.yml up -d && echo '\n✅ Stack ready. Grafana: http://localhost:3000'",
     "teardown:local": "docker compose -f docker/docker-compose.yml down -v",
     "generate:alert": "tsx --env-file=.env.local scripts/generate-alert.ts",
+    "test:triage:live": "tsx scripts/triage-live-test.ts",
     "quickstart": "tsx scripts/quickstart.ts",
     "docs:compat": "tsx scripts/generate-compat-matrix.ts",
     "docs:compat:check": "tsx scripts/generate-compat-matrix.ts --check",

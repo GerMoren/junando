@@ -109,7 +109,7 @@ describe('VercelGatewayTriageProvider', () => {
     expect(mockLogger.warn).toHaveBeenCalled();
   });
 
-  it('sends max_tokens: 5 and the correct model/messages shape', async () => {
+  it('sends max_tokens: 32 and the correct model/messages shape', async () => {
     mockFetch.mockResolvedValue(mockContentResponse('low'));
 
     await provider.classify(makeCluster());
@@ -124,7 +124,7 @@ describe('VercelGatewayTriageProvider', () => {
 
     const body = JSON.parse(options.body as string);
     expect(body.model).toBe('anthropic/claude-3-5-haiku');
-    expect(body.max_tokens).toBe(5);
+    expect(body.max_tokens).toBe(32);
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe('system');
     expect(body.messages[1].role).toBe('user');
