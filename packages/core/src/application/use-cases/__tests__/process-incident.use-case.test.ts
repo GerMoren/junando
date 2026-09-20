@@ -8,6 +8,7 @@ import type {
   ILLMProvider,
   INotifier,
   IRuleEngine,
+  ITriageProvider,
   LLMResult,
   NotifyResult,
   RuleActionResult,
@@ -87,6 +88,7 @@ interface DepsOverrides {
   notifier?: INotifier;
   ruleEngine?: IRuleEngine;
   onClustersBuilt?: (count: number) => void;
+  triage?: ITriageProvider;
 }
 
 function makeDeps(overrides: DepsOverrides = {}) {
@@ -117,6 +119,7 @@ function makeDeps(overrides: DepsOverrides = {}) {
     dedupTtlSeconds: 300,
     ...(overrides.ruleEngine !== undefined && { ruleEngine: overrides.ruleEngine }),
     ...(overrides.onClustersBuilt !== undefined && { onClustersBuilt: overrides.onClustersBuilt }),
+    ...(overrides.triage !== undefined && { triage: overrides.triage }),
   };
 }
 
@@ -967,4 +970,70 @@ describe('ProcessIncidentUseCase — wide event sampling and redaction', () => {
     expect(event['outcome']).toBe(Outcome.Success);
     expect(event['correlationId']).toBe('corr-redact');
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Optional triage step — cheap classification before the full LLM call
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ProcessIncidentUseCase — ITriageProvider integration', () => {
+  it('is backward compatible: no triage dependency behaves exactly as before', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const deps = makeDeps();
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await useCase.execute([makeAlert({ serviceName: 'svc-no-triage' })], 'corr-no-triage');
+
+    expect(deps.llm.analyze).toHaveBeenCalledOnce();
+    expect(deps.notifier.send).toHaveBeenCalledOnce();
+    const event = emittedEvents(deps.logger)[0]!;
+    expect(event['triage']).toBeUndefined();
+    expect(event['outcome']).toBe(Outcome.Success);
+  });
+
+  it('skips the full LLM call and notifies without a diagnosis when triage returns low severity', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const triage: ITriageProvider = {
+      classify: vi.fn().mockResolvedValue({ severity: 'low' }),
+    };
+    const deps = makeDeps({ triage });
+    const useCase = new ProcessIncidentUseCase(deps);
+
+    await useCase.execute([makeAlert({ serviceName: 'svc-triage-low' })], 'corr-triage-low');
+
+    expect(triage.classify).toHaveBeenCalledOnce();
+    expect(deps.llm.analyze).not.toHaveBeenCalled();
+    expect(deps.notifier.send).toHaveBeenCalledWith(expect.anything(), null, undefined);
+
+    const event = emittedEvents(deps.logger)[0]!;
+    expect(event['outcome']).toBe(Outcome.Degraded);
+    expect(event['triage']).toMatchObject({ severity: 'low' });
+    expect(event['llm']).toMatchObject({
+      provider: 'triage',
+      model: 'n/a',
+      degradedReason: 'triage_low_severity',
+      tokens: 0,
+    });
+  });
+
+  it.each(['medium', 'high', 'critical'] as const)(
+    'proceeds to the full LLM call when triage returns %s severity',
+    async (severity) => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+      const triage: ITriageProvider = {
+        classify: vi.fn().mockResolvedValue({ severity }),
+      };
+      const deps = makeDeps({ triage });
+      const useCase = new ProcessIncidentUseCase(deps);
+
+      await useCase.execute([makeAlert({ serviceName: `svc-triage-${severity}` })], `corr-triage-${severity}`);
+
+      expect(triage.classify).toHaveBeenCalledOnce();
+      expect(deps.llm.analyze).toHaveBeenCalledOnce();
+
+      const event = emittedEvents(deps.logger)[0]!;
+      expect(event['triage']).toMatchObject({ severity });
+      expect(event['llm']).toMatchObject({ provider: 'mock', model: 'mock-model' });
+    },
+  );
 });

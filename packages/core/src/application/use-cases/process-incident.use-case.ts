@@ -7,6 +7,7 @@ import type {
   INotifier,
   IRuleEngine,
   ITraceRepository,
+  ITriageProvider,
 } from '../../domain/ports/index.js';
 import { NotifyOutcome } from '../../domain/ports/index.js';
 import { ClusteringService } from '../../domain/services/clustering.service.js';
@@ -44,6 +45,7 @@ interface Dependencies {
   clustering?: ClusteringService;
   onClustersBuilt?: (count: number) => void;
   ruleEngine?: IRuleEngine;
+  triage?: ITriageProvider;
 }
 
 function toErrorSection(err: unknown): ErrorSection {
@@ -173,24 +175,49 @@ export class ProcessIncidentUseCase {
         ...(traceErrors > 0 && { traceErrors }),
       });
 
+      // 4.5. Optional cheap triage classification — skips the full LLM call
+      // for low-severity clusters (still notifies, without an AI diagnosis).
+      // Any triage failure fails open: skipLlmForLowSeverity stays false and
+      // the full LLM call proceeds as if triage were absent.
+      let skipLlmForLowSeverity = false;
+      if (this.deps.triage) {
+        const triageResult = await this.deps.triage.classify(cluster);
+        builder.set('triage', { severity: triageResult.severity });
+        if (triageResult.severity === 'low') {
+          skipLlmForLowSeverity = true;
+        }
+      }
+
       // 5. LLM inference — fail gracefully, notify anyway with null analysis
       let analysis: LLMAnalysis | null = null;
       let llmError: unknown | null = null;
       let llmDegradedReason: string | null = null;
-      try {
-        const llmResult = await llm.analyze(cluster, allSpans);
-        analysis = llmResult.analysis;
-        llmDegradedReason = llmResult.degradedReason ?? null;
+      if (skipLlmForLowSeverity) {
+        analysis = null;
+        llmDegradedReason = 'triage_low_severity';
         builder.set('llm', {
-          provider: llmResult.provider,
-          model: llmResult.model,
-          latencyMs: llmResult.latencyMs,
-          ...(llmResult.analysis && { urgency: llmResult.analysis.urgency_level }),
-          ...(llmResult.degradedReason && { degradedReason: llmResult.degradedReason }),
-          tokens: llmResult.promptTokens + llmResult.completionTokens,
+          provider: 'triage',
+          model: 'n/a',
+          latencyMs: 0,
+          degradedReason: 'triage_low_severity',
+          tokens: 0,
         });
-      } catch (err) {
-        llmError = err;
+      } else {
+        try {
+          const llmResult = await llm.analyze(cluster, allSpans);
+          analysis = llmResult.analysis;
+          llmDegradedReason = llmResult.degradedReason ?? null;
+          builder.set('llm', {
+            provider: llmResult.provider,
+            model: llmResult.model,
+            latencyMs: llmResult.latencyMs,
+            ...(llmResult.analysis && { urgency: llmResult.analysis.urgency_level }),
+            ...(llmResult.degradedReason && { degradedReason: llmResult.degradedReason }),
+            tokens: llmResult.promptTokens + llmResult.completionTokens,
+          });
+        } catch (err) {
+          llmError = err;
+        }
       }
 
       // 6. POST-LLM rule engine hook — evaluate rules after LLM analysis
