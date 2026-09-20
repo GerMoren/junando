@@ -89,7 +89,7 @@ async function loadSecretsFromSSM(): Promise<void> {
 
 const ConfigSchema = z
   .object({
-    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen', 'bedrock']),
+    llmProvider: z.enum(['gemini', 'claude', 'openrouter', 'qwen', 'bedrock', 'vercel-gateway']),
     llmApiKey: z.string().min(1).optional(),
     llmModel: z.string().optional().transform((v) => v === '' ? undefined : v),
     // Notifier selector — defaults to 'slack' for backward compatibility

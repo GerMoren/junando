@@ -45,6 +45,7 @@ export enum LLMProviderType {
   OpenRouter = 'openrouter',
   Qwen = 'qwen',
   Bedrock = 'bedrock',
+  VercelGateway = 'vercel-gateway',
 }
 
 // ── HTTP / Timeout Constants ───────────────────────────────────────────────────

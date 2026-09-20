@@ -4,6 +4,7 @@ import { BedrockProvider } from './bedrock.provider.js';
 import { ClaudeProvider } from './claude.provider.js';
 import { GeminiProvider } from './gemini.provider.js';
 import { OpenRouterProvider, type FallbackOptions } from './openrouter.provider.js';
+import { VercelGatewayProvider } from './vercel-gateway.provider.js';
 
 /**
  * Factory type for creating LLM providers.
@@ -42,6 +43,10 @@ const LLM_PROVIDER_REGISTRY: ReadonlyMap<string, LLMFactory> = new Map<string, L
   ],
   // Bedrock authenticates by IAM role — the apiKey argument is unused by design.
   [LLMProviderType.Bedrock, (_apiKey, model) => new BedrockProvider(model)],
+  [
+    LLMProviderType.VercelGateway,
+    (apiKey, model) => new VercelGatewayProvider(apiKey, model ?? ''),
+  ],
 ]);
 
 export function createLLMProvider(
