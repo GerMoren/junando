@@ -177,6 +177,19 @@ export class SlackNotifier implements INotifier {
             text: `*${cluster.alertCount} alerts* on \`${safeEndpointPath}\` since ${cluster.firstSeenAt}\nLLM analysis unavailable — manual investigation required.`,
           },
         },
+        { type: 'divider' },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '✅ Acknowledge' },
+              style: 'primary',
+              action_id: 'acknowledge',
+              value: cluster.fingerprint,
+            },
+          ],
+        },
       ],
     };
   }
