@@ -163,11 +163,20 @@ describe('SlackNotifier', () => {
     // Header should indicate no AI diagnosis
     expect(body.blocks[0].text.text).toContain('no AI diagnosis');
 
-    // Should have only 2 blocks (header + section, no divider or actions)
-    expect(body.blocks).toHaveLength(2);
+    // Header + section + divider + actions (Acknowledge only — no Trigger
+    // Rollback without an LLM verdict on requires_rollback)
+    expect(body.blocks).toHaveLength(4);
 
     // Section should mention manual investigation required
     expect(body.blocks[1].text.text).toContain('manual investigation required');
+
+    // Acknowledge button is still available so the team can mark it as seen
+    // even when the LLM is unavailable.
+    const actions = body.blocks[3];
+    expect(actions.type).toBe('actions');
+    expect(actions.elements).toHaveLength(1);
+    expect(actions.elements[0].action_id).toBe('acknowledge');
+    expect(actions.elements[0].value).toBe(cluster.fingerprint);
   });
 
   it('sanitizes endpointPath by stripping backticks', async () => {
