@@ -50,6 +50,10 @@ function makeAppConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     llmFallbackModels: [],
     llmFallbackTimeoutMs: 5_000,
     rulesConfigPath: undefined,
+    triageEnabled: false,
+    triageProvider: undefined,
+    triageModel: undefined,
+    triageApiKey: undefined,
     ...overrides,
   };
 }

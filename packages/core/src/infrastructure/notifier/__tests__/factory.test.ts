@@ -29,6 +29,10 @@ function makeSlackConfig(overrides: Partial<Config> = {}): Config {
     dedupStore: overrides.dedupStore ?? 'dynamodb',
     dedupTableName: overrides.dedupTableName ?? 'junando-dedup',
     rulesConfigPath: overrides.rulesConfigPath,
+    triageEnabled: overrides.triageEnabled ?? false,
+    triageProvider: overrides.triageProvider,
+    triageModel: overrides.triageModel,
+    triageApiKey: overrides.triageApiKey,
   };
 }
 
