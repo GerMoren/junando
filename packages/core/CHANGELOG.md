@@ -1,5 +1,14 @@
 # @junando/core
 
+## 0.18.0
+
+### Minor Changes
+
+- e146ba3: Add `JevTriageProvider` — a real triage backend using TypeSafe AI's Jev via Vercel AI Gateway's Evaluation API (`POST /v1/evaluate`), a purpose-built decision/scoring model rather than a chat-completions LLM. Set `TRIAGE_PROVIDER=jev` (no `TRIAGE_MODEL` needed). Confirmed live against real alert clusters: fast (~150-400ms), accurate, and — while Jev remains in its promotional window — free. This unblocks the "jev" backend originally scoped in issue #355 and deferred pending Vercel documenting the correct integration path (Jev is rejected on the standard chat-completions endpoint).
+- e146ba3: Add an optional two-stage triage step, off by default. When enabled (`TRIAGE_ENABLED=true`, `TRIAGE_PROVIDER=vercel-gateway`, `TRIAGE_MODEL`, `TRIAGE_API_KEY`), a cheap classification call scores each incident's severity before the full LLM analysis. Low-severity incidents skip the expensive LLM call and are notified with the standard no-diagnosis fallback message instead, saving cost on noise. Fail-open by design: any triage failure (network error, bad response, unparseable content) proceeds to the full analysis exactly as if triage were disabled — it never suppresses a real incident.
+
+  With `TRIAGE_ENABLED` unset or `false` (the default), pipeline behavior is unchanged.
+
 ## 0.17.0
 
 ### Minor Changes
