@@ -1,21 +1,30 @@
 #!/usr/bin/env tsx
 /**
  * triage-live-test.ts
- * Fires N real requests at VercelGatewayTriageProvider against the actual
- * Vercel AI Gateway (no mocks) and reports the severity distribution, latency
- * stats, and how many results fell back to 'medium' (the fail-open default).
+ * Fires N real requests at a triage provider against the actual Vercel AI
+ * Gateway (no mocks) and reports the severity distribution, latency stats,
+ * and how many results fell back to 'medium' (the fail-open default).
  *
  * Usage:
- *   TRIAGE_MODEL=meta/llama-3.1-8b AI_GATEWAY_API_KEY=... \
+ *   TRIAGE_PROVIDER=jev AI_GATEWAY_API_KEY=... \
+ *     pnpm run test:triage:live -- --count 20
+ *
+ *   TRIAGE_PROVIDER=vercel-gateway TRIAGE_MODEL=meta/llama-3.1-8b AI_GATEWAY_API_KEY=... \
  *     pnpm run test:triage:live -- --count 20 --delay-ms 3000
  *
- * Model choice matters: reasoning/"thinking" models (e.g. qwen3's thinking
- * variants) burn the whole max_tokens budget on their reasoning preamble and
- * never emit the actual word, even at 32 tokens — confirmed live against
- * alibaba/qwen-3-14b, which returned empty `content` on every single call.
- * Prefer a plain instruction-following model for triage.
+ * Provider notes:
+ * - 'jev' (TypeSafe AI, via Vercel AI Gateway's Evaluation API — POST
+ *   /v1/evaluate) is a purpose-built decision/scoring model. Confirmed live:
+ *   fast (~150ms), correct, and free while in its promotional window.
+ * - 'vercel-gateway' asks any chat-completions model in the Gateway's
+ *   catalog for a single severity word. Reasoning/"thinking" models (e.g.
+ *   qwen3's thinking variants) burn the whole max_tokens budget on their
+ *   reasoning preamble and never emit the actual word — confirmed live
+ *   against alibaba/qwen-3-14b, which returned empty `content` on every
+ *   single call. Prefer a plain instruction-following model, e.g.
+ *   meta/llama-3.1-8b.
  */
-import { VercelGatewayTriageProvider } from "../packages/core/src/index.js";
+import { createTriageProvider } from "../packages/core/src/index.js";
 import type { AlertCluster } from "../packages/core/src/index.js";
 import { AlertType } from "../packages/core/src/shared/constants.js";
 
@@ -30,12 +39,15 @@ const delayIndex = args.indexOf("--delay-ms");
 const delayMs = delayIndex === -1 ? 0 : Number.parseInt(args[delayIndex + 1] ?? "0", 10);
 
 const apiKey = process.env["AI_GATEWAY_API_KEY"] ?? process.env["TRIAGE_API_KEY"];
-const model = process.env["TRIAGE_MODEL"];
+const provider = process.env["TRIAGE_PROVIDER"] ?? "jev";
+const model = process.env["TRIAGE_MODEL"] ?? "";
 
-if (!apiKey || !model) {
-  console.error(
-    "Missing AI_GATEWAY_API_KEY (or TRIAGE_API_KEY) and/or TRIAGE_MODEL environment variables.",
-  );
+if (!apiKey) {
+  console.error("Missing AI_GATEWAY_API_KEY (or TRIAGE_API_KEY) environment variable.");
+  process.exit(1);
+}
+if (provider === "vercel-gateway" && !model) {
+  console.error("TRIAGE_MODEL is required when TRIAGE_PROVIDER=vercel-gateway.");
   process.exit(1);
 }
 
@@ -75,15 +87,17 @@ const SAMPLE_CLUSTERS: AlertCluster[] = [
 ];
 
 async function main() {
-  const provider = new VercelGatewayTriageProvider(apiKey!, model!);
+  const triage = createTriageProvider(provider, apiKey!, model);
   const results: { clusterName: string; severity: string; latencyMs: number }[] = [];
 
-  console.log(`Firing ${count} live requests at model "${model}"...\n`);
+  console.log(
+    `Firing ${count} live requests at provider "${provider}"${model ? ` (model "${model}")` : ""}...\n`,
+  );
 
   for (let i = 0; i < count; i++) {
     const cluster = SAMPLE_CLUSTERS[i % SAMPLE_CLUSTERS.length]!;
     const startMs = Date.now();
-    const result = await provider.classify(cluster);
+    const result = await triage.classify(cluster);
     const latencyMs = Date.now() - startMs;
     results.push({ clusterName: cluster.serviceName, severity: result.severity, latencyMs });
     console.log(

@@ -59,6 +59,7 @@ export { MockLLMProvider } from './infrastructure/llm/mock.provider.js';
 export { OpenRouterProvider } from './infrastructure/llm/openrouter.provider.js';
 export { VercelGatewayProvider } from './infrastructure/llm/vercel-gateway.provider.js';
 export { VercelGatewayTriageProvider } from './infrastructure/triage/vercel-gateway-triage.provider.js';
+export { JevTriageProvider } from './infrastructure/triage/jev-triage.provider.js';
 export { createTriageProvider } from './infrastructure/triage/factory.js';
 export { createNotifier, createRuleEngine } from './infrastructure/notifier/factory.js';
 export { createRollbackActionHandler } from './infrastructure/rollback/factory.js';

@@ -132,7 +132,7 @@ const ConfigSchema = z
     // an AI diagnosis). Off by default — superRefine enforces the other
     // fields only when enabled.
     triageEnabled: z.boolean().default(false),
-    triageProvider: z.enum(['vercel-gateway']).optional(),
+    triageProvider: z.enum(['vercel-gateway', 'jev']).optional(),
     triageModel: z.string().optional(),
     triageApiKey: z.string().min(1).optional(),
   })
@@ -219,11 +219,12 @@ const ConfigSchema = z
           message: '[triageEnabled: true] TRIAGE_PROVIDER is required',
         });
       }
-      if (!data.triageModel) {
+      // jev is a single fixed model (typesafe-ai/jev) — no TRIAGE_MODEL needed.
+      if (data.triageProvider !== 'jev' && !data.triageModel) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['triageModel'],
-          message: '[triageEnabled: true] TRIAGE_MODEL is required',
+          message: '[triageEnabled: true] TRIAGE_MODEL is required unless TRIAGE_PROVIDER=jev',
         });
       }
       if (!data.triageApiKey) {

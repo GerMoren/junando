@@ -884,10 +884,30 @@ describe('Config — loadConfig', () => {
     it('rejects an unsupported TRIAGE_PROVIDER value', async () => {
       setEnv({ ...validConfig });
       process.env['TRIAGE_ENABLED'] = 'true';
-      process.env['TRIAGE_PROVIDER'] = 'jev';
-      process.env['TRIAGE_MODEL'] = 'anthropic/claude-3-5-haiku';
+      process.env['TRIAGE_PROVIDER'] = 'openai-direct';
+      process.env['TRIAGE_MODEL'] = 'gpt-4o-mini';
       process.env['TRIAGE_API_KEY'] = 'triage-key';
       await expect(loadConfig()).rejects.toThrow(/Invalid configuration/);
+    });
+
+    it('accepts TRIAGE_PROVIDER=jev without requiring TRIAGE_MODEL', async () => {
+      setEnv({ ...validConfig });
+      process.env['TRIAGE_ENABLED'] = 'true';
+      process.env['TRIAGE_PROVIDER'] = 'jev';
+      process.env['TRIAGE_API_KEY'] = 'triage-key';
+      delete process.env['TRIAGE_MODEL'];
+      const config = await loadConfig();
+      expect(config.triageProvider).toBe('jev');
+      expect(config.triageModel).toBeUndefined();
+    });
+
+    it('still requires TRIAGE_MODEL when TRIAGE_PROVIDER=vercel-gateway', async () => {
+      setEnv({ ...validConfig });
+      process.env['TRIAGE_ENABLED'] = 'true';
+      process.env['TRIAGE_PROVIDER'] = 'vercel-gateway';
+      process.env['TRIAGE_API_KEY'] = 'triage-key';
+      delete process.env['TRIAGE_MODEL'];
+      await expect(loadConfig()).rejects.toThrow(/TRIAGE_MODEL is required/);
     });
 
     it('requires TRIAGE_PROVIDER, TRIAGE_MODEL, and TRIAGE_API_KEY when triageEnabled is true', async () => {
