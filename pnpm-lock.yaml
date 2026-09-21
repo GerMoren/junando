@@ -12,8 +12,8 @@ importers:
         specifier: ^5.2.0
         version: 5.2.0
       '@aws-sdk/client-sqs':
-        specifier: ^3.1131.0
-        version: 3.1131.0
+        specifier: ^3.1136.0
+        version: 3.1136.0
       '@aws-sdk/client-ssm':
         specifier: ^3.1131.0
         version: 3.1131.0
@@ -212,8 +212,8 @@ importers:
   packages/ingest:
     dependencies:
       '@aws-sdk/client-sqs':
-        specifier: ^3.1131.0
-        version: 3.1131.0
+        specifier: ^3.1136.0
+        version: 3.1136.0
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -237,8 +237,8 @@ importers:
   packages/webhook:
     dependencies:
       '@aws-sdk/client-sqs':
-        specifier: ^3.1131.0
-        version: 3.1131.0
+        specifier: ^3.1136.0
+        version: 3.1136.0
       '@junando/core':
         specifier: workspace:*
         version: link:../core
@@ -265,8 +265,8 @@ importers:
   packages/worker:
     dependencies:
       '@aws-sdk/client-sqs':
-        specifier: ^3.1131.0
-        version: 3.1131.0
+        specifier: ^3.1136.0
+        version: 3.1136.0
       '@aws-sdk/client-ssm':
         specifier: ^3.1131.0
         version: 3.1131.0
@@ -461,8 +461,8 @@ packages:
     resolution: {integrity: sha512-o0iuLR+wTo6+PnC/IhJL0xdryniu70lU/CGENJWLkm9JbXeMlwwfhNmOsPgvCv1CoWDtKRLSolLduSzkRU3EtQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aws-sdk/client-sqs@3.1131.0':
-    resolution: {integrity: sha512-vXKH0iLF+VR0mWg65LjGyA4C7h9vhodEL/Oxd/gZr5BH5eRZb1le2uVQVT7P8aFjA8FnoFW3LVV37ewSrFZAwg==}
+  '@aws-sdk/client-sqs@3.1136.0':
+    resolution: {integrity: sha512-m3Nadi9aqXnc0c879465tV5sn/z0lSdjMZ/ijxRREO5v0qwygPHzsWdcjkqGnVmngDPr4VqmxqIGBS+yJ9cTkA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/client-ssm@3.1131.0':
@@ -3926,7 +3926,7 @@ snapshots:
       '@smithy/types': 4.18.0
       tslib: 2.8.1
 
-  '@aws-sdk/client-sqs@3.1131.0':
+  '@aws-sdk/client-sqs@3.1136.0':
     dependencies:
       '@aws-sdk/core': 3.978.0
       '@aws-sdk/credential-provider-node': 3.972.83
