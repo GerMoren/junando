@@ -24,7 +24,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.125.0",
+    "@anthropic-ai/sdk": "^0.127.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1131.0",
     "@aws-sdk/client-dynamodb": "^3.1131.0",
     "@google/generative-ai": "^0.24.1",
