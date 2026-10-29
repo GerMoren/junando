@@ -53,6 +53,9 @@ coverage/
 .pi-lens/
 .codegraph/
 artifacts/
+
+# Skills staged for external marketplaces (e.g. Agensi) — not for this public repo
+.claude/skills/
 openspec/
 
 # Temp / testing
